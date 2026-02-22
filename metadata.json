@@ -1,0 +1,5 @@
+{
+  "name": "Dakota",
+  "description": "Extracts data from Rate Confirmation PDFs and sends it to Google Sheets.",
+  "requestFramePermissions": []
+}
