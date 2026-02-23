@@ -38,15 +38,19 @@ const PATTERNS = {
   ]
 };
 
+export interface Stop {
+  type: 'pickup' | 'delivery';
+  date: string;
+  time: string;
+  address: string;
+  sequence: number;
+}
+
 export interface ParsedRateCon {
   loadNumber: string;
   weight: string;
   rate: string;
-  pickupTime: string;
-  pickupDate: string;
-  deliveryTime: string;
-  originAddress: string;
-  destinationAddress: string;
+  stops: Stop[];
   rawTextPreview: string;
 }
 
@@ -64,11 +68,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     loadNumber: "",
     weight: "",
     rate: "",
-    pickupTime: "",
-    pickupDate: "",
-    deliveryTime: "",
-    originAddress: "",
-    destinationAddress: "",
+    stops: [],
     rawTextPreview: text.substring(0, 200) + "..."
   };
 
@@ -178,119 +178,92 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   result.loadNumber = extract(PATTERNS.loadNumber, text);
   result.weight = normalizeWeight(extract(PATTERNS.weight, text));
 
-  // Context-aware parsing for Times and Addresses
-  // Strategy: Find First Pickup and First Delivery after Pickup
+  // --- Multi-Stop Extraction ---
   
   const lowerText = text.toLowerCase();
+
+  // 1. Find all stop markers and their positions
+  const stopMarkers: { index: number, type: 'pickup' | 'delivery' }[] = [];
   
-  // Stronger anchors for sections to avoid false positives in notes
-  const pickupAnchors = ["shipper - pickup", "shipper:", "origin:", "stop 1", "stop #1", "pickup 1 of"];
-  const pickupKeys = ["shipper", "pick up", "pick-up", "pickup", "origin", "loading", "pu", "p/u", "facility name", "shipping address", "pick-up location"];
-  
-  let firstPickupIdx = -1;
-  // Try anchors first
-  for (const key of pickupAnchors) {
-    const idx = lowerText.indexOf(key);
-    if (idx !== -1 && (firstPickupIdx === -1 || idx < firstPickupIdx)) {
-      firstPickupIdx = idx;
+  const pickupKeys = ["shipper - pickup", "shipper:", "origin:", "stop 1", "stop #1", "pickup 1 of", "pick up", "pick-up", "pickup"];
+  const deliveryKeys = ["consignee - delivery", "consignee:", "destination:", "stop 2", "stop #2", "delivery 1 of", "delivery", "dest", "drop", "unloading", "receiver"];
+
+  pickupKeys.forEach(key => {
+    let pos = lowerText.indexOf(key);
+    while (pos !== -1) {
+      stopMarkers.push({ index: pos, type: 'pickup' });
+      pos = lowerText.indexOf(key, pos + 1);
     }
-  }
-  // If no anchor found, try keys
-  if (firstPickupIdx === -1) {
-    for (const key of pickupKeys) {
-      const idx = lowerText.indexOf(key);
-      if (idx !== -1 && (firstPickupIdx === -1 || idx < firstPickupIdx)) {
-        firstPickupIdx = idx;
+  });
+
+  deliveryKeys.forEach(key => {
+    let pos = lowerText.indexOf(key);
+    while (pos !== -1) {
+      stopMarkers.push({ index: pos, type: 'delivery' });
+      pos = lowerText.indexOf(key, pos + 1);
+    }
+  });
+
+  // 2. Sort and filter markers (remove duplicates or very close markers)
+  stopMarkers.sort((a, b) => a.index - b.index);
+  
+  const uniqueMarkers: typeof stopMarkers = [];
+  stopMarkers.forEach(m => {
+    if (uniqueMarkers.length === 0 || m.index > uniqueMarkers[uniqueMarkers.length - 1].index + 50) {
+      uniqueMarkers.push(m);
+    }
+  });
+
+  // 3. Extract data for each stop section
+  uniqueMarkers.forEach((marker, i) => {
+    const start = marker.index;
+    const end = uniqueMarkers[i + 1] ? uniqueMarkers[i + 1].index : text.length;
+    const section = text.substring(start, end);
+    
+    const stop: Stop = {
+      type: marker.type,
+      date: "",
+      time: "",
+      address: "",
+      sequence: i + 1
+    };
+
+    // Extract Date
+    const dateMatch = section.match(PATTERNS.date);
+    if (dateMatch) stop.date = normalizeDate(dateMatch[1]);
+
+    // Extract Time
+    const timeMatch = section.match(PATTERNS.time);
+    if (timeMatch) {
+      let time = normalizeTime(timeMatch[1]);
+      const tzMatch = section.match(PATTERNS.timezone);
+      if (tzMatch) {
+        time += ` ${tzMatch[1].toUpperCase()}`;
       }
+      stop.time = time;
     }
-  }
 
-  const deliveryAnchors = ["consignee - delivery", "consignee:", "destination:", "stop 2", "stop #2", "delivery 1 of"];
-  const deliveryKeys = ["consignee", "delivery", "dest", "drop", "unloading", "receiver", "del", "unloading point", "drop off", "receiving address", "delivery location"];
-  
-  let firstDeliveryIdx = -1;
-  
-  if (firstPickupIdx !== -1) {
-    // Try anchors first (after pickup)
-    for (const key of deliveryAnchors) {
-      const idx = lowerText.indexOf(key, firstPickupIdx + 10); // Offset to skip the anchor itself
-      if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
-        firstDeliveryIdx = idx;
-      }
+    // Extract Address
+    const addrMatch = section.match(PATTERNS.address[0]) || section.match(PATTERNS.address[1]);
+    if (addrMatch) {
+      stop.address = cleanAddress(addrMatch[0] || addrMatch[1]);
     }
-    // If no anchor found, try keys
-    if (firstDeliveryIdx === -1) {
-      for (const key of deliveryKeys) {
-        const idx = lowerText.indexOf(key, firstPickupIdx + 10);
-        if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
-          firstDeliveryIdx = idx;
-        }
-      }
-    }
-  }
 
-  let pickupSection = text;
-  let deliverySection = "";
+    result.stops.push(stop);
+  });
 
-  if (firstPickupIdx !== -1 && firstDeliveryIdx !== -1 && firstDeliveryIdx > firstPickupIdx) {
-    // Pickup section: From first pickup keyword to delivery keyword
-    pickupSection = text.substring(firstPickupIdx, firstDeliveryIdx);
-    // Delivery section: From delivery keyword to end
-    deliverySection = text.substring(firstDeliveryIdx);
-  } else if (firstPickupIdx !== -1) {
-    // Only found pickup?
-    pickupSection = text.substring(firstPickupIdx);
-  } else if (firstDeliveryIdx !== -1) {
-    // Only found delivery?
-    deliverySection = text.substring(firstDeliveryIdx);
-  }
-
-  // Extract Times & Dates
-  const puTimeMatch = pickupSection.match(PATTERNS.time);
-  if (puTimeMatch) {
-    let time = normalizeTime(puTimeMatch[1]);
-    const tzMatch = pickupSection.match(PATTERNS.timezone);
-    if (tzMatch) {
-      time += ` ${tzMatch[1].toUpperCase()}`;
-    }
-    result.pickupTime = time;
-  }
-
-  const puDateMatch = pickupSection.match(PATTERNS.date);
-  if (puDateMatch) result.pickupDate = normalizeDate(puDateMatch[1]);
-
-  const delTimeMatch = deliverySection.match(PATTERNS.time);
-  if (delTimeMatch) {
-    let time = normalizeTime(delTimeMatch[1]);
-    const tzMatch = deliverySection.match(PATTERNS.timezone);
-    if (tzMatch) {
-      time += ` ${tzMatch[1].toUpperCase()}`;
-    }
-    result.deliveryTime = time;
-  }
-
-  // Extract Addresses
-  const puAddrMatch = pickupSection.match(PATTERNS.address[0]) || pickupSection.match(PATTERNS.address[1]);
-  if (puAddrMatch) {
-    result.originAddress = cleanAddress(puAddrMatch[0] || puAddrMatch[1]);
-  }
-
-  const delAddrMatch = deliverySection.match(PATTERNS.address[0]) || deliverySection.match(PATTERNS.address[1]);
-  if (delAddrMatch) {
-    result.destinationAddress = cleanAddress(delAddrMatch[0] || delAddrMatch[1]);
-  }
-
-  // Address extraction fallback if sectioning failed
-  if (!result.originAddress) {
+  // Fallback if no stops found
+  if (result.stops.length === 0) {
+    // Try to find at least one address anywhere
     const allAddresses = Array.from(text.matchAll(new RegExp(PATTERNS.address[0], 'gi')));
     if (allAddresses.length > 0) {
-      result.originAddress = cleanAddress(allAddresses[0][0]);
-    }
-  }
-  if (!result.destinationAddress) {
-    const allAddresses = Array.from(text.matchAll(new RegExp(PATTERNS.address[0], 'gi')));
-    if (allAddresses.length > 1) {
-      result.destinationAddress = cleanAddress(allAddresses[allAddresses.length - 1][0]);
+      result.stops.push({
+        type: 'pickup',
+        date: normalizeDate(extract([PATTERNS.date], text)),
+        time: normalizeTime(extract([PATTERNS.time], text)),
+        address: cleanAddress(allAddresses[0][0]),
+        sequence: 1
+      });
     }
   }
 
