@@ -55,10 +55,17 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
 
         const containerWidth = containerRef.current.clientWidth;
         const unscaledViewport = page.getViewport({ scale: 1 });
-        const scale = containerWidth / unscaledViewport.width;
-        const viewport = page.getViewport({ scale });
+        const baseScale = containerWidth / unscaledViewport.width;
+        
+        // Render at higher resolution for sharpness when zoomed
+        // We use 2x base scale plus device pixel ratio for maximum clarity
+        const outputScale = window.devicePixelRatio || 1;
+        const renderScale = baseScale * Math.max(2, outputScale); 
+        
+        const viewport = page.getViewport({ scale: baseScale });
+        const renderViewport = page.getViewport({ scale: renderScale });
 
-        // Update state for highlight layer
+        // Update state for highlight layer (using base viewport for coordinate matching)
         if (!isCancelled) {
           setPageData({ page, viewport });
         }
@@ -67,12 +74,17 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         const context = canvas.getContext('2d');
         if (!context) return;
 
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
+        // Set display size
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+
+        // Set actual resolution
+        canvas.height = renderViewport.height;
+        canvas.width = renderViewport.width;
 
         const renderContext = {
           canvasContext: context,
-          viewport: viewport,
+          viewport: renderViewport,
         };
         
         renderTask = page.render(renderContext);
