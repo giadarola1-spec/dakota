@@ -235,6 +235,7 @@ function useLocalStorage<T>(key: string, initialValue: T) {
 
 export default function App() {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   
@@ -282,8 +283,7 @@ export default function App() {
     accentHover: 'hover:bg-indigo-500',
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const uploadedFile = e.target.files?.[0];
+  const processFile = async (uploadedFile: File) => {
     if (!uploadedFile) return;
     
     setFileName(uploadedFile.name);
@@ -318,6 +318,27 @@ export default function App() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const uploadedFile = e.target.files?.[0];
+    if (uploadedFile) processFile(uploadedFile);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
   };
 
   const handleNextStep = () => {
@@ -470,9 +491,9 @@ ${chain}`;
     const value = extractedData[step.key];
 
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[calc(100vh-140px)]">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:h-[calc(100vh-140px)]">
         {/* Left: PDF View */}
-        <div className={`h-full ${isAutoZoomEnabled ? 'overflow-hidden' : 'overflow-y-auto'} pr-2 custom-scrollbar relative`}>
+        <div className={`h-[400px] md:h-full ${isAutoZoomEnabled ? 'overflow-hidden' : 'overflow-y-auto'} pr-2 custom-scrollbar relative`}>
           <PdfViewer pdfDocument={pdfDoc} highlightText={value} isDarkMode={isDarkMode} isAutoZoomEnabled={isAutoZoomEnabled} />
           
           {/* Zoom Toggle */}
@@ -486,7 +507,7 @@ ${chain}`;
         </div>
 
         {/* Right: Verification Controls */}
-        <div className="flex flex-col justify-center space-y-8">
+        <div className="flex flex-col justify-center space-y-8 pb-8 md:pb-0">
           <motion.div 
             key={step.key}
             initial={{ opacity: 0, x: 20 }}
@@ -754,19 +775,28 @@ ${chain}`;
             className="max-w-7xl mx-auto w-full flex-1 flex flex-col"
           >
             {appState === 'upload' && (
-              <label className="flex-1 flex flex-col items-center justify-center text-center space-y-6 opacity-50 hover:opacity-100 transition-all duration-300 cursor-pointer">
+              <label 
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`flex-1 flex flex-col items-center justify-center text-center space-y-6 transition-all duration-300 cursor-pointer rounded-3xl border-2 border-dashed ${isDragging ? 'border-indigo-500 bg-indigo-500/5 opacity-100 scale-[1.02]' : `${theme.border} opacity-50 hover:opacity-100`}`}
+              >
                 <input 
                   type="file" 
                   accept=".pdf" 
                   onChange={handleFileUpload}
                   className="hidden" 
                 />
-                <div className={`w-24 h-24 rounded-full ${theme.cardBg} border ${theme.border} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm`}>
-                  <Upload size={40} className={theme.textMuted} />
+                <div className={`w-24 h-24 rounded-full ${theme.cardBg} border ${theme.border} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm ${isDragging ? 'border-indigo-500 text-indigo-500' : ''}`}>
+                  <Upload size={40} className={isDragging ? 'text-indigo-500' : theme.textMuted} />
                 </div>
                 <div className="space-y-2">
-                  <h2 className={`text-xl font-medium ${theme.text}`}>No Document Selected</h2>
-                  <p className={`text-sm ${theme.textMuted}`}>Click here to upload a Rate Confirmation PDF</p>
+                  <h2 className={`text-xl font-medium ${isDragging ? 'text-indigo-500' : theme.text}`}>
+                    {isDragging ? 'Drop PDF here' : 'No Document Selected'}
+                  </h2>
+                  <p className={`text-sm ${theme.textMuted}`}>
+                    {isDragging ? 'Release to upload' : 'Click or drag PDF here to upload'}
+                  </p>
                 </div>
               </label>
             )}
