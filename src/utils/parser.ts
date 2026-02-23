@@ -5,29 +5,29 @@
 // Regex patterns
 const PATTERNS = {
   loadNumber: [
-    /(?:Load\s*#|Order\s*#|Shipment\s*ID|Pro\s*#|Ref\s*#|Reference\s*#)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
+    /(?:Load\s*#|Order\s*#|PO\s*#|PO\s*:|Order\s*:|Shipment\s*ID|Pro\s*#|Ref\s*#|Reference\s*#)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
     /(?:Ref\s*#)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
     /\b(\d{7,})\b/ // Fallback
   ],
   weight: [
-    /(?:Weight|Wt|Gross\s*Wt)\s*[:.]?\s*(\d{1,3}(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs)?/i,
+    /(?:Weight|Wt|Gross\s*Wt|Estimated\s*Weight|Total\s*Weight)\s*[:.]?\s*(\d{1,3}(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs)?/i,
     /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs)/
   ],
   rate: [
-    /(?:Rate|Total|Amount|Pay|Flat\s*Rate)\s*[:.]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i,
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount)\s*[:.]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i,
     /\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/
   ],
-  // Time patterns: Look for HH:MM AM/PM or Military
-  time: /(\d{1,2}:\d{2}\s*(?:AM|PM)?|\d{4}\s*hrs?)/i,
+  // Time patterns: Look for HH:MM AM/PM, Military, or TBD
+  // Added support for "Appt", "Appointment", or "Appointment Time" prefix
+  time: /(?:Appt\s*|Appointment\s*Time\s*[:]?|Appointment\s*)?(\d{1,2}:\d{2}\s*(?:AM|PM)?|\d{4}\s*hrs?|TBD)/i,
   
   // Date pattern: MM/DD/YYYY, MM-DD-YYYY, MM.DD.YYYY
   date: /\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/,
 
   // Address pattern: City, ST Zip (Simplified)
-  // Looks for: Word(s), 2-letter State, 5-digit Zip
-  // Updated to be more flexible: City (lazy), comma/space, State, Zip
-  // Added capturing group for Zip
-  address: /([A-Za-z\s\.]+?)(?:,|\s+)\s*([A-Z]{2})\s+((?:\d{5})(?:-\d{4})?)/
+  // Looks for: Word(s) starting with Capital, 2-letter State, and optional 5-digit Zip
+  // Restricted city name to not include newlines to avoid capturing headers
+  address: /\b([A-Z][A-Za-z \.\/]{1,30}?)(?:,|\s+)\s*([A-Z]{2})\b(?:\s+((?:\d{5})(?:-\d{4})?))?/
 };
 
 export interface ParsedRateCon {
@@ -81,8 +81,15 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
 
   const normalizeTime = (t: string): string => {
     if (!t) return "";
-    // Remove "hrs"
-    let clean = t.replace(/hrs?/i, '').trim();
+    if (t.toUpperCase() === "TBD") return "TBD";
+
+    // Remove "hrs", "Appt", "Appointment", "Appointment Time", "Time"
+    let clean = t.replace(/hrs?/i, '')
+                 .replace(/Appointment\s*Time\s*[:]?/i, '')
+                 .replace(/Appointment/i, '')
+                 .replace(/Appt/i, '')
+                 .replace(/Time\s*[:]?/i, '')
+                 .trim();
     
     // Detect AM/PM
     const isPM = /PM/i.test(clean);
@@ -120,7 +127,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
   
   // Find start of First Pickup Section
-  const pickupKeys = ["shipper", "pick up", "pickup", "origin", "loading"];
+  const pickupKeys = ["shipper", "pick up", "pick-up", "pickup", "origin", "loading"];
   let firstPickupIdx = -1;
   for (const key of pickupKeys) {
     const idx = lowerText.indexOf(key);
@@ -179,15 +186,23 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
 
   // Extract Addresses
   // We look for the City, ST Zip pattern in the respective sections
+  const cleanAddress = (addr: string): string => {
+    if (!addr) return "";
+    // Remove common header words that might be captured, potentially multiple times
+    return addr.replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS)\s*[:]?\s*)+/i, "").trim();
+  };
+
   const puAddrMatch = pickupSection.match(PATTERNS.address);
   if (puAddrMatch) {
     // Construct full address string: City, ST Zip
-    result.originAddress = `${puAddrMatch[1].trim()}, ${puAddrMatch[2]} ${puAddrMatch[3] ? puAddrMatch[3].trim() : ''}`.trim();
+    const city = cleanAddress(puAddrMatch[1]);
+    result.originAddress = `${city}, ${puAddrMatch[2]} ${puAddrMatch[3] ? puAddrMatch[3].trim() : ''}`.trim();
   }
 
   const delAddrMatch = deliverySection.match(PATTERNS.address);
   if (delAddrMatch) {
-    result.destinationAddress = `${delAddrMatch[1].trim()}, ${delAddrMatch[2]} ${delAddrMatch[3] ? delAddrMatch[3].trim() : ''}`.trim();
+    const city = cleanAddress(delAddrMatch[1]);
+    result.destinationAddress = `${city}, ${delAddrMatch[2]} ${delAddrMatch[3] ? delAddrMatch[3].trim() : ''}`.trim();
   }
 
   return result;
