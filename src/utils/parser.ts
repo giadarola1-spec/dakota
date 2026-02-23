@@ -5,28 +5,25 @@
 // Regex patterns
 const PATTERNS = {
   loadNumber: [
-    /(?:Load\s*#|Order\s*#|PO\s*#|PO\s*:|Order\s*:|Shipment\s*ID|Pro\s*#|Ref\s*#|Reference\s*#)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
-    /(?:Ref\s*#)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
-    /\b(\d{7,})\b/ // Fallback
+    /(?:Load\s*#|Order\s*#|PO\s*#|PO\s*:|Order\s*:|Shipment\s*ID|Pro\s*#|Ref\s*#|Reference\s*#|Booking\s*#|Confirmation\s*#|Control\s*#|Trip\s*#|Job\s*#|Shipment\s*#)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
+    /(?:Ref\s*#|Reference)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
+    /\b(\d{7,})\b/ // Fallback for long numeric strings
   ],
   weight: [
-    /(?:Weight|Wt|Gross\s*Wt|Estimated\s*Weight|Total\s*Weight)\s*[:.]?\s*(\d{1,3}(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs)?/i,
-    /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs)/
+    /(?:Weight|Wt|Gross\s*Wt|Estimated\s*Weight|Total\s*Weight|Net\s*Wt|Actual\s*Wt|Wgt)\s*[:.]?\s*(\d{1,3}(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs|kg)?/i,
+    /(\d{1,3}(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs|kg)/i
   ],
   rate: [
-    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount)\s*[:.]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i,
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount)\s*[:.]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i,
     /\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/
   ],
   // Time patterns: Look for HH:MM AM/PM, Military, or TBD
-  // Added support for "Appt", "Appointment", or "Appointment Time" prefix
-  time: /(?:Appt\s*|Appointment\s*Time\s*[:]?|Appointment\s*)?(\d{1,2}:\d{2}\s*(?:AM|PM)?|\d{4}\s*hrs?|TBD)/i,
+  time: /(?:Appt\s*|Appointment\s*Time\s*[:]?|Appointment\s*|Window\s*|ETA\s*|Scheduled\s*|Arrival\s*|Time\s*[:]?)\s*(\d{1,2}:\d{2}\s*(?:AM|PM)?|\d{4}\s*hrs?|TBD)/i,
   
   // Date pattern: MM/DD/YYYY, MM-DD-YYYY, MM.DD.YYYY
   date: /\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/,
 
-  // Address pattern: City, ST Zip (Simplified)
-  // Looks for: Word(s) starting with Capital, 2-letter State, and optional 5-digit Zip
-  // Restricted city name to not include newlines to avoid capturing headers
+  // Address pattern: City, ST Zip
   address: /\b([A-Z][A-Za-z \.\/]{1,30}?)(?:,|\s+)\s*([A-Z]{2})\b(?:\s+((?:\d{5})(?:-\d{4})?))?/
 };
 
@@ -83,11 +80,15 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     if (!t) return "";
     if (t.toUpperCase() === "TBD") return "TBD";
 
-    // Remove "hrs", "Appt", "Appointment", "Appointment Time", "Time"
+    // Remove common prefixes and suffixes
     let clean = t.replace(/hrs?/i, '')
                  .replace(/Appointment\s*Time\s*[:]?/i, '')
                  .replace(/Appointment/i, '')
                  .replace(/Appt/i, '')
+                 .replace(/Window/i, '')
+                 .replace(/ETA/i, '')
+                 .replace(/Scheduled/i, '')
+                 .replace(/Arrival/i, '')
                  .replace(/Time\s*[:]?/i, '')
                  .trim();
     
@@ -111,7 +112,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
       if (isPM && h < 12) h += 12;
       if (isAM && h === 12) h = 0;
       
-      return `${h.toString().padStart(2, '0')}${minutes}`;
+      return `${h.toString().padStart(2, '0')}${minutes.substring(0, 2)}`;
     }
 
     return clean; // Fallback
@@ -127,7 +128,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
   
   // Find start of First Pickup Section
-  const pickupKeys = ["shipper", "pick up", "pick-up", "pickup", "origin", "loading"];
+  const pickupKeys = ["shipper", "pick up", "pick-up", "pickup", "origin", "loading", "from", "stop 1", "stop #1"];
   let firstPickupIdx = -1;
   for (const key of pickupKeys) {
     const idx = lowerText.indexOf(key);
@@ -137,7 +138,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   }
 
   // Find start of Delivery Section (First occurrence AFTER pickup)
-  const deliveryKeys = ["consignee", "delivery", "dest", "drop", "unloading"];
+  const deliveryKeys = ["consignee", "delivery", "dest", "drop", "unloading", "to", "receiver", "stop 2", "stop #2"];
   let firstDeliveryIdx = -1;
   
   if (firstPickupIdx !== -1) {
@@ -189,7 +190,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const cleanAddress = (addr: string): string => {
     if (!addr) return "";
     // Remove common header words that might be captured, potentially multiple times
-    return addr.replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS)\s*[:]?\s*)+/i, "").trim();
+    return addr.replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING)\s*[:]?\s*)+/i, "").trim();
   };
 
   const puAddrMatch = pickupSection.match(PATTERNS.address);
