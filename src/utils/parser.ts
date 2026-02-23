@@ -14,7 +14,9 @@ const PATTERNS = {
     /(\d+(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs|kg|kilograms)/i
   ],
   rate: [
-    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention)\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i,
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})(?:\.\d{2})?)/i, // Prefer matches with commas and decimals
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$\s*(\d+(?:\.\d{2})?)/i, // Prefer matches with $
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i,
     /\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/
   ],
   // Time patterns: Look for HH:MM AM/PM, Military, or TBD
@@ -24,8 +26,13 @@ const PATTERNS = {
   // Date pattern: MM/DD/YYYY, MM-DD-YYYY, MM.DD.YYYY
   date: /\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/,
 
-  // Address pattern: City, ST Zip
-  address: /\b([A-Z][A-Za-z \.\/]{1,30}?)(?:,|\s+)\s*([A-Z]{2})\b(?:\s+((?:\d{5})(?:-\d{4})?))?/
+  // Address patterns
+  address: [
+    // Pattern for Street, City, ST Zip (e.g., 5505 BROOKVILLE RD INDIANAPOLIS, IN 45235)
+    /(\d+\s+[A-Z0-9\s\.,#-]{2,60}?[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
+    // Fallback for City, ST Zip
+    /([A-Z][A-Za-z \.\/]{1,30}?)(?:,|\s+)\s*([A-Z]{2})\b(?:\s+((?:\d{5})(?:-\d{4})?))?/
+  ]
 };
 
 export interface ParsedRateCon {
@@ -44,6 +51,12 @@ export interface ParsedRateCon {
  * Parses raw text to find Rate Confirmation details.
  */
 export function parseRateConfirmation(text: string): ParsedRateCon {
+  const cleanAddress = (addr: string): string => {
+    if (!addr) return "";
+    // Remove common header words that might be captured, potentially multiple times
+    return addr.replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF)\s*[:]?\s*)+/i, "").trim();
+  };
+
   const result: ParsedRateCon = {
     loadNumber: "",
     weight: "",
@@ -128,36 +141,48 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   
   const lowerText = text.toLowerCase();
   
-  // Find start of First Pickup Section
-  // Removed "from" as it's too common in sentences
-  const pickupKeys = ["shipper", "pick up", "pick-up", "pickup", "origin", "loading", "stop 1", "stop #1", "pu", "p/u", "facility name", "shipping address", "pick-up location"];
+  // Stronger anchors for sections to avoid false positives in notes
+  const pickupAnchors = ["shipper - pickup", "shipper:", "origin:", "stop 1", "stop #1", "pickup 1 of"];
+  const pickupKeys = ["shipper", "pick up", "pick-up", "pickup", "origin", "loading", "pu", "p/u", "facility name", "shipping address", "pick-up location"];
+  
   let firstPickupIdx = -1;
-  for (const key of pickupKeys) {
+  // Try anchors first
+  for (const key of pickupAnchors) {
     const idx = lowerText.indexOf(key);
     if (idx !== -1 && (firstPickupIdx === -1 || idx < firstPickupIdx)) {
       firstPickupIdx = idx;
     }
   }
+  // If no anchor found, try keys
+  if (firstPickupIdx === -1) {
+    for (const key of pickupKeys) {
+      const idx = lowerText.indexOf(key);
+      if (idx !== -1 && (firstPickupIdx === -1 || idx < firstPickupIdx)) {
+        firstPickupIdx = idx;
+      }
+    }
+  }
 
-  // Find start of Delivery Section (First occurrence AFTER pickup)
-  // Removed "to" as it's too common
-  const deliveryKeys = ["consignee", "delivery", "dest", "drop", "unloading", "receiver", "stop 2", "stop #2", "del", "unloading point", "drop off", "receiving address", "delivery location"];
+  const deliveryAnchors = ["consignee - delivery", "consignee:", "destination:", "stop 2", "stop #2", "delivery 1 of"];
+  const deliveryKeys = ["consignee", "delivery", "dest", "drop", "unloading", "receiver", "del", "unloading point", "drop off", "receiving address", "delivery location"];
+  
   let firstDeliveryIdx = -1;
   
   if (firstPickupIdx !== -1) {
-    // Search for delivery keywords starting from the pickup index
-    for (const key of deliveryKeys) {
-      const idx = lowerText.indexOf(key, firstPickupIdx);
+    // Try anchors first (after pickup)
+    for (const key of deliveryAnchors) {
+      const idx = lowerText.indexOf(key, firstPickupIdx + 10); // Offset to skip the anchor itself
       if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
         firstDeliveryIdx = idx;
       }
     }
-  } else {
-    // Fallback: Search anywhere if pickup not found
-    for (const key of deliveryKeys) {
-      const idx = lowerText.indexOf(key);
-      if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
-        firstDeliveryIdx = idx;
+    // If no anchor found, try keys
+    if (firstDeliveryIdx === -1) {
+      for (const key of deliveryKeys) {
+        const idx = lowerText.indexOf(key, firstPickupIdx + 10);
+        if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
+          firstDeliveryIdx = idx;
+        }
       }
     }
   }
@@ -189,24 +214,14 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   if (delTimeMatch) result.deliveryTime = normalizeTime(delTimeMatch[1]);
 
   // Extract Addresses
-  // We look for the City, ST Zip pattern in the respective sections
-  const cleanAddress = (addr: string): string => {
-    if (!addr) return "";
-    // Remove common header words that might be captured, potentially multiple times
-    return addr.replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF)\s*[:]?\s*)+/i, "").trim();
-  };
-
-  const puAddrMatch = pickupSection.match(PATTERNS.address);
+  const puAddrMatch = pickupSection.match(PATTERNS.address[0]) || pickupSection.match(PATTERNS.address[1]);
   if (puAddrMatch) {
-    // Construct full address string: City, ST Zip
-    const city = cleanAddress(puAddrMatch[1]);
-    result.originAddress = `${city}, ${puAddrMatch[2]} ${puAddrMatch[3] ? puAddrMatch[3].trim() : ''}`.trim();
+    result.originAddress = cleanAddress(puAddrMatch[0] || puAddrMatch[1]);
   }
 
-  const delAddrMatch = deliverySection.match(PATTERNS.address);
+  const delAddrMatch = deliverySection.match(PATTERNS.address[0]) || deliverySection.match(PATTERNS.address[1]);
   if (delAddrMatch) {
-    const city = cleanAddress(delAddrMatch[1]);
-    result.destinationAddress = `${city}, ${delAddrMatch[2]} ${delAddrMatch[3] ? delAddrMatch[3].trim() : ''}`.trim();
+    result.destinationAddress = cleanAddress(delAddrMatch[0] || delAddrMatch[1]);
   }
 
   return result;

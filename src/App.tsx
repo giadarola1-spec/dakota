@@ -39,6 +39,8 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
   const containerRef = useRef<HTMLDivElement>(null);
   const [pageData, setPageData] = useState<{ page: any, viewport: any } | null>(null);
   const [zoomStyle, setZoomStyle] = useState<React.CSSProperties>({ transform: 'scale(1) translate(0, 0)' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   // 1. Render Base PDF
   useEffect(() => {
@@ -49,7 +51,8 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
       if (!pdfDocument || !canvasRef.current || !containerRef.current) return;
 
       try {
-        const page = await pdfDocument.getPage(1);
+        setTotalPages(pdfDocument.numPages);
+        const page = await pdfDocument.getPage(currentPage);
         
         if (isCancelled) return;
 
@@ -57,15 +60,12 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         const unscaledViewport = page.getViewport({ scale: 1 });
         const baseScale = containerWidth / unscaledViewport.width;
         
-        // Render at higher resolution for sharpness when zoomed
-        // We use 2x base scale plus device pixel ratio for maximum clarity
         const outputScale = window.devicePixelRatio || 1;
         const renderScale = baseScale * Math.max(2, outputScale); 
         
         const viewport = page.getViewport({ scale: baseScale });
         const renderViewport = page.getViewport({ scale: renderScale });
 
-        // Update state for highlight layer (using base viewport for coordinate matching)
         if (!isCancelled) {
           setPageData({ page, viewport });
         }
@@ -74,11 +74,8 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         const context = canvas.getContext('2d');
         if (!context) return;
 
-        // Set display size
         canvas.style.width = `${viewport.width}px`;
         canvas.style.height = `${viewport.height}px`;
-
-        // Set actual resolution
         canvas.height = renderViewport.height;
         canvas.width = renderViewport.width;
 
@@ -104,9 +101,43 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         renderTask.cancel();
       }
     };
-  }, [pdfDocument]);
+  }, [pdfDocument, currentPage]);
 
-  // 2. Render Highlights (HTML Overlay Method) & Auto Zoom
+  // 2. Search all pages for highlight text and jump to page
+  useEffect(() => {
+    const findPageWithText = async () => {
+      if (!pdfDocument || !highlightText || highlightText.length < 2) return;
+
+      const cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
+      
+      // Check current page first
+      if (pageData) {
+        const textContent = await pageData.page.getTextContent();
+        const hasMatch = textContent.items.some((item: any) => 
+          item.str.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanHighlight)
+        );
+        if (hasMatch) return; // Already on the right page
+      }
+
+      // Search other pages
+      for (let i = 1; i <= pdfDocument.numPages; i++) {
+        if (i === currentPage) continue;
+        const page = await pdfDocument.getPage(i);
+        const textContent = await page.getTextContent();
+        const hasMatch = textContent.items.some((item: any) => 
+          item.str.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanHighlight)
+        );
+        if (hasMatch) {
+          setCurrentPage(i);
+          return;
+        }
+      }
+    };
+
+    findPageWithText();
+  }, [pdfDocument, highlightText]);
+
+  // 3. Render Highlights & Auto Zoom
   useEffect(() => {
     const drawHighlights = async () => {
       if (!highlightLayerRef.current || !pageData) return;
@@ -197,13 +228,40 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
   }, [highlightText, pageData, isAutoZoomEnabled]);
 
   return (
-    <div ref={containerRef} className={`w-full ${isAutoZoomEnabled ? 'h-full' : 'h-auto'} overflow-hidden rounded-lg shadow-lg border relative ${isDarkMode ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-slate-100'}`}>
-      <div 
-        className="origin-top-left transition-transform duration-500 cubic-bezier(0.25, 0.46, 0.45, 0.94)"
-        style={zoomStyle}
-      >
-        <canvas ref={canvasRef} className="w-full h-auto block" />
-        <div ref={highlightLayerRef} className="absolute inset-0 w-full h-full pointer-events-none" />
+    <div className={`w-full ${isAutoZoomEnabled ? 'h-full' : 'h-auto'} overflow-hidden rounded-lg shadow-lg border relative ${isDarkMode ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-slate-100'} flex flex-col`}>
+      {/* Page Navigation */}
+      {totalPages > 1 && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-white text-xs font-medium">
+          <button 
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="hover:text-indigo-400 disabled:opacity-30 transition-colors"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span className="min-w-[60px] text-center">Page {currentPage} of {totalPages}</span>
+          <button 
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="hover:text-indigo-400 disabled:opacity-30 transition-colors"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-auto p-4 md:p-8 flex justify-center items-start scrollbar-hide">
+        <div 
+          ref={containerRef}
+          className="relative shadow-2xl transition-transform duration-500 ease-out origin-top"
+          style={zoomStyle}
+        >
+          <canvas ref={canvasRef} className="rounded-sm" />
+          <div 
+            ref={highlightLayerRef} 
+            className="absolute inset-0 pointer-events-none"
+          />
+        </div>
       </div>
     </div>
   );
