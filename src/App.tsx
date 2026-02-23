@@ -396,7 +396,7 @@ ${chain}`;
       loadNum = `T${loadNum}`;
     }
 
-    const chain = `${emoji ? emoji + " " : ""}${tNum}-${lane}-${date} ${brk} ${loadNum}`;
+    const chain = `${emoji ? emoji + " " : ""}${tNum}-${lane}-${date} ${brk} LOAD ${loadNum}`;
     return chain;
   };
 
