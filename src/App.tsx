@@ -266,7 +266,6 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useLocalStorage("dakota_isDarkMode", true);
   const [isAutoZoomEnabled, setIsAutoZoomEnabled] = useLocalStorage("dakota_isAutoZoomEnabled", true);
-  const [skipVerification, setSkipVerification] = useLocalStorage("dakota_skipVerification", false);
 
   // --- Styles Helper ---
   const theme = {
@@ -305,12 +304,8 @@ export default function App() {
       const data = parseRateConfirmation(fullText);
       setExtractedData(data);
       
-      if (skipVerification) {
-        finishVerification(data);
-      } else {
-        setAppState('verify');
-        setCurrentStepIndex(0);
-      }
+      setAppState('verify');
+      setCurrentStepIndex(0);
 
     } catch (error) {
       console.error("PDF Error:", error);
@@ -883,25 +878,6 @@ ${chain}`;
                     >
                       Dark
                     </button>
-                  </div>
-                </div>
-
-                {/* Skip Verification Toggle */}
-                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">Skip Verification</span>
-                    <button 
-                      onClick={() => setSkipVerification(!skipVerification)}
-                      className={`relative w-11 h-6 rounded-full transition-colors ${skipVerification ? 'bg-red-500' : 'bg-slate-500/30'}`}
-                    >
-                      <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${skipVerification ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </button>
-                  </div>
-                  <div className="flex items-start gap-2 mt-2 bg-red-500/10 p-2 rounded-lg border border-red-500/20">
-                    <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-red-500/80 leading-relaxed">
-                      Warning: Skipping human verification may result in incorrect data extraction. Use with caution.
-                    </p>
                   </div>
                 </div>
 
