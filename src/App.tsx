@@ -742,7 +742,14 @@ ${chain}`;
       {/* Header */}
       <header className={`border-b ${theme.border} sticky top-0 z-20 ${theme.headerBg} backdrop-blur-xl transition-colors duration-300 flex-none`}>
         <div className="w-full px-6 h-16 flex items-center justify-between">
-          <h1 className={`text-2xl font-geologica font-bold tracking-tight ${theme.text} lowercase`}>dakota</h1>
+          <div className="flex items-center gap-3">
+            <h1 className={`text-2xl font-geologica font-bold tracking-tight ${theme.text} lowercase`}>dakota</h1>
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#BF0A30] shadow-sm" />
+              <div className="w-2.5 h-2.5 rounded-full bg-white shadow-sm border border-slate-200/50" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[#002868] shadow-sm" />
+            </div>
+          </div>
           
           <div className="flex items-center gap-4">
             {appState !== 'upload' && (
