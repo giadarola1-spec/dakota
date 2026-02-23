@@ -26,6 +26,9 @@ const PATTERNS = {
   // Date pattern: MM/DD/YYYY, MM-DD-YYYY, MM.DD.YYYY
   date: /\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/,
 
+  // Timezone pattern
+  timezone: /\b(EST|CST|MST|PST|EDT|CDT|MDT|PDT|AST|HST|AKST|AKDT|UTC|GMT)\b/i,
+
   // Address patterns
   address: [
     // Pattern for Street, City, ST Zip (e.g., 5505 BROOKVILLE RD INDIANAPOLIS, IN 45235)
@@ -81,7 +84,9 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   };
 
   const normalizeWeight = (w: string): string => {
-    return w.replace(/,/g, '');
+    if (!w) return "";
+    const clean = w.replace(/,/g, '').trim();
+    return clean ? `${clean} LBS` : "";
   };
 
   const normalizeDate = (d: string): string => {
@@ -132,9 +137,46 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     return clean; // Fallback
   };
 
+  // Improved Rate extraction: Look for the most likely "Total" amount
+  const rateMatches: { value: string, score: number }[] = [];
+  for (const pattern of PATTERNS.rate) {
+    const matches = text.matchAll(new RegExp(pattern, 'gi'));
+    for (const match of matches) {
+      if (match[1]) {
+        let score = 0;
+        const val = match[1].replace(/,/g, '');
+        const num = parseFloat(val);
+        
+        if (isNaN(num)) continue;
+        
+        // Prioritize matches with $ or currency codes
+        if (match[0].includes('$')) score += 10;
+        if (match[0].toUpperCase().includes('USD')) score += 10;
+        
+        // Prioritize "Total" or "Agreed Amount"
+        if (match[0].toLowerCase().includes('total')) score += 5;
+        if (match[0].toLowerCase().includes('agreed')) score += 5;
+        
+        // Penalize matches that look like counts or miles
+        if (match[0].toLowerCase().includes('miles')) score -= 20;
+        if (match[0].toLowerCase().includes('weight')) score -= 20;
+        if (match[0].toLowerCase().includes('pieces')) score -= 20;
+        
+        // Penalize very small numbers (likely not a rate)
+        if (num < 50) score -= 15;
+        
+        rateMatches.push({ value: val, score });
+      }
+    }
+  }
+  
+  if (rateMatches.length > 0) {
+    rateMatches.sort((a, b) => b.score - a.score);
+    result.rate = rateMatches[0].value;
+  }
+
   result.loadNumber = extract(PATTERNS.loadNumber, text);
   result.weight = normalizeWeight(extract(PATTERNS.weight, text));
-  result.rate = extract(PATTERNS.rate, text);
 
   // Context-aware parsing for Times and Addresses
   // Strategy: Find First Pickup and First Delivery after Pickup
@@ -205,13 +247,27 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
 
   // Extract Times & Dates
   const puTimeMatch = pickupSection.match(PATTERNS.time);
-  if (puTimeMatch) result.pickupTime = normalizeTime(puTimeMatch[1]);
+  if (puTimeMatch) {
+    let time = normalizeTime(puTimeMatch[1]);
+    const tzMatch = pickupSection.match(PATTERNS.timezone);
+    if (tzMatch) {
+      time += ` ${tzMatch[1].toUpperCase()}`;
+    }
+    result.pickupTime = time;
+  }
 
   const puDateMatch = pickupSection.match(PATTERNS.date);
   if (puDateMatch) result.pickupDate = normalizeDate(puDateMatch[1]);
 
   const delTimeMatch = deliverySection.match(PATTERNS.time);
-  if (delTimeMatch) result.deliveryTime = normalizeTime(delTimeMatch[1]);
+  if (delTimeMatch) {
+    let time = normalizeTime(delTimeMatch[1]);
+    const tzMatch = deliverySection.match(PATTERNS.timezone);
+    if (tzMatch) {
+      time += ` ${tzMatch[1].toUpperCase()}`;
+    }
+    result.deliveryTime = time;
+  }
 
   // Extract Addresses
   const puAddrMatch = pickupSection.match(PATTERNS.address[0]) || pickupSection.match(PATTERNS.address[1]);
@@ -222,6 +278,20 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const delAddrMatch = deliverySection.match(PATTERNS.address[0]) || deliverySection.match(PATTERNS.address[1]);
   if (delAddrMatch) {
     result.destinationAddress = cleanAddress(delAddrMatch[0] || delAddrMatch[1]);
+  }
+
+  // Address extraction fallback if sectioning failed
+  if (!result.originAddress) {
+    const allAddresses = Array.from(text.matchAll(new RegExp(PATTERNS.address[0], 'gi')));
+    if (allAddresses.length > 0) {
+      result.originAddress = cleanAddress(allAddresses[0][0]);
+    }
+  }
+  if (!result.destinationAddress) {
+    const allAddresses = Array.from(text.matchAll(new RegExp(PATTERNS.address[0], 'gi')));
+    if (allAddresses.length > 1) {
+      result.destinationAddress = cleanAddress(allAddresses[allAddresses.length - 1][0]);
+    }
   }
 
   return result;

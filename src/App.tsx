@@ -36,9 +36,10 @@ const STEPS: VerificationStep[] = [
 const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }: { pdfDocument: any, highlightText: string, isDarkMode: boolean, isAutoZoomEnabled: boolean }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const highlightLayerRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [pageData, setPageData] = useState<{ page: any, viewport: any } | null>(null);
-  const [zoomStyle, setZoomStyle] = useState<React.CSSProperties>({ transform: 'scale(1) translate(0, 0)' });
+  const [zoomStyle, setZoomStyle] = useState<React.CSSProperties>({ transform: 'scale(1) translate(0, 0)', transformOrigin: '0 0' });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -48,7 +49,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
     let isCancelled = false;
 
     const renderPage = async () => {
-      if (!pdfDocument || !canvasRef.current || !containerRef.current) return;
+      if (!pdfDocument || !canvasRef.current || !viewportRef.current) return;
 
       try {
         setTotalPages(pdfDocument.numPages);
@@ -56,7 +57,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         
         if (isCancelled) return;
 
-        const containerWidth = containerRef.current.clientWidth;
+        const containerWidth = viewportRef.current.clientWidth - 64; // Subtract padding
         const unscaledViewport = page.getViewport({ scale: 1 });
         const baseScale = containerWidth / unscaledViewport.width;
         
@@ -108,7 +109,14 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
     const findPageWithText = async () => {
       if (!pdfDocument || !highlightText || highlightText.length < 2) return;
 
-      const cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
+      let cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanHighlight.endsWith('lbs')) {
+        cleanHighlight = cleanHighlight.replace(/lbs$/, '');
+      }
+      const timeWithTzMatch = cleanHighlight.match(/^(\d{4})(est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
+      if (timeWithTzMatch) {
+        cleanHighlight = timeWithTzMatch[1];
+      }
       
       // Check current page first
       if (pageData) {
@@ -155,7 +163,19 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
 
       try {
         const textContent = await page.getTextContent();
-        const cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
+        
+        // If it ends with 'lbs', try searching without it as well
+        if (cleanHighlight.endsWith('lbs')) {
+          cleanHighlight = cleanHighlight.replace(/lbs$/, '');
+        }
+        
+        // If it's a time with a timezone (e.g. 0440est), strip the timezone
+        const timeWithTzMatch = cleanHighlight.match(/^(\d{4})(est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
+        if (timeWithTzMatch) {
+          cleanHighlight = timeWithTzMatch[1];
+        }
+
         let firstMatchRect: number[] | null = null;
 
         textContent.items.forEach((item: any) => {
@@ -202,20 +222,21 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         });
 
         // Apply Auto Zoom to first match
-        if (isAutoZoomEnabled && firstMatchRect && containerRef.current) {
+        if (isAutoZoomEnabled && firstMatchRect && viewportRef.current) {
           const [x, y, w, h] = firstMatchRect;
           const centerX = x + w / 2;
           const centerY = y + h / 2;
           
-          const containerW = containerRef.current.clientWidth;
-          const containerH = containerRef.current.clientHeight || 600;
+          const containerW = viewportRef.current.clientWidth;
+          const containerH = viewportRef.current.clientHeight || 600;
           
           const scale = 2.0; // 2x Zoom
           const translateX = containerW / 2 - centerX * scale;
           const translateY = containerH / 2 - centerY * scale;
 
           setZoomStyle({
-            transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`
+            transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
+            transformOrigin: '0 0'
           });
         }
 
@@ -250,10 +271,13 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         </div>
       )}
 
-      <div className="flex-1 overflow-auto p-4 md:p-8 flex justify-center items-start scrollbar-hide">
+      <div 
+        ref={viewportRef}
+        className="flex-1 overflow-auto p-4 md:p-8 flex justify-center items-start scrollbar-hide relative"
+      >
         <div 
-          ref={containerRef}
-          className="relative shadow-2xl transition-transform duration-500 ease-out origin-top"
+          ref={contentRef}
+          className="relative shadow-2xl transition-transform duration-500 ease-out"
           style={zoomStyle}
         >
           <canvas ref={canvasRef} className="rounded-sm" />
