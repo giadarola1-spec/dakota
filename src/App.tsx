@@ -341,12 +341,54 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
     drawHighlights();
   }, [highlightText, pageData, isAutoZoomEnabled]);
 
+  const [copiedLocation, setCopiedLocation] = useState<{x: number, y: number} | null>(null);
+
   // Handlers for Manual Controls
   const handleZoomIn = () => setScale(s => Math.min(s + 0.5, 5));
   const handleZoomOut = () => setScale(s => Math.max(s - 0.5, 0.5));
   const handleFitPage = () => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
+  };
+
+  const showCopiedFeedback = (x: number, y: number) => {
+    setCopiedLocation({ x, y });
+    setTimeout(() => setCopiedLocation(null), 2000);
+  };
+
+  const handleTextLayerClick = (e: React.MouseEvent) => {
+    if (tool !== 'cursor') return;
+    
+    // If user just clicked (no drag selection), select the word and copy
+    const selection = window.getSelection();
+    if (selection && selection.isCollapsed) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'SPAN') {
+        const range = document.createRange();
+        range.selectNodeContents(target);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        const text = target.textContent;
+        if (text) {
+          navigator.clipboard.writeText(text);
+          showCopiedFeedback(e.clientX, e.clientY);
+        }
+      }
+    }
+  };
+
+  const handleTextLayerMouseUp = (e: React.MouseEvent) => {
+    if (tool !== 'cursor') return;
+    
+    // Check for drag selection
+    const selection = window.getSelection();
+    const text = selection?.toString();
+    
+    if (text && text.length > 0 && !selection?.isCollapsed) {
+       navigator.clipboard.writeText(text);
+       showCopiedFeedback(e.clientX, e.clientY);
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -460,8 +502,10 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
           <canvas ref={canvasRef} className="rounded-sm" />
           <div 
             ref={textLayerRef} 
-            className="textLayer"
+            className={`textLayer ${tool === 'cursor' ? 'cursor-mode' : ''}`}
             style={{ pointerEvents: tool === 'cursor' ? 'auto' : 'none' }}
+            onClick={handleTextLayerClick}
+            onMouseUp={handleTextLayerMouseUp}
           />
           <div 
             ref={highlightLayerRef} 
@@ -469,6 +513,28 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
           />
         </div>
       </div>
+
+      {/* Copied Feedback Toast */}
+      <AnimatePresence>
+        {copiedLocation && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.9 }}
+            style={{
+              position: 'fixed',
+              left: copiedLocation.x,
+              top: copiedLocation.y - 40,
+              zIndex: 100,
+              pointerEvents: 'none'
+            }}
+            className="bg-black/80 text-white text-xs px-2 py-1 rounded shadow-lg backdrop-blur-sm flex items-center gap-1"
+          >
+            <Check size={12} className="text-green-400" />
+            Copied!
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -16,9 +16,10 @@
   right: 0;
   bottom: 0;
   overflow: hidden;
-  opacity: 0.2;
+  opacity: 1; /* Changed from 0.2 to 1 so selection color is vibrant, but text is transparent */
   line-height: 1.0;
-  pointer-events: none; /* Allow clicks to pass through to canvas if needed, but we want selection */
+  pointer-events: auto;
+  mix-blend-mode: multiply; /* Optional: helps with blending */
 }
 
 .textLayer > span {
@@ -29,7 +30,15 @@
   transform-origin: 0% 0%;
 }
 
-/* Allow text selection */
-.textLayer {
-  pointer-events: auto;
+/* Custom Selection Style */
+.textLayer ::selection {
+  background: rgba(255, 215, 0, 0.4); /* Vibrant Yellow */
+  color: transparent;
 }
+
+/* Hover effect for spans when in cursor mode - handled via class in React */
+.textLayer.cursor-mode > span:hover {
+  background-color: rgba(255, 215, 0, 0.1); /* Subtle yellow on hover */
+  cursor: pointer;
+}
+
