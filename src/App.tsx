@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import 'pdfjs-dist/build/pdf.worker.mjs';
 
@@ -30,6 +30,54 @@ const STEPS: VerificationStep[] = [
   { key: 'originAddress', label: 'Origin', description: 'Verify the pickup location' },
   { key: 'destinationAddress', label: 'Destination', description: 'Verify the delivery location' },
 ];
+
+// --- Helper Functions ---
+
+const formatAddress = (fullAddress: string, simplified: boolean) => {
+  if (!simplified || !fullAddress) return fullAddress;
+
+  const extractCity = (partBefore: string, state: string, zip: string) => {
+    // Strategy 1: If there's a comma, assume City is after the last comma
+    if (partBefore.includes(',')) {
+      const parts = partBefore.split(',');
+      const city = parts[parts.length - 1].trim();
+      // Ensure the city part isn't empty or just a number (suite number?)
+      if (city && isNaN(Number(city))) {
+        return `${city.toUpperCase()}, ${state.toUpperCase()} ${zip}`;
+      }
+    }
+
+    // Strategy 2: Try to split by common street suffixes
+    const suffixes = ["AVE", "RD", "ST", "DR", "BLVD", "LN", "CT", "PL", "WAY", "CIR", "PKWY", "HWY", "TER", "TRL", "LOOP", "PIKE", "SQUARE", "SQ", "PARKWAY", "ROAD", "STREET", "DRIVE", "AVENUE", "LANE", "COURT", "PLACE"];
+    // Allow for optional dot, optional comma, and whitespace
+    const regex = new RegExp(`\\b(?:${suffixes.join("|")})\\.?\\s*,?\\s+(.*)$`, "i");
+    
+    const match = partBefore.match(regex);
+    if (match && match[1].trim().length > 0) {
+      return `${match[1].trim().toUpperCase()}, ${state.toUpperCase()} ${zip}`;
+    }
+    
+    return `${partBefore.toUpperCase()}, ${state.toUpperCase()} ${zip}`;
+  };
+
+  // 1. Find State and Zip at the end
+  const stateZipMatch = fullAddress.match(/,\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)$/i);
+  if (!stateZipMatch) {
+     // Try without comma before state
+     const stateZipMatchNoComma = fullAddress.match(/\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i);
+     if (!stateZipMatchNoComma) return fullAddress;
+     
+     const [_, state, zip] = stateZipMatchNoComma;
+     const partBefore = fullAddress.substring(0, stateZipMatchNoComma.index).trim();
+     
+     return extractCity(partBefore, state, zip);
+  }
+
+  const [_, state, zip] = stateZipMatch;
+  const partBefore = fullAddress.substring(0, stateZipMatch.index).trim();
+  
+  return extractCity(partBefore, state, zip);
+};
 
 // --- Components ---
 
@@ -348,6 +396,7 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useLocalStorage("dakota_isDarkMode", true);
   const [isAutoZoomEnabled, setIsAutoZoomEnabled] = useLocalStorage("dakota_isAutoZoomEnabled", true);
+  const [isSimplifiedAddress, setIsSimplifiedAddress] = useLocalStorage("dakota_isSimplifiedAddress", false);
 
   // --- Styles Helper ---
   const theme = {
@@ -444,7 +493,7 @@ export default function App() {
     if (!data) return;
     
     // Format Outputs
-    const route = `${data.originAddress || "Origin Not Found"}\n${data.destinationAddress || "Dest Not Found"}`.toUpperCase();
+    const route = `${formatAddress(data.originAddress || "Origin Not Found", isSimplifiedAddress)}\n${formatAddress(data.destinationAddress || "Dest Not Found", isSimplifiedAddress)}`.toUpperCase();
     setRouteText(route);
 
     const chain = generateChainString(data, truckNumber, broker, team);
@@ -526,15 +575,6 @@ ${chain}`;
       
       // Update notes with new chain (replace last line)
       setNotesText(prev => {
-        const lines = prev.split('\n');
-        // Assuming chain is always the last line or we just append it if not found?
-        // To be safe, let's reconstruct the standard notes part and append chain
-        // But user might have edited notes. 
-        // Let's try to find the old chain or load line and replace it.
-        // For simplicity, let's just update the last line if it looks like a chain or load info
-        // Or better: Re-generate notes completely to ensure consistency as requested.
-        // "En las notas, despues en vez de Load number, debe aparecer el chain."
-        
         return `W${extractedData.weight || "?"}
 PU ${extractedData.pickupTime || "?"}
 DEL ${extractedData.deliveryTime || "?"}
@@ -542,6 +582,14 @@ ${chain}`;
       });
     }
   }, [truckNumber, broker, extractedData, team]);
+
+  // Update route text when simplified address setting changes
+  useEffect(() => {
+    if (appState === 'results' && extractedData) {
+      const route = `${formatAddress(extractedData.originAddress || "Origin Not Found", isSimplifiedAddress)}\n${formatAddress(extractedData.destinationAddress || "Dest Not Found", isSimplifiedAddress)}`.toUpperCase();
+      setRouteText(route);
+    }
+  }, [isSimplifiedAddress, extractedData, appState]);
 
   const copyToClipboard = (text: string, setCopied: (v: boolean) => void) => {
     navigator.clipboard.writeText(text);
@@ -959,6 +1007,28 @@ ${chain}`;
                       className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${isDarkMode ? 'bg-slate-700 shadow text-white' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                       Dark
+                    </button>
+                  </div>
+                </div>
+
+                {/* Address Format Toggle */}
+                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-sm">Address Format</span>
+                    <MapPin size={18} className="text-indigo-400" />
+                  </div>
+                  <div className="flex gap-2 bg-black/5 p-1 rounded-lg">
+                    <button 
+                      onClick={() => setIsSimplifiedAddress(false)}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${!isSimplifiedAddress ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Full
+                    </button>
+                    <button 
+                      onClick={() => setIsSimplifiedAddress(true)}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${isSimplifiedAddress ? 'bg-indigo-500 shadow text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      City/Zip
                     </button>
                   </div>
                 </div>
