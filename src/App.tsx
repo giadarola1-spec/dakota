@@ -109,21 +109,21 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
     const findPageWithText = async () => {
       if (!pdfDocument || !highlightText || highlightText.length < 2) return;
 
-      const cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
-      
-      // If the highlight ends with 'lbs', try searching without it as well
-      const searchTerms = [cleanHighlight];
+      let cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
       if (cleanHighlight.endsWith('lbs')) {
-        searchTerms.push(cleanHighlight.replace(/lbs$/, ''));
+        cleanHighlight = cleanHighlight.replace(/lbs$/, '');
+      }
+      const timeWithTzMatch = cleanHighlight.match(/^(\d{4})(est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
+      if (timeWithTzMatch) {
+        cleanHighlight = timeWithTzMatch[1];
       }
       
       // Check current page first
       if (pageData) {
         const textContent = await pageData.page.getTextContent();
-        const hasMatch = textContent.items.some((item: any) => {
-          const itemStr = item.str.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return searchTerms.some(term => term.length > 1 && itemStr.includes(term));
-        });
+        const hasMatch = textContent.items.some((item: any) => 
+          item.str.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanHighlight)
+        );
         if (hasMatch) return; // Already on the right page
       }
 
@@ -132,10 +132,9 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         if (i === currentPage) continue;
         const page = await pdfDocument.getPage(i);
         const textContent = await page.getTextContent();
-        const hasMatch = textContent.items.some((item: any) => {
-          const itemStr = item.str.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return searchTerms.some(term => term.length > 1 && itemStr.includes(term));
-        });
+        const hasMatch = textContent.items.some((item: any) => 
+          item.str.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanHighlight)
+        );
         if (hasMatch) {
           setCurrentPage(i);
           return;
@@ -164,12 +163,17 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
 
       try {
         const textContent = await page.getTextContent();
-        const cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
         
-        // If the highlight ends with 'lbs', try searching without it as well
-        const searchTerms = [cleanHighlight];
+        // If it ends with 'lbs', try searching without it as well
         if (cleanHighlight.endsWith('lbs')) {
-          searchTerms.push(cleanHighlight.replace(/lbs$/, ''));
+          cleanHighlight = cleanHighlight.replace(/lbs$/, '');
+        }
+        
+        // If it's a time with a timezone (e.g. 0440est), strip the timezone
+        const timeWithTzMatch = cleanHighlight.match(/^(\d{4})(est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
+        if (timeWithTzMatch) {
+          cleanHighlight = timeWithTzMatch[1];
         }
 
         let firstMatchRect: number[] | null = null;
@@ -177,7 +181,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         textContent.items.forEach((item: any) => {
           const itemStr = item.str.toLowerCase().replace(/[^a-z0-9]/g, '');
           
-          if (itemStr.length > 0 && searchTerms.some(term => term.length > 1 && itemStr.includes(term))) {
+          if (itemStr.length > 0 && itemStr.includes(cleanHighlight)) {
             // item.transform is [scaleX, skewY, skewX, scaleY, x, y]
             const pdfX = item.transform[4];
             const pdfY = item.transform[5];
