@@ -625,7 +625,20 @@ export default function App() {
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(" ");
+        
+        // Sort items by visual position (top-to-bottom, left-to-right)
+        // item.transform: [scaleX, skewY, skewX, scaleY, x, y]
+        const items = (textContent.items as any[]).filter(item => item.str !== undefined);
+        
+        items.sort((a, b) => {
+          const yDiff = b.transform[5] - a.transform[5];
+          if (Math.abs(yDiff) > 5) { // Threshold for "same line"
+            return yDiff;
+          }
+          return a.transform[4] - b.transform[4];
+        });
+
+        const pageText = items.map((item: any) => item.str).join(" ");
         fullText += pageText + "\n";
       }
 
