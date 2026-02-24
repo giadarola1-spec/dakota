@@ -56,23 +56,23 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
     return `${partBefore.toUpperCase()}, ${state.toUpperCase()} ${zip}`;
   };
 
-  // 1. Find State and Zip at the end
-  const stateZipMatch = fullAddress.match(/,\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)$/i);
+  // 1. Find State and Zip at the end (Zip is optional)
+  const stateZipMatch = fullAddress.match(/,\s*([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$/i);
   if (!stateZipMatch) {
      // Try without comma before state
-     const stateZipMatchNoComma = fullAddress.match(/\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/i);
+     const stateZipMatchNoComma = fullAddress.match(/\s+([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$/i);
      if (!stateZipMatchNoComma) return fullAddress;
      
      const [_, state, zip] = stateZipMatchNoComma;
      const partBefore = fullAddress.substring(0, stateZipMatchNoComma.index).trim();
      
-     return extractCity(partBefore, state, zip);
+     return extractCity(partBefore, state, zip || "");
   }
 
   const [_, state, zip] = stateZipMatch;
   const partBefore = fullAddress.substring(0, stateZipMatch.index).trim();
   
-  return extractCity(partBefore, state, zip);
+  return extractCity(partBefore, state, zip || "");
 };
 
 // --- Components ---

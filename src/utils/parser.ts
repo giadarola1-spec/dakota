@@ -21,7 +21,7 @@ const PATTERNS = {
   ],
   // Time patterns: Look for HH:MM AM/PM, Military, or TBD
   // Made prefix optional to catch standalone values like "TBD"
-  time: /(?:(?:Appt\s*|Appointment\s*Time\s*[:]?|Appointment\s*|Window\s*|ETA\s*|Scheduled\s*|Arrival\s*|Time\s*[:]?|Check-in|FCFS|ASAP|Delivery\s*Window|PU\s*Date\s*\/\s*Time|DEL\s*Date\s*\/\s*Time|Pick\s*up\s*time|Delivery\s*time|Schedule|Earliest|Latest|Appointment\s*Scheduled\s*For)\s*[:.]?\s*)?(\d{1,2}:\d{2}\s*(?:AM|PM)?|\d{4}\s*hrs?|TBD|ASAP|FCFS)/i,
+  time: /(?:(?:Appt\s*|Appointment\s*Time\s*[:]?|Appointment\s*|Window\s*|ETA\s*|Scheduled\s*|Arrival\s*|Time\s*[:]?|Check-in|FCFS|ASAP|Delivery\s*Window|PU\s*Date\s*\/\s*Time|DEL\s*Date\s*\/\s*Time|Pick\s*up\s*time|Delivery\s*time|Schedule|Earliest|Latest|Appointment\s*Scheduled\s*For|Pick-up\s*Location|Delivery\s*Location)\s*[:.]?\s*)?(\d{1,2}:\d{2}\s*(?:AM|PM)?|\d{4}\s*hrs?|TBD|ASAP|FCFS)/i,
   
   // Date pattern: MM/DD/YYYY, MM-DD-YYYY, MM.DD.YYYY
   date: /\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/,
@@ -33,8 +33,8 @@ const PATTERNS = {
   address: [
     // Pattern for Street, City, ST Zip (e.g., 5505 BROOKVILLE RD INDIANAPOLIS, IN 45235)
     /(\d+\s+[A-Z0-9\s\.,#-]{2,60}?[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
-    // Fallback for City, ST Zip
-    /([A-Z][A-Za-z \.\/]{1,30}?)(?:,|\s+)\s*([A-Z]{2})\b(?:\s+((?:\d{5})(?:-\d{4})?))?/
+    // Fallback for City, ST Zip (or just City, ST)
+    /\b([A-Z][A-Za-z\s\.\/]{1,30})(?:,|\s+)\s*([A-Z]{2})\b(?:\s*(\d{5}(?:-\d{4})?))?/i
   ]
 };
 
@@ -57,7 +57,26 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const cleanAddress = (addr: string): string => {
     if (!addr) return "";
     // Remove common header words that might be captured, potentially multiple times
-    return addr.replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF)\s*[:]?\s*)+/i, "").trim();
+    // Added more TQL/Traffix specific noise like "Location", "Date", "Time", "Notes"
+    // Also allowed / and - as separators in the prefix
+    const cleaned = addr.replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF|PICK-UP\s*LOCATION|DELIVERY\s*LOCATION|DATE\s*TIME|NOTES|SPECIAL\s*INSTRUCTIONS)\s*[:\/\-]?\s*)+/i, "").trim();
+    
+    // Blacklist for corporate addresses and common false positives
+    const blacklist = [
+      "1701 Edison Drive", "PO Box 9049", "Louisville, KY 40209", "Milford, OH 45150",
+      "FLEET ONE FACTORING", "WEX", "PO BOX 94565", "CLEVELAND, OH 44101",
+      "pickup / delivery", "pickup/delivery", "pickup / delivery OR BOTH",
+      "delivery OR BOTH", "pickup / delivery OR"
+    ];
+    
+    for (const item of blacklist) {
+      if (cleaned.toUpperCase().includes(item.toUpperCase())) return "";
+    }
+    
+    // If it's just a few characters or just "OR", it's likely a false positive
+    if (cleaned.length < 5) return "";
+    
+    return cleaned;
   };
 
   const result: ParsedRateCon = {
@@ -97,7 +116,8 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
 
   const normalizeTime = (t: string): string => {
     if (!t) return "";
-    if (t.toUpperCase() === "TBD") return "TBD";
+    const upper = t.toUpperCase();
+    if (upper === "TBD" || upper === "ASAP" || upper === "FCFS") return upper;
 
     // Remove common prefixes and suffixes
     let clean = t.replace(/hrs?/i, '')
@@ -120,18 +140,19 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     
     // Handle "1400" case (already military, no colon)
     if (!clean.includes(':') && clean.length === 4 && !isNaN(Number(clean))) {
-      return clean;
+      return `${clean.substring(0, 2)}:${clean.substring(2, 4)}`;
     }
 
     // Handle "14:00" or "2:00"
     if (clean.includes(':')) {
       let [hours, minutes] = clean.split(':');
       let h = parseInt(hours, 10);
+      let m = minutes.substring(0, 2).padStart(2, '0');
       
       if (isPM && h < 12) h += 12;
       if (isAM && h === 12) h = 0;
       
-      return `${h.toString().padStart(2, '0')}${minutes.substring(0, 2)}`;
+      return `${h.toString().padStart(2, '0')}:${m}`;
     }
 
     return clean; // Fallback
@@ -188,7 +209,8 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const pickupAnchors = [
     "shipper - pickup", "shipper:", "origin:", "stop 1", "stop #1", "pickup 1 of", 
     "shipper", "origin", "pick up at", "picking up at", "pickup", "pku#",
-    "stop 1: pick up", "stop 1: pickup", "load at", "load at:", "shipper :", "name/address"
+    "stop 1: pick up", "stop 1: pickup", "load at", "load at:", "shipper :", "name/address",
+    "pick-up location", "pick-up", "pickup location"
   ];
   const pickupKeys = [
     "pick up", "pick-up", "pickup", "loading", "pu", "p/u", "facility name", "shipping address", "pick-up location"
@@ -215,7 +237,8 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const deliveryAnchors = [
     "consignee - delivery", "consignee:", "destination:", "stop 2", "stop #2", "delivery 1 of",
     "consignee", "destination", "deliver to", "delivering to", "drop off at", "receiver", "receiver #1",
-    "drop", "delv#", "stop 2: delivery", "stop 2: drop", "consignee #", "unload"
+    "drop", "delv#", "stop 2: delivery", "stop 2: drop", "consignee #", "unload",
+    "delivery location"
   ];
   const deliveryKeys = [
     "delivery", "dest", "drop", "unloading", "receiver", "del", "unloading point", "drop off", "receiving address", "delivery location", "unload"
@@ -300,28 +323,84 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     result.deliveryTime = time;
   }
 
-  // Extract Addresses
-  const puAddrMatch = pickupSection.match(PATTERNS.address[0]) || pickupSection.match(PATTERNS.address[1]);
-  if (puAddrMatch) {
-    result.originAddress = cleanAddress(puAddrMatch[0] || puAddrMatch[1]);
-  }
+  // Extract Addresses - Find earliest valid address in each section
+  const findEarliestAddress = (section: string): string => {
+    const matches: { text: string, index: number, patternIdx: number }[] = [];
+    for (let i = 0; i < PATTERNS.address.length; i++) {
+      const pattern = PATTERNS.address[i];
+      const mAll = section.matchAll(new RegExp(pattern, 'gi'));
+      for (const m of mAll) {
+        const cleaned = cleanAddress(m[0]);
+        if (cleaned) {
+          matches.push({ text: cleaned, index: m.index || 0, patternIdx: i });
+        }
+      }
+    }
+    if (matches.length === 0) return "";
+    
+    // Prioritize pattern 0 (Full address with street) over pattern 1 (City, ST)
+    const fullAddressMatches = matches.filter(m => m.patternIdx === 0);
+    if (fullAddressMatches.length > 0) {
+      fullAddressMatches.sort((a, b) => a.index - b.index);
+      return fullAddressMatches[0].text;
+    }
+    
+    matches.sort((a, b) => a.index - b.index);
+    return matches[0].text;
+  };
 
-  const delAddrMatch = deliverySection.match(PATTERNS.address[0]) || deliverySection.match(PATTERNS.address[1]);
-  if (delAddrMatch) {
-    result.destinationAddress = cleanAddress(delAddrMatch[0] || delAddrMatch[1]);
-  }
+  result.originAddress = findEarliestAddress(pickupSection);
+  result.destinationAddress = findEarliestAddress(deliverySection);
 
   // Address extraction fallback if sectioning failed
   if (!result.originAddress) {
-    const allAddresses = Array.from(text.matchAll(new RegExp(PATTERNS.address[0], 'gi')));
+    const allAddresses: { text: string, index: number, patternIdx: number }[] = [];
+    for (let i = 0; i < PATTERNS.address.length; i++) {
+      const pattern = PATTERNS.address[i];
+      const matches = text.matchAll(new RegExp(pattern, 'gi'));
+      for (const m of matches) {
+        const cleaned = cleanAddress(m[0]);
+        if (cleaned) {
+          allAddresses.push({ text: cleaned, index: m.index || 0, patternIdx: i });
+        }
+      }
+    }
+    
     if (allAddresses.length > 0) {
-      result.originAddress = cleanAddress(allAddresses[0][0]);
+      const fullMatches = allAddresses.filter(m => m.patternIdx === 0).sort((a, b) => a.index - b.index);
+      if (fullMatches.length > 0) {
+        result.originAddress = fullMatches[0].text;
+      } else {
+        allAddresses.sort((a, b) => a.index - b.index);
+        result.originAddress = allAddresses[0].text;
+      }
     }
   }
   if (!result.destinationAddress) {
-    const allAddresses = Array.from(text.matchAll(new RegExp(PATTERNS.address[0], 'gi')));
+    const allAddresses: { text: string, index: number, patternIdx: number }[] = [];
+    for (let i = 0; i < PATTERNS.address.length; i++) {
+      const pattern = PATTERNS.address[i];
+      const matches = text.matchAll(new RegExp(pattern, 'gi'));
+      for (const m of matches) {
+        const cleaned = cleanAddress(m[0]);
+        if (cleaned) {
+          allAddresses.push({ text: cleaned, index: m.index || 0, patternIdx: i });
+        }
+      }
+    }
+    
     if (allAddresses.length > 1) {
-      result.destinationAddress = cleanAddress(allAddresses[allAddresses.length - 1][0]);
+      // Pick the last one that isn't the origin
+      const filtered = allAddresses.filter(a => a.text !== result.originAddress);
+      if (filtered.length > 0) {
+        const fullMatches = filtered.filter(m => m.patternIdx === 0).sort((a, b) => b.index - a.index);
+        if (fullMatches.length > 0) {
+          result.destinationAddress = fullMatches[0].text;
+        } else {
+          filtered.sort((a, b) => b.index - a.index);
+          result.destinationAddress = filtered[0].text;
+        }
+      }
     }
   }
 
