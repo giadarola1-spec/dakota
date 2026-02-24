@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import 'pdfjs-dist/build/pdf.worker.mjs';
 
@@ -81,13 +81,22 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
 
 // --- Components ---
 
-const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }: { pdfDocument: any, highlightText: string, isDarkMode: boolean, isAutoZoomEnabled: boolean }) => {
+const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, dragSensitivity }: { pdfDocument: any, highlightText: string, isDarkMode: boolean, isAutoZoomEnabled: boolean, dragSensitivity: number }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const highlightLayerRef = useRef<HTMLDivElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [pageData, setPageData] = useState<{ page: any, viewport: any } | null>(null);
-  const [zoomStyle, setZoomStyle] = useState<React.CSSProperties>({ transform: 'scale(1) translate(0, 0)', transformOrigin: '0 0' });
+  
+  // Zoom & Pan State
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [startPosition, setStartPosition] = useState({ x: 0, y: 0 });
+  const [tool, setTool] = useState<'cursor' | 'hand'>('hand');
+
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -135,6 +144,41 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         
         renderTask = page.render(renderContext);
         await renderTask.promise;
+
+        // Render Text Layer
+        if (textLayerRef.current) {
+          textLayerRef.current.innerHTML = '';
+          textLayerRef.current.style.width = `${viewport.width}px`;
+          textLayerRef.current.style.height = `${viewport.height}px`;
+          
+          const textContent = await page.getTextContent();
+          
+          // Simple manual text layer rendering
+          textContent.items.forEach((item: any) => {
+            const tx = pdfjsLib.Util.transform(
+              viewport.transform,
+              item.transform
+            );
+            
+            // Calculate font size (height)
+            const fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]));
+            
+            if (fontHeight < 4) return; // Skip tiny text
+
+            const span = document.createElement('span');
+            span.textContent = item.str;
+            span.style.left = `${tx[4]}px`;
+            span.style.top = `${tx[5] - fontHeight}px`;
+            span.style.fontSize = `${fontHeight}px`;
+            span.style.fontFamily = item.fontName || 'sans-serif';
+            
+            // Approximate width scaling if needed, but simple positioning is often enough for selection
+            // span.style.transform = `scaleX(${item.width / item.transform[0]})`; 
+            
+            textLayerRef.current?.appendChild(span);
+          });
+        }
+
       } catch (error: any) {
         if (error.name !== 'RenderingCancelledException') {
           console.error('PDF Render Error:', error);
@@ -205,7 +249,10 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
 
       // Reset zoom if disabled or no text
       if (!isAutoZoomEnabled || !highlightText || highlightText.length < 2) {
-        setZoomStyle({ transform: 'scale(1) translate(0, 0)' });
+        if (isAutoZoomEnabled) {
+             setScale(1);
+             setPosition({ x: 0, y: 0 });
+        }
         if (!highlightText || highlightText.length < 2) return;
       }
 
@@ -278,14 +325,12 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
           const containerW = viewportRef.current.clientWidth;
           const containerH = viewportRef.current.clientHeight || 600;
           
-          const scale = 2.0; // 2x Zoom
-          const translateX = containerW / 2 - centerX * scale;
-          const translateY = containerH / 2 - centerY * scale;
+          const newScale = 2.0; // 2x Zoom
+          const translateX = containerW / 2 - centerX * newScale;
+          const translateY = containerH / 2 - centerY * newScale;
 
-          setZoomStyle({
-            transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
-            transformOrigin: '0 0'
-          });
+          setScale(newScale);
+          setPosition({ x: translateX, y: translateY });
         }
 
       } catch (err) {
@@ -295,6 +340,42 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
 
     drawHighlights();
   }, [highlightText, pageData, isAutoZoomEnabled]);
+
+  // Handlers for Manual Controls
+  const handleZoomIn = () => setScale(s => Math.min(s + 0.5, 5));
+  const handleZoomOut = () => setScale(s => Math.max(s - 0.5, 0.5));
+  const handleFitPage = () => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (tool === 'hand') {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+      setStartPosition({ x: position.x, y: position.y });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging && tool === 'hand') {
+      const deltaX = (e.clientX - dragStart.x) * dragSensitivity;
+      const deltaY = (e.clientY - dragStart.y) * dragSensitivity;
+      
+      setPosition({
+        x: startPosition.x + deltaX,
+        y: startPosition.y + deltaY
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
 
   return (
     <div className={`w-full ${isAutoZoomEnabled ? 'h-full' : 'h-auto'} overflow-hidden rounded-lg shadow-lg border relative ${isDarkMode ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-slate-100'} flex flex-col`}>
@@ -319,16 +400,69 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled }
         </div>
       )}
 
+      {/* Manual Controls Toolbar */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-black/60 backdrop-blur-md px-2 py-1.5 rounded-full border border-white/10 text-white shadow-xl">
+         <button 
+            onClick={() => setTool('cursor')}
+            className={`p-1.5 rounded-md transition-colors ${tool === 'cursor' ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
+            title="Select Mode"
+          >
+            <MousePointer size={16} />
+          </button>
+          <button 
+            onClick={() => setTool('hand')}
+            className={`p-1.5 rounded-md transition-colors ${tool === 'hand' ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
+            title="Pan Mode"
+          >
+            <Hand size={16} />
+          </button>
+          <div className="w-px h-4 bg-white/20 mx-1" />
+          <button 
+            onClick={handleZoomOut}
+            className="p-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            title="Zoom Out"
+          >
+            <ZoomOut size={16} />
+          </button>
+          <span className="text-xs font-mono min-w-[3ch] text-center">{Math.round(scale * 100)}%</span>
+          <button 
+            onClick={handleZoomIn}
+            className="p-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            title="Zoom In"
+          >
+            <ZoomIn size={16} />
+          </button>
+          <div className="w-px h-4 bg-white/20 mx-1" />
+          <button 
+            onClick={handleFitPage}
+            className="p-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            title="Fit to Page"
+          >
+            <Maximize size={16} />
+          </button>
+      </div>
+
       <div 
         ref={viewportRef}
-        className="flex-1 overflow-auto p-4 md:p-8 flex justify-center items-start scrollbar-hide relative"
+        className={`flex-1 overflow-hidden p-4 md:p-8 flex justify-center items-start relative ${tool === 'hand' ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
       >
         <div 
           ref={contentRef}
-          className="relative shadow-2xl transition-transform duration-500 ease-out"
-          style={zoomStyle}
+          className="relative shadow-2xl transition-transform duration-100 ease-out origin-top-left"
+          style={{
+            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`
+          }}
         >
           <canvas ref={canvasRef} className="rounded-sm" />
+          <div 
+            ref={textLayerRef} 
+            className="textLayer"
+            style={{ pointerEvents: tool === 'cursor' ? 'auto' : 'none' }}
+          />
           <div 
             ref={highlightLayerRef} 
             className="absolute inset-0 pointer-events-none"
@@ -397,6 +531,7 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useLocalStorage("dakota_isDarkMode", true);
   const [isAutoZoomEnabled, setIsAutoZoomEnabled] = useLocalStorage("dakota_isAutoZoomEnabled", true);
   const [isSimplifiedAddress, setIsSimplifiedAddress] = useLocalStorage("dakota_isSimplifiedAddress", false);
+  const [dragSensitivity, setDragSensitivity] = useLocalStorage("dakota_dragSensitivity", 1.5);
 
   // --- Styles Helper ---
   const theme = {
@@ -619,7 +754,7 @@ ${chain}`;
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:h-[calc(100vh-140px)]">
         {/* Left: PDF View */}
         <div className={`h-[400px] md:h-full ${isAutoZoomEnabled ? 'overflow-hidden' : 'overflow-y-auto'} pr-2 custom-scrollbar relative`}>
-          <PdfViewer pdfDocument={pdfDoc} highlightText={value} isDarkMode={isDarkMode} isAutoZoomEnabled={isAutoZoomEnabled} />
+          <PdfViewer pdfDocument={pdfDoc} highlightText={value} isDarkMode={isDarkMode} isAutoZoomEnabled={isAutoZoomEnabled} dragSensitivity={dragSensitivity} />
           
           {/* Zoom Toggle */}
           <button 
@@ -1030,6 +1165,30 @@ ${chain}`;
                     >
                       City/Zip
                     </button>
+                  </div>
+                </div>
+
+                {/* Drag Sensitivity Slider */}
+                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-sm">Drag Sensitivity</span>
+                    <Sliders size={18} className="text-indigo-400" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-500">1x</span>
+                    <input 
+                      type="range" 
+                      min="0.5" 
+                      max="3" 
+                      step="0.1" 
+                      value={dragSensitivity} 
+                      onChange={(e) => setDragSensitivity(parseFloat(e.target.value))}
+                      className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    />
+                    <span className="text-xs text-slate-500">3x</span>
+                  </div>
+                  <div className="text-center mt-1">
+                     <span className="text-xs font-mono text-indigo-500">{dragSensitivity.toFixed(1)}x</span>
                   </div>
                 </div>
 

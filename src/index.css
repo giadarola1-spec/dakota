@@ -6,3 +6,30 @@
   --font-sans: "Roboto", sans-serif;
   --font-geologica: "Geologica", sans-serif;
 }
+
+/* PDF Text Layer */
+.textLayer {
+  position: absolute;
+  text-align: initial;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  opacity: 0.2;
+  line-height: 1.0;
+  pointer-events: none; /* Allow clicks to pass through to canvas if needed, but we want selection */
+}
+
+.textLayer > span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+/* Allow text selection */
+.textLayer {
+  pointer-events: auto;
+}
