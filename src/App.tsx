@@ -12,20 +12,58 @@ import { DottedMapBackground } from './components/DottedMapBackground';
 // --- Types ---
 
 type VerificationStep = {
-  key: keyof ParsedRateCon;
+  key: keyof ParsedRateCon | string;
   label: string;
   description: string;
+  stopIndex?: number;
+  field?: 'time' | 'address' | 'date';
 };
 
-const STEPS: VerificationStep[] = [
-  { key: 'loadNumber', label: 'Load Number', description: 'Confirm the Load Reference Number' },
-  { key: 'weight', label: 'Weight', description: 'Confirm the total weight' },
-  { key: 'pickupTime', label: 'Pickup Time', description: 'Check the scheduled pickup time' },
-  { key: 'deliveryTime', label: 'Delivery Time', description: 'Check the scheduled delivery time' },
-  { key: 'rate', label: 'Rate', description: 'Confirm the total rate amount' },
-  { key: 'originAddress', label: 'Origin', description: 'Verify the pickup location' },
-  { key: 'destinationAddress', label: 'Destination', description: 'Verify the delivery location' },
-];
+const isMultiStop = (data: ParsedRateCon | null) => {
+  if (!data || !data.stops) return false;
+  const pickups = data.stops.filter(s => s.type === 'pickup');
+  const deliveries = data.stops.filter(s => s.type === 'delivery');
+  // Multi-stop means more than one pickup OR more than one delivery
+  return pickups.length > 1 || deliveries.length > 1;
+};
+
+const getBaseSteps = (data: ParsedRateCon | null): VerificationStep[] => {
+  const baseSteps: VerificationStep[] = [
+    { key: 'loadNumber', label: 'Load Number', description: 'Confirm the Load Reference Number' },
+    { key: 'weight', label: 'Weight', description: 'Confirm the total weight' },
+    { key: 'rate', label: 'Rate', description: 'Confirm the total rate amount' },
+  ];
+
+  if (!isMultiStop(data)) {
+    return [
+      ...baseSteps,
+      { key: 'pickupTime', label: 'Pickup Time', description: 'Check the scheduled pickup time' },
+      { key: 'deliveryTime', label: 'Delivery Time', description: 'Check the scheduled delivery time' },
+      { key: 'originAddress', label: 'Origin', description: 'Verify the pickup location' },
+      { key: 'destinationAddress', label: 'Destination', description: 'Verify the delivery location' },
+    ];
+  }
+
+  const stopSteps: VerificationStep[] = [];
+  data!.stops.forEach((stop, index) => {
+    stopSteps.push({
+      key: `stop_${index}_time`,
+      label: `${stop.label} Time`,
+      description: `Check the scheduled time for ${stop.label}`,
+      stopIndex: index,
+      field: 'time'
+    });
+    stopSteps.push({
+      key: `stop_${index}_address`,
+      label: `${stop.label} Address`,
+      description: `Verify the location for ${stop.label}`,
+      stopIndex: index,
+      field: 'address'
+    });
+  });
+
+  return [...baseSteps, ...stopSteps];
+};
 
 // --- Helper Functions ---
 
@@ -593,6 +631,7 @@ export default function App() {
   // Data State
   const [extractedData, setExtractedData] = useState<ParsedRateCon | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentSteps, setCurrentSteps] = useState<VerificationStep[]>([]);
   
   // Output States
   const [routeText, setRouteText] = useState("");
@@ -667,6 +706,9 @@ export default function App() {
       const data = parseRateConfirmation(fullText);
       setExtractedData(data);
       
+      const steps = getBaseSteps(data);
+      setCurrentSteps(steps);
+      
       setAppState('verify');
       setCurrentStepIndex(0);
 
@@ -700,7 +742,7 @@ export default function App() {
   };
 
   const handleNextStep = () => {
-    if (currentStepIndex < STEPS.length - 1) {
+    if (currentStepIndex < currentSteps.length - 1) {
       setCurrentStepIndex(prev => prev + 1);
     } else {
       finishVerification();
@@ -716,9 +758,19 @@ export default function App() {
   };
 
   const handleDataChange = (val: string) => {
-    if (!extractedData) return;
-    const key = STEPS[currentStepIndex].key;
-    setExtractedData({ ...extractedData, [key]: val });
+    if (!extractedData || !currentSteps[currentStepIndex]) return;
+    const step = currentSteps[currentStepIndex];
+    
+    if (step.stopIndex !== undefined && step.field) {
+      const newStops = [...extractedData.stops];
+      newStops[step.stopIndex] = {
+        ...newStops[step.stopIndex],
+        [step.field]: val
+      };
+      setExtractedData({ ...extractedData, stops: newStops });
+    } else {
+      setExtractedData({ ...extractedData, [step.key as keyof ParsedRateCon]: val });
+    }
   };
 
   // Keyboard Navigation
@@ -749,7 +801,12 @@ export default function App() {
     if (!data) return;
     
     // Format Outputs
-    const route = `${formatAddress(data.originAddress || "Origin Not Found", isSimplifiedAddress)}\n${formatAddress(data.destinationAddress || "Dest Not Found", isSimplifiedAddress)}`.toUpperCase();
+    let route = "";
+    if (data.stops && data.stops.length > 0) {
+      route = data.stops.map(s => formatAddress(s.address || "Address Not Found", isSimplifiedAddress)).join("\n").toUpperCase();
+    } else {
+      route = `${formatAddress(data.originAddress || "Origin Not Found", isSimplifiedAddress)}\n${formatAddress(data.destinationAddress || "Dest Not Found", isSimplifiedAddress)}`.toUpperCase();
+    }
     setRouteText(route);
 
     const chain = generateChainString(data, truckNumber, broker, team);
@@ -758,10 +815,17 @@ export default function App() {
     const rename = generateRenameString(data, truckNumber);
     setRenameText(rename);
 
-    const notes = `W${data.weight || "?"}
-PU ${data.pickupTime || "?"}
-DEL ${data.deliveryTime || "?"}
-${chain}`;
+    let notes = `W${data.weight || "?"}\n`;
+    if (data.stops && data.stops.length > 0) {
+      data.stops.forEach(s => {
+        const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
+        const label = s.label.match(/\d+/)?.[0] || "";
+        notes += `${prefix}${label ? ' ' + label : ''} ${s.time || "?"}\n`;
+      });
+    } else {
+      notes += `PU ${data.pickupTime || "?"}\nDEL ${data.deliveryTime || "?"}\n`;
+    }
+    notes += chain;
     setNotesText(notes);
 
     setAppState('results');
@@ -831,18 +895,30 @@ ${chain}`;
       
       // Update notes with new chain (replace last line)
       setNotesText(prev => {
-        return `W${extractedData.weight || "?"}
-PU ${extractedData.pickupTime || "?"}
-DEL ${extractedData.deliveryTime || "?"}
-${chain}`;
+        let notes = `W${extractedData.weight || "?"}\n`;
+        if (extractedData.stops && extractedData.stops.length > 0) {
+          extractedData.stops.forEach(s => {
+            const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
+            const label = s.label.match(/\d+/)?.[0] || "";
+            notes += `${prefix}${label ? ' ' + label : ''} ${s.time || "?"}\n`;
+          });
+        } else {
+          notes += `PU ${extractedData.pickupTime || "?"}\nDEL ${extractedData.deliveryTime || "?"}\n`;
+        }
+        notes += chain;
+        return notes;
       });
     }
   }, [truckNumber, broker, extractedData, team]);
 
-  // Update route text when simplified address setting changes
   useEffect(() => {
     if (appState === 'results' && extractedData) {
-      const route = `${formatAddress(extractedData.originAddress || "Origin Not Found", isSimplifiedAddress)}\n${formatAddress(extractedData.destinationAddress || "Dest Not Found", isSimplifiedAddress)}`.toUpperCase();
+      let route = "";
+      if (extractedData.stops && extractedData.stops.length > 0) {
+        route = extractedData.stops.map(s => formatAddress(s.address || "Address Not Found", isSimplifiedAddress)).join("\n").toUpperCase();
+      } else {
+        route = `${formatAddress(extractedData.originAddress || "Origin Not Found", isSimplifiedAddress)}\n${formatAddress(extractedData.destinationAddress || "Dest Not Found", isSimplifiedAddress)}`.toUpperCase();
+      }
       setRouteText(route);
     }
   }, [isSimplifiedAddress, extractedData, appState]);
@@ -868,8 +944,15 @@ ${chain}`;
 
   const renderVerification = () => {
     if (!extractedData) return null;
-    const step = STEPS[currentStepIndex];
-    const value = extractedData[step.key];
+    const step = currentSteps[currentStepIndex];
+    if (!step) return null;
+
+    let value = "";
+    if (step.stopIndex !== undefined && step.field) {
+      value = extractedData.stops[step.stopIndex]?.[step.field] || "";
+    } else {
+      value = (extractedData[step.key as keyof ParsedRateCon] as string) || "";
+    }
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:h-[calc(100vh-140px)]">
@@ -902,7 +985,7 @@ ${chain}`;
             <div className="relative z-10 space-y-6">
               <div className="flex items-center justify-between">
                 <span className={`text-xs font-medium ${isDarkMode ? 'text-indigo-400 border-indigo-500/30' : 'text-indigo-600 border-indigo-200'} uppercase tracking-widest border px-3 py-1 rounded-full`}>
-                  Step {currentStepIndex + 1} of {STEPS.length}
+                  Step {currentStepIndex + 1} of {currentSteps.length}
                 </span>
                 <span className={`${theme.textMuted} text-xs`}>Human Supervision Required</span>
               </div>
@@ -937,7 +1020,7 @@ ${chain}`;
                   onClick={handleNextStep}
                   className={`flex-1 px-6 py-3 rounded-xl ${theme.accentBg} ${theme.accentHover} text-white font-medium shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 group`}
                 >
-                  {currentStepIndex === STEPS.length - 1 ? 'Finish & Generate' : 'Confirm & Next'}
+                  {currentStepIndex === currentSteps.length - 1 ? 'Finish & Generate' : 'Confirm & Next'}
                   <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
@@ -946,7 +1029,7 @@ ${chain}`;
 
           {/* Progress Indicators */}
           <div className="flex justify-center gap-2">
-            {STEPS.map((_, idx) => (
+            {currentSteps.map((_, idx) => (
               <div 
                 key={idx} 
                 className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentStepIndex ? 'w-8 bg-indigo-500' : idx < currentStepIndex ? 'w-2 bg-emerald-500' : `w-2 ${isDarkMode ? 'bg-slate-700' : 'bg-slate-300'}`}`}

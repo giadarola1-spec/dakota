@@ -38,10 +38,19 @@ const PATTERNS = {
   ]
 };
 
+export interface Stop {
+  type: 'pickup' | 'delivery';
+  address: string;
+  date: string;
+  time: string;
+  label: string;
+}
+
 export interface ParsedRateCon {
   loadNumber: string;
   weight: string;
   rate: string;
+  stops: Stop[];
   pickupTime: string;
   pickupDate: string;
   deliveryTime: string;
@@ -60,8 +69,6 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const cleanAddress = (addr: string): string => {
     if (!addr) return "";
     // Remove common header words that might be captured, potentially multiple times
-    // Added more TQL/Traffix specific noise like "Location", "Date", "Time", "Notes"
-    // Also allowed / and - as separators in the prefix
     const cleaned = addr.replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF|PICK-UP\s*LOCATION|DELIVERY\s*LOCATION|DATE\s*TIME|NOTES|SPECIAL\s*INSTRUCTIONS|UP|PICK|INFO|CONTACT|NAME|PHONE|EMAIL|FAX|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|UNLOADING|RECEIPT|EXCHANGE|NOTE|CARRIER)\s*[:\/\-]?\s*)+/i, "").trim();
     
     // Blacklist for corporate addresses and common false positives
@@ -76,7 +83,6 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
       if (cleaned.toUpperCase().includes(item.toUpperCase())) return "";
     }
     
-    // If it's just a few characters or just "OR", it's likely a false positive
     if (cleaned.length < 5) return "";
     
     return cleaned;
@@ -86,6 +92,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     loadNumber: "",
     weight: "",
     rate: "",
+    stops: [],
     pickupTime: "",
     pickupDate: "",
     deliveryTime: "",
@@ -113,7 +120,6 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
 
   const normalizeDate = (d: string): string => {
     if (!d) return "";
-    // Replace / or - with .
     return d.replace(/[/.-]/g, '.');
   };
 
@@ -122,7 +128,6 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     const upper = t.toUpperCase();
     if (upper === "TBD" || upper === "ASAP" || upper === "FCFS") return upper;
 
-    // Remove common prefixes and suffixes
     let clean = t.replace(/hrs?/i, '')
                  .replace(/Appointment\s*Time\s*[:]?/i, '')
                  .replace(/Appointment/i, '')
@@ -134,19 +139,14 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
                  .replace(/Time\s*[:]?/i, '')
                  .trim();
     
-    // Detect AM/PM
     const isPM = /PM/i.test(clean);
     const isAM = /AM/i.test(clean);
-    
-    // Remove AM/PM text
     clean = clean.replace(/(?:AM|PM)/i, '').trim();
     
-    // Handle "1400" case (already military, no colon)
     if (!clean.includes(':') && clean.length === 4 && !isNaN(Number(clean))) {
       return `${clean.substring(0, 2)}:${clean.substring(2, 4)}`;
     }
 
-    // Handle "14:00" or "2:00"
     if (clean.includes(':')) {
       let [hours, minutes] = clean.split(':');
       let h = parseInt(hours, 10);
@@ -158,10 +158,10 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
       return `${h.toString().padStart(2, '0')}:${m}`;
     }
 
-    return clean; // Fallback
+    return clean;
   };
 
-  // Improved Rate extraction: Look for the most likely "Total" amount
+  // Improved Rate extraction
   const rateMatches: { value: string, score: number }[] = [];
   for (const pattern of PATTERNS.rate) {
     const matches = text.matchAll(new RegExp(pattern, 'gi'));
@@ -170,25 +170,15 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
         let score = 0;
         const val = match[1].replace(/,/g, '');
         const num = parseFloat(val);
-        
         if (isNaN(num)) continue;
-        
-        // Prioritize matches with $ or currency codes
         if (match[0].includes('$')) score += 10;
         if (match[0].toUpperCase().includes('USD')) score += 10;
-        
-        // Prioritize "Total" or "Agreed Amount"
         if (match[0].toLowerCase().includes('total')) score += 5;
         if (match[0].toLowerCase().includes('agreed')) score += 5;
-        
-        // Penalize matches that look like counts or miles
         if (match[0].toLowerCase().includes('miles')) score -= 20;
         if (match[0].toLowerCase().includes('weight')) score -= 20;
         if (match[0].toLowerCase().includes('pieces')) score -= 20;
-        
-        // Penalize very small numbers (likely not a rate)
         if (num < 50) score -= 15;
-        
         rateMatches.push({ value: val, score });
       }
     }
@@ -202,209 +192,125 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   result.loadNumber = extract(PATTERNS.loadNumber, text);
   result.weight = normalizeWeight(extract(PATTERNS.weight, text));
 
-  // Context-aware parsing for Times and Addresses
-  // Strategy: Find First Pickup and First Delivery after Pickup
+  // --- Multi-Stop Detection ---
   
-  const lowerText = text.toLowerCase();
-  
-  // Stronger anchors for sections to avoid false positives in notes
-  // We prioritize these over generic "pickup" or "delivery" words which might appear in notes
-  const pickupAnchors = [
-    "shipper - pickup", "shipper:", "origin:", "stop 1", "stop #1", "pickup 1 of", 
-    "shipper", "origin", "pick up at", "picking up at", "pickup", "pku#",
-    "stop 1: pick up", "stop 1: pickup", "load at", "load at:", "shipper :", "name/address",
-    "pick-up location", "pick-up", "pickup location"
+  const stopMarkers = [
+    { pattern: /(?:Shipper|Origin|Pickup)\s*-\s*(?:Pickup|Stop)\s*(\d+)\s*of\s*(\d+)/i, type: 'pickup', priority: 2 },
+    { pattern: /(?:Consignee|Destination|Delivery)\s*-\s*(?:Delivery|Stop)\s*(\d+)\s*of\s*(\d+)/i, type: 'delivery', priority: 2 },
+    { pattern: /Stop\s*#?\s*(\d+)\s*[:\-]?\s*(Pick|Del)/i, type: 'auto', priority: 2 },
+    { pattern: /Stop\s*#?\s*(\d+)/i, type: 'auto', priority: 2 },
+    { pattern: /(?:Shipper|Origin|Pickup)\s*[:\-]/i, type: 'pickup', priority: 1 },
+    { pattern: /(?:Consignee|Destination|Delivery)\s*[:\-]/i, type: 'delivery', priority: 1 }
   ];
-  const pickupKeys = [
-    "pick up", "pick-up", "pickup", "loading", "pu", "p/u", "facility name", "shipping address", "pick-up location"
-  ];
+
+  let foundMarkers: { index: number, type: string, label: string, priority: number }[] = [];
   
-  let firstPickupIdx = -1;
-  // Try anchors first
-  for (const key of pickupAnchors) {
-    const idx = lowerText.indexOf(key);
-    if (idx !== -1 && (firstPickupIdx === -1 || idx < firstPickupIdx)) {
-      firstPickupIdx = idx;
-    }
-  }
-  // If no anchor found, try keys
-  if (firstPickupIdx === -1) {
-    for (const key of pickupKeys) {
-      const idx = lowerText.indexOf(key);
-      if (idx !== -1 && (firstPickupIdx === -1 || idx < firstPickupIdx)) {
-        firstPickupIdx = idx;
+  for (const marker of stopMarkers) {
+    const matches = text.matchAll(new RegExp(marker.pattern, 'gi'));
+    for (const match of matches) {
+      let type = marker.type;
+      let label = "";
+      
+      if (type === 'auto') {
+        const sub = match[0].toLowerCase();
+        type = sub.includes('pick') || sub.includes('shipper') ? 'pickup' : 'delivery';
       }
-    }
-  }
-
-  const deliveryAnchors = [
-    "consignee - delivery", "consignee:", "destination:", "stop 2", "stop #2", "delivery 1 of",
-    "consignee", "destination", "deliver to", "delivering to", "drop off at", "receiver", "receiver #1",
-    "drop", "delv#", "stop 2: delivery", "stop 2: drop", "consignee #", "unload",
-    "delivery location"
-  ];
-  const deliveryKeys = [
-    "delivery", "dest", "drop", "unloading", "receiver", "del", "unloading point", "drop off", "receiving address", "delivery location", "unload"
-  ];
-  
-  let firstDeliveryIdx = -1;
-  
-  if (firstPickupIdx !== -1) {
-    // Try anchors first (after pickup)
-    for (const key of deliveryAnchors) {
-      const idx = lowerText.indexOf(key, firstPickupIdx + 10); // Offset to skip the anchor itself
-      if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
-        firstDeliveryIdx = idx;
-      }
-    }
-    // If no anchor found, try keys
-    if (firstDeliveryIdx === -1) {
-      for (const key of deliveryKeys) {
-        const idx = lowerText.indexOf(key, firstPickupIdx + 10);
-        if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
-          firstDeliveryIdx = idx;
-        }
-      }
-    }
-  } else {
-    // If no pickup found, search for delivery from start
-    for (const key of deliveryAnchors) {
-      const idx = lowerText.indexOf(key);
-      if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
-        firstDeliveryIdx = idx;
-      }
-    }
-    if (firstDeliveryIdx === -1) {
-      for (const key of deliveryKeys) {
-        const idx = lowerText.indexOf(key);
-        if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
-          firstDeliveryIdx = idx;
-        }
-      }
-    }
-  }
-
-  let pickupSection = text;
-  let deliverySection = "";
-
-  if (firstPickupIdx !== -1 && firstDeliveryIdx !== -1 && firstDeliveryIdx > firstPickupIdx) {
-    // Pickup section: From first pickup keyword to delivery keyword
-    pickupSection = text.substring(firstPickupIdx, firstDeliveryIdx);
-    // Delivery section: From delivery keyword to end
-    deliverySection = text.substring(firstDeliveryIdx);
-  } else if (firstPickupIdx !== -1) {
-    // Only found pickup?
-    pickupSection = text.substring(firstPickupIdx);
-  } else if (firstDeliveryIdx !== -1) {
-    // Only found delivery?
-    // Assume everything before delivery is pickup/header
-    pickupSection = text.substring(0, firstDeliveryIdx);
-    deliverySection = text.substring(firstDeliveryIdx);
-  }
-
-  // Extract Times & Dates
-  const puTimeMatch = pickupSection.match(PATTERNS.time);
-  if (puTimeMatch) {
-    let time = normalizeTime(puTimeMatch[1]);
-    const tzMatch = pickupSection.match(PATTERNS.timezone);
-    if (tzMatch) {
-      time += ` ${tzMatch[1].toUpperCase()}`;
-    }
-    result.pickupTime = time;
-  }
-
-  const puDateMatch = pickupSection.match(PATTERNS.date);
-  if (puDateMatch) result.pickupDate = normalizeDate(puDateMatch[1]);
-
-  const delTimeMatch = deliverySection.match(PATTERNS.time);
-  if (delTimeMatch) {
-    let time = normalizeTime(delTimeMatch[1]);
-    const tzMatch = deliverySection.match(PATTERNS.timezone);
-    if (tzMatch) {
-      time += ` ${tzMatch[1].toUpperCase()}`;
-    }
-    result.deliveryTime = time;
-  }
-
-  // Extract Addresses - Find earliest valid address in each section
-  const findEarliestAddress = (section: string): string => {
-    const matches: { text: string, index: number, patternIdx: number }[] = [];
-    for (let i = 0; i < PATTERNS.address.length; i++) {
-      const pattern = PATTERNS.address[i];
-      const mAll = section.matchAll(new RegExp(pattern, 'gi'));
-      for (const m of mAll) {
-        const cleaned = cleanAddress(m[0]);
-        if (cleaned) {
-          matches.push({ text: cleaned, index: m.index || 0, patternIdx: i });
-        }
-      }
-    }
-    if (matches.length === 0) return "";
-    
-    // Prioritize pattern 0 (Full address with street) over pattern 1 (City, ST)
-    const fullAddressMatches = matches.filter(m => m.patternIdx === 0);
-    if (fullAddressMatches.length > 0) {
-      fullAddressMatches.sort((a, b) => a.index - b.index);
-      return fullAddressMatches[0].text;
-    }
-    
-    matches.sort((a, b) => a.index - b.index);
-    return matches[0].text;
-  };
-
-  result.originAddress = findEarliestAddress(pickupSection);
-  result.destinationAddress = findEarliestAddress(deliverySection);
-
-  // Address extraction fallback if sectioning failed
-  if (!result.originAddress) {
-    const allAddresses: { text: string, index: number, patternIdx: number }[] = [];
-    for (let i = 0; i < PATTERNS.address.length; i++) {
-      const pattern = PATTERNS.address[i];
-      const matches = text.matchAll(new RegExp(pattern, 'gi'));
-      for (const m of matches) {
-        const cleaned = cleanAddress(m[0]);
-        if (cleaned) {
-          allAddresses.push({ text: cleaned, index: m.index || 0, patternIdx: i });
-        }
-      }
-    }
-    
-    if (allAddresses.length > 0) {
-      const fullMatches = allAddresses.filter(m => m.patternIdx === 0).sort((a, b) => a.index - b.index);
-      if (fullMatches.length > 0) {
-        result.originAddress = fullMatches[0].text;
+      
+      if (match[1] && match[2]) {
+        label = `${type.charAt(0).toUpperCase() + type.slice(1)} ${match[1]} of ${match[2]}`;
+      } else if (match[1]) {
+        label = `${type.charAt(0).toUpperCase() + type.slice(1)} ${match[1]}`;
       } else {
-        allAddresses.sort((a, b) => a.index - b.index);
-        result.originAddress = allAddresses[0].text;
+        label = `${type.charAt(0).toUpperCase() + type.slice(1)}`;
+      }
+      
+      // Avoid duplicates at same index
+      if (!foundMarkers.some(m => Math.abs(m.index - (match.index || 0)) < 10)) {
+        foundMarkers.push({ index: match.index || 0, type, label, priority: marker.priority });
       }
     }
   }
-  if (!result.destinationAddress) {
-    const allAddresses: { text: string, index: number, patternIdx: number }[] = [];
-    for (let i = 0; i < PATTERNS.address.length; i++) {
-      const pattern = PATTERNS.address[i];
-      const matches = text.matchAll(new RegExp(pattern, 'gi'));
-      for (const m of matches) {
-        const cleaned = cleanAddress(m[0]);
-        if (cleaned) {
-          allAddresses.push({ text: cleaned, index: m.index || 0, patternIdx: i });
-        }
-      }
-    }
+
+  // If we found high priority markers (numbered stops), filter out low priority ones (generic headers)
+  const maxPriority = foundMarkers.length > 0 ? Math.max(...foundMarkers.map(m => m.priority)) : 0;
+  if (maxPriority > 1) {
+    foundMarkers = foundMarkers.filter(m => m.priority === maxPriority);
+  }
+
+  foundMarkers.sort((a, b) => a.index - b.index);
+
+  // If no markers found, use legacy logic as fallback
+  if (foundMarkers.length === 0) {
+    const pickupIdx = text.toLowerCase().indexOf('pickup');
+    const deliveryIdx = text.toLowerCase().indexOf('delivery', pickupIdx + 1);
     
-    if (allAddresses.length > 1) {
-      // Pick the last one that isn't the origin
-      const filtered = allAddresses.filter(a => a.text !== result.originAddress);
-      if (filtered.length > 0) {
-        const fullMatches = filtered.filter(m => m.patternIdx === 0).sort((a, b) => b.index - a.index);
-        if (fullMatches.length > 0) {
-          result.destinationAddress = fullMatches[0].text;
-        } else {
-          filtered.sort((a, b) => b.index - a.index);
-          result.destinationAddress = filtered[0].text;
+    if (pickupIdx !== -1) foundMarkers.push({ index: pickupIdx, type: 'pickup', label: 'Pickup', priority: 1 });
+    if (deliveryIdx !== -1) foundMarkers.push({ index: deliveryIdx, type: 'delivery', label: 'Delivery', priority: 1 });
+  }
+
+  // Split text into sections based on markers
+  for (let i = 0; i < foundMarkers.length; i++) {
+    const start = foundMarkers[i].index;
+    const end = (i < foundMarkers.length - 1) ? foundMarkers[i + 1].index : text.length;
+    const section = text.substring(start, end);
+    
+    const findEarliestAddress = (sec: string): string => {
+      const matches: { text: string, index: number, patternIdx: number }[] = [];
+      for (let j = 0; j < PATTERNS.address.length; j++) {
+        const pattern = PATTERNS.address[j];
+        const mAll = sec.matchAll(new RegExp(pattern, 'gi'));
+        for (const m of mAll) {
+          const cleaned = cleanAddress(m[0]);
+          if (cleaned) matches.push({ text: cleaned, index: m.index || 0, patternIdx: j });
         }
       }
+      if (matches.length === 0) return "";
+      const full = matches.filter(m => m.patternIdx === 0).sort((a, b) => a.index - b.index);
+      if (full.length > 0) return full[0].text;
+      matches.sort((a, b) => a.index - b.index);
+      return matches[0].text;
+    };
+
+    const timeMatch = section.match(PATTERNS.time);
+    let time = timeMatch ? normalizeTime(timeMatch[1]) : "";
+    const tzMatch = section.match(PATTERNS.timezone);
+    if (time && tzMatch) time += ` ${tzMatch[1].toUpperCase()}`;
+
+    const dateMatch = section.match(PATTERNS.date);
+    const date = dateMatch ? normalizeDate(dateMatch[1]) : "";
+    const address = findEarliestAddress(section);
+
+    result.stops.push({
+      type: foundMarkers[i].type as 'pickup' | 'delivery',
+      label: foundMarkers[i].label,
+      address,
+      date,
+      time
+    });
+  }
+
+  // Deduplicate stops by address to avoid redundant steps for the same location
+  const uniqueStops: Stop[] = [];
+  for (const stop of result.stops) {
+    if (stop.address && !uniqueStops.some(s => s.address === stop.address)) {
+      uniqueStops.push(stop);
     }
+  }
+  result.stops = uniqueStops;
+
+  // Populate legacy fields for compatibility
+  const pickups = result.stops.filter(s => s.type === 'pickup');
+  const deliveries = result.stops.filter(s => s.type === 'delivery');
+
+  if (pickups.length > 0) {
+    result.pickupTime = pickups[0].time;
+    result.pickupDate = pickups[0].date;
+    result.originAddress = pickups[0].address;
+  }
+  if (deliveries.length > 0) {
+    const lastDel = deliveries[deliveries.length - 1];
+    result.deliveryTime = lastDel.time;
+    result.destinationAddress = lastDel.address;
   }
 
   return result;
