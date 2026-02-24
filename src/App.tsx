@@ -415,6 +415,27 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
     setIsDragging(false);
   };
 
+  const handleWheel = (e: React.WheelEvent) => {
+    // Zoom with wheel
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setScale(s => Math.min(Math.max(s + delta, 0.5), 5));
+  };
+
+  // Use a non-passive listener to prevent page scroll during zoom
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const preventDefaultWheel = (e: WheelEvent) => {
+      if (e.currentTarget === viewport) {
+        e.preventDefault();
+      }
+    };
+
+    viewport.addEventListener('wheel', preventDefaultWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', preventDefaultWheel);
+  }, []);
+
   return (
     <div className={`w-full ${isAutoZoomEnabled ? 'h-full' : 'h-auto'} overflow-hidden rounded-lg shadow-lg border relative ${isDarkMode ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-slate-100'} flex flex-col`}>
       {/* Page Navigation */}
@@ -487,6 +508,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
+        onWheel={handleWheel}
       >
         <div 
           ref={contentRef}
@@ -698,6 +720,30 @@ export default function App() {
     const key = STEPS[currentStepIndex].key;
     setExtractedData({ ...extractedData, [key]: val });
   };
+
+  // Keyboard Navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (appState !== 'verify') return;
+      
+      // Don't navigate if user is typing in an input, unless it's Enter
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        if (e.key === 'Enter') {
+          handleNextStep();
+        }
+        return;
+      }
+
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        handleNextStep();
+      } else if (e.key === 'ArrowLeft') {
+        handlePrevStep();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [appState, currentStepIndex, extractedData]);
 
   const finishVerification = (data: ParsedRateCon | null = extractedData) => {
     if (!data) return;
