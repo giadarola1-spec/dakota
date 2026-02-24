@@ -5,7 +5,7 @@
 // Regex patterns
 const PATTERNS = {
   loadNumber: [
-    /(?:Load\s*#|Order\s*#|PO\s*#|PO\s*:|Order\s*:|Shipment\s*ID|Pro\s*#|Ref\s*#|Reference\s*#|Booking\s*#|Confirmation\s*#|Confirmation\s*-\s*#|Control\s*#|Trip\s*#|Job\s*#|Shipment\s*#|Arrive\s*Order|Convoy\s*ID|Reference\s*ID|Service\s*for\s*Load\s*#)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
+    /(?:Load\s*#|Order\s*#|PO\s*#|PO\s*:|Order\s*:|Shipment\s*ID|Pro\s*#|Ref\s*#|Reference\s*#|Booking\s*#|Confirmation\s*#|Confirmation\s*-\s*#|Control\s*#|Trip\s*#|Job\s*#|Shipment\s*#|Arrive\s*Order|Convoy\s*ID|Reference\s*ID|Service\s*for\s*Load\s*#|Carrier\s*Confirmation\s*for\s*Load|FB\s*#)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
     /(?:Ref\s*#|Reference)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
     /\b(\d{7,})\b/ // Fallback for long numeric strings
   ],
@@ -14,9 +14,9 @@ const PATTERNS = {
     /(\d+(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs|kg|kilograms)/i
   ],
   rate: [
-    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})(?:\.\d{2})?)/i, // Prefer matches with commas and decimals
-    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$\s*(\d+(?:\.\d{2})?)/i, // Prefer matches with $
-    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i,
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})(?:\.\d{2})?)/i, // Prefer matches with commas and decimals
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$\s*(\d+(?:\.\d{2})?)/i, // Prefer matches with $
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i,
     /\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/
   ],
   // Time patterns: Look for HH:MM AM/PM, Military, or TBD
@@ -188,7 +188,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const pickupAnchors = [
     "shipper - pickup", "shipper:", "origin:", "stop 1", "stop #1", "pickup 1 of", 
     "shipper", "origin", "pick up at", "picking up at", "pickup", "pku#",
-    "stop 1: pick up", "stop 1: pickup"
+    "stop 1: pick up", "stop 1: pickup", "load at", "load at:", "shipper :", "name/address"
   ];
   const pickupKeys = [
     "pick up", "pick-up", "pickup", "loading", "pu", "p/u", "facility name", "shipping address", "pick-up location"
@@ -215,10 +215,10 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const deliveryAnchors = [
     "consignee - delivery", "consignee:", "destination:", "stop 2", "stop #2", "delivery 1 of",
     "consignee", "destination", "deliver to", "delivering to", "drop off at", "receiver", "receiver #1",
-    "drop", "delv#", "stop 2: delivery", "stop 2: drop"
+    "drop", "delv#", "stop 2: delivery", "stop 2: drop", "consignee #", "unload"
   ];
   const deliveryKeys = [
-    "delivery", "dest", "drop", "unloading", "receiver", "del", "unloading point", "drop off", "receiving address", "delivery location"
+    "delivery", "dest", "drop", "unloading", "receiver", "del", "unloading point", "drop off", "receiving address", "delivery location", "unload"
   ];
   
   let firstDeliveryIdx = -1;
@@ -240,6 +240,22 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
         }
       }
     }
+  } else {
+    // If no pickup found, search for delivery from start
+    for (const key of deliveryAnchors) {
+      const idx = lowerText.indexOf(key);
+      if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
+        firstDeliveryIdx = idx;
+      }
+    }
+    if (firstDeliveryIdx === -1) {
+      for (const key of deliveryKeys) {
+        const idx = lowerText.indexOf(key);
+        if (idx !== -1 && (firstDeliveryIdx === -1 || idx < firstDeliveryIdx)) {
+          firstDeliveryIdx = idx;
+        }
+      }
+    }
   }
 
   let pickupSection = text;
@@ -255,6 +271,8 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     pickupSection = text.substring(firstPickupIdx);
   } else if (firstDeliveryIdx !== -1) {
     // Only found delivery?
+    // Assume everything before delivery is pickup/header
+    pickupSection = text.substring(0, firstDeliveryIdx);
     deliverySection = text.substring(firstDeliveryIdx);
   }
 
