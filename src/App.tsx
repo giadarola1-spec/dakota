@@ -245,12 +245,26 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
         cleanHighlight = timeWithTzMatch[1];
       }
       
+      const highlightWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+      const isMatch = (itemStr: string) => {
+        const cleanItem = itemStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (cleanItem.length < 2) return false;
+        if (cleanItem.includes(cleanHighlight)) return true;
+        if (cleanHighlight.length > 6 && cleanItem.length >= 4 && cleanHighlight.includes(cleanItem)) return true;
+        if (cleanHighlight.length > 10 && highlightWords.length > 0) {
+          return highlightWords.some(w => {
+            const cw = w.replace(/[^a-z0-9]/g, '');
+            return cw.length >= 4 && cleanItem.includes(cw);
+          });
+        }
+        return false;
+      };
+
       // Check current page first
       if (pageData) {
         const textContent = await pageData.page.getTextContent();
-        const hasMatch = textContent.items.some((item: any) => 
-          item.str.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanHighlight)
-        );
+        const hasMatch = textContent.items.some((item: any) => isMatch(item.str));
         if (hasMatch) return; // Already on the right page
       }
 
@@ -259,9 +273,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
         if (i === currentPage) continue;
         const page = await pdfDocument.getPage(i);
         const textContent = await page.getTextContent();
-        const hasMatch = textContent.items.some((item: any) => 
-          item.str.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanHighlight)
-        );
+        const hasMatch = textContent.items.some((item: any) => isMatch(item.str));
         if (hasMatch) {
           setCurrentPage(i);
           return;
@@ -295,23 +307,37 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
         const textContent = await page.getTextContent();
         let cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
         
-        // If it ends with 'lbs', try searching without it as well
         if (cleanHighlight.endsWith('lbs')) {
           cleanHighlight = cleanHighlight.replace(/lbs$/, '');
         }
         
-        // If it's a time with a timezone (e.g. 0440est), strip the timezone
         const timeWithTzMatch = cleanHighlight.match(/^(\d{4})(est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
         if (timeWithTzMatch) {
           cleanHighlight = timeWithTzMatch[1];
         }
 
+        const highlightWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
         let firstMatchRect: number[] | null = null;
 
         textContent.items.forEach((item: any) => {
-          const itemStr = item.str.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const itemStr = item.str;
+          const cleanItem = itemStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanItem.length < 2) return;
+
+          let isMatch = false;
+          if (cleanItem.includes(cleanHighlight)) {
+            isMatch = true;
+          } else if (cleanHighlight.length > 6 && cleanItem.length >= 4 && cleanHighlight.includes(cleanItem)) {
+            isMatch = true;
+          } else if (cleanHighlight.length > 10 && highlightWords.length > 0) {
+            isMatch = highlightWords.some(w => {
+              const cw = w.replace(/[^a-z0-9]/g, '');
+              return cw.length >= 4 && cleanItem.includes(cw);
+            });
+          }
           
-          if (itemStr.length > 0 && itemStr.includes(cleanHighlight)) {
+          if (isMatch) {
             // item.transform is [scaleX, skewY, skewX, scaleY, x, y]
             const pdfX = item.transform[4];
             const pdfY = item.transform[5];
@@ -325,7 +351,6 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
               pdfY + pdfHeight
             ]);
 
-            // rect is [x1, y1, x2, y2] in canvas coordinates
             const x = Math.min(rect[0], rect[2]);
             const y = Math.min(rect[1], rect[3]);
             const w = Math.abs(rect[0] - rect[2]);
@@ -366,6 +391,10 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
 
           setScale(newScale);
           setPosition({ x: translateX, y: translateY });
+        } else if (isAutoZoomEnabled && !firstMatchRect) {
+          // If no match found, reset to fit page so user isn't stuck in a random zoomed area
+          setScale(1);
+          setPosition({ x: 0, y: 0 });
         }
 
       } catch (err) {
