@@ -8,6 +8,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.624/b
 
 import { parseRateConfirmation, ParsedRateCon } from './utils/parser';
 import { DottedMapBackground } from './components/DottedMapBackground';
+import { LoadingScreen } from './components/LoadingScreen';
 
 // --- Types ---
 
@@ -620,6 +621,7 @@ function useLocalStorage<T>(key: string, initialValue: T) {
 }
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -648,6 +650,14 @@ export default function App() {
   const [renameText, setRenameText] = useState("");
   const [copiedRename, setCopiedRename] = useState(false);
   const [team, setTeam] = useLocalStorage<'green' | 'purple' | 'red' | 'blue' | 'none'>("dakota_team", 'none');
+
+  // Loading Screen Effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Settings State
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -1201,6 +1211,9 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.text} font-sans selection:bg-indigo-500/30 transition-colors duration-300 flex flex-col relative overflow-hidden`}>
+      <AnimatePresence>
+        {isLoading && <LoadingScreen isDarkMode={isDarkMode} />}
+      </AnimatePresence>
       <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#4F46E5" : "#94A3B8"} />
       
       {/* Header */}
