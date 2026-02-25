@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to CDN for reliable production behavior
@@ -656,8 +656,9 @@ export default function App() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   
-  // App State: 'upload' | 'verify' | 'results'
-  const [appState, setAppState] = useState<'upload' | 'verify' | 'results'>('upload');
+  // App State: 'upload' | 'verify' | 'results' | 'stats'
+  const [appState, setAppState] = useState<'upload' | 'verify' | 'results' | 'stats'>('upload');
+  const [prevAppState, setPrevAppState] = useState<'upload' | 'verify' | 'results'>('upload');
   
   // Data State
   const [extractedData, setExtractedData] = useState<ParsedRateCon | null>(null);
@@ -1083,7 +1084,16 @@ export default function App() {
   const renderResults = () => (
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className={`text-2xl font-display font-medium ${theme.text}`}>Generated Output</h2>
+        <div className="flex items-baseline gap-3">
+          <h2 className={`text-2xl font-display font-medium ${theme.text}`}>
+            {extractedData?.loadNumber || "Generated Output"}
+          </h2>
+          {extractedData?.rate && (
+            <span className={`text-lg ${theme.textMuted} opacity-60 font-normal`}>
+              ${extractedData.rate}
+            </span>
+          )}
+        </div>
         <button 
           onClick={() => setAppState('upload')}
           className={`text-sm ${theme.textMuted} hover:${theme.text} flex items-center gap-2 transition-colors`}
@@ -1257,7 +1267,22 @@ export default function App() {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={() => {
+                if (appState !== 'stats') {
+                  setPrevAppState(appState as any);
+                  setAppState('stats');
+                } else {
+                  setAppState(prevAppState);
+                }
+              }}
+              className={`text-sm font-medium transition-colors ${appState === 'stats' ? 'text-indigo-500' : `${theme.textMuted} hover:${theme.text}`}`}
+            >
+              Estadísticas
+            </button>
+
+            <div className="flex items-center gap-4">
             {appState !== 'upload' && (
               <div className={`hidden md:flex items-center gap-2 text-xs font-medium ${theme.textMuted} ${theme.cardBg} px-3 py-1.5 rounded-full border ${theme.border}`}>
                 <span className={appState === 'verify' ? 'text-indigo-500' : ''}>Verify</span>
@@ -1274,7 +1299,8 @@ export default function App() {
             </button>
           </div>
         </div>
-      </header>
+      </div>
+    </header>
 
       {/* Main Layout */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 relative z-10 flex flex-col">
@@ -1287,6 +1313,109 @@ export default function App() {
             transition={{ duration: 0.2 }}
             className="max-w-7xl mx-auto w-full flex-1 flex flex-col"
           >
+            {appState === 'stats' && (
+              <div className="flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full py-12 px-4">
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center mb-16 space-y-4"
+                >
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-4">
+                    <TrendingUp size={12} />
+                    System Performance
+                  </div>
+                  <h2 className={`text-5xl font-geologica font-bold tracking-tight ${theme.text} mb-2`}>
+                    Métricas de <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-violet-500">Precisión</span>
+                  </h2>
+                  <p className={`${theme.textMuted} max-w-lg mx-auto text-sm leading-relaxed`}>
+                    Análisis detallado del rendimiento de nuestro motor de extracción inteligente basado en el procesamiento histórico de documentos por proveedor.
+                  </p>
+                </motion.div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                  {[
+                    { name: 'Traffix', success: 99.9, color: '#BF0A30', icon: Target, desc: 'Optimización máxima para formatos estructurados.' },
+                    { name: 'Arrive', success: 90.0, color: '#6366F1', icon: Zap, desc: 'Alta fiabilidad en documentos de logística rápida.' },
+                    { name: 'TQL', success: 85.0, color: '#002868', icon: Search, desc: 'Extracción avanzada en tablas complejas.' }
+                  ].map((stat, idx) => (
+                    <motion.div
+                      key={stat.name}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      whileHover={{ y: -8, transition: { duration: 0.2 } }}
+                      className={`${theme.cardBg} border ${theme.border} p-8 rounded-[2rem] shadow-sm relative overflow-hidden group flex flex-col items-center text-center`}
+                    >
+                      {/* Subtle Background Pattern */}
+                      <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity">
+                        <stat.icon size={120} strokeWidth={1} />
+                      </div>
+
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'}`}>
+                        <stat.icon size={24} style={{ color: stat.color }} />
+                      </div>
+
+                      <h3 className={`text-lg font-bold ${theme.text} mb-2`}>{stat.name}</h3>
+                      <p className={`${theme.textMuted} text-xs mb-8 px-4 leading-relaxed`}>{stat.desc}</p>
+                      
+                      <div className="relative flex items-center justify-center mb-6">
+                        <svg className="w-40 h-40 transform -rotate-90">
+                          <circle
+                            cx="80"
+                            cy="80"
+                            r="70"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="transparent"
+                            className={isDarkMode ? 'text-white/5' : 'text-slate-100'}
+                          />
+                          <motion.circle
+                            cx="80"
+                            cy="80"
+                            r="70"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="transparent"
+                            strokeDasharray={439.8}
+                            initial={{ strokeDashoffset: 439.8 }}
+                            animate={{ strokeDashoffset: 439.8 - (439.8 * stat.success) / 100 }}
+                            transition={{ duration: 2, ease: "circOut", delay: 0.5 }}
+                            strokeLinecap="round"
+                            style={{ color: stat.color }}
+                          />
+                        </svg>
+                        <div className="absolute flex flex-col items-center">
+                          <span className={`text-3xl font-geologica font-bold ${theme.text}`}>{stat.success}%</span>
+                          <span className={`${theme.textMuted} text-[10px] font-bold uppercase tracking-widest`}>Accuracy</span>
+                        </div>
+                      </div>
+
+                      <div className="w-full h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${stat.success}%` }}
+                          transition={{ duration: 1.5, ease: "easeOut", delay: 0.8 }}
+                          className="h-full rounded-full"
+                          style={{ backgroundColor: stat.color }}
+                        />
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                <motion.button 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 1 }}
+                  onClick={() => setAppState(prevAppState)}
+                  className={`mt-16 flex items-center gap-2 ${theme.textMuted} hover:${theme.text} transition-colors text-sm font-medium group`}
+                >
+                  <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                  Volver al Panel Principal
+                </motion.button>
+              </div>
+            )}
+
             {appState === 'upload' && (
               <label 
                 onDragOver={handleDragOver}
