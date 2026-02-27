@@ -721,6 +721,7 @@ export default function App() {
 
     // Handle PDF data via postMessage (for Gmail attachments where fetch fails)
     const handleMessage = async (event: MessageEvent) => {
+      // 1. OPEN_PDF_DATA (Legacy/Alternative)
       if (event.data && event.data.type === 'OPEN_PDF_DATA') {
         const { data, name } = event.data; // data should be base64 string or ArrayBuffer
         if (data) {
@@ -748,6 +749,31 @@ export default function App() {
            } finally {
              setIsProcessing(false);
            }
+        }
+      }
+
+      // 2. LOAD_PDF_BASE64 (New Standard)
+      if (event.data && event.data.type === 'LOAD_PDF_BASE64') {
+        const { pdfData } = event.data;
+        
+        try {
+          // Convert Base64 to File
+          const byteCharacters = atob(pdfData);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const file = new File([byteArray], "rate_confirmation.pdf", { type: "application/pdf" });
+
+          console.log("PDF received from extension successfully");
+          
+          // Use processFile to handle the File object directly
+          await processFile(file);
+
+        } catch (error) {
+          console.error("Error processing PDF from extension:", error);
+          alert("Error processing PDF from extension.");
         }
       }
     };
