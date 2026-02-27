@@ -700,6 +700,8 @@ export default function App() {
         try {
           // Fetch the PDF
           const response = await fetch(pdfUrl);
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          
           const blob = await response.blob();
           const arrayBuffer = await blob.arrayBuffer();
           
@@ -710,15 +712,54 @@ export default function App() {
           await processPdfData(pdf);
         } catch (error) {
            console.error("Extension Load Error:", error);
+           alert("Could not auto-load PDF from extension. Security restrictions may prevent direct access. Please download the file and drag it here.");
         } finally {
            setIsProcessing(false);
         }
       }
     };
 
+    // Handle PDF data via postMessage (for Gmail attachments where fetch fails)
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.data && event.data.type === 'OPEN_PDF_DATA') {
+        const { data, name } = event.data; // data should be base64 string or ArrayBuffer
+        if (data) {
+           setIsProcessing(true);
+           try {
+             // Convert base64 to Uint8Array if needed
+             let pdfData = data;
+             if (typeof data === 'string') {
+               const binaryString = window.atob(data);
+               const len = binaryString.length;
+               const bytes = new Uint8Array(len);
+               for (let i = 0; i < len; i++) {
+                 bytes[i] = binaryString.charCodeAt(i);
+               }
+               pdfData = bytes.buffer;
+             }
+
+             const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+             setPdfDoc(pdf);
+             setFileName(name || "Extension Document.pdf");
+             await processPdfData(pdf);
+           } catch (error) {
+             console.error("Message Load Error:", error);
+             alert("Error loading PDF data from extension.");
+           } finally {
+             setIsProcessing(false);
+           }
+        }
+      }
+    };
+
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('message', handleMessage);
+    };
   }, []);
 
   // Settings State
@@ -1302,6 +1343,19 @@ export default function App() {
     <div className={`min-h-screen ${theme.bg} ${theme.text} font-sans selection:bg-indigo-500/30 transition-colors duration-300 flex flex-col relative overflow-hidden`}>
       <AnimatePresence>
         {isLoading && <LoadingScreen isDarkMode={isDarkMode} />}
+        {isProcessing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          >
+            <div className={`${theme.cardBg} p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4`}>
+              <RefreshCw className="animate-spin text-indigo-500" size={32} />
+              <p className={`font-medium ${theme.text}`}>Processing Document...</p>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
       <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#4F46E5" : "#94A3B8"} />
       
