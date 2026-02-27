@@ -721,15 +721,20 @@ export default function App() {
 
     // Handle PDF data via postMessage (for Gmail attachments where fetch fails)
     const handleMessage = async (event: MessageEvent) => {
-      if (event.data && event.data.type === 'OPEN_PDF_DATA') {
-        const { data, name } = event.data; // data should be base64 string or ArrayBuffer
+      // Support both old and new message types
+      if (event.data && (event.data.type === 'OPEN_PDF_DATA' || event.data.type === 'LOAD_PDF_BASE64')) {
+        const data = event.data.pdfData || event.data.data; // New uses pdfData, old uses data
+        const name = event.data.name || "Extension Document.pdf";
+        
         if (data) {
            setIsProcessing(true);
            try {
              // Convert base64 to Uint8Array if needed
              let pdfData = data;
              if (typeof data === 'string') {
-               const binaryString = window.atob(data);
+               // Clean base64 string if it has data URI prefix
+               const base64 = data.includes(',') ? data.split(',')[1] : data;
+               const binaryString = window.atob(base64);
                const len = binaryString.length;
                const bytes = new Uint8Array(len);
                for (let i = 0; i < len; i++) {
@@ -740,7 +745,7 @@ export default function App() {
 
              const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
              setPdfDoc(pdf);
-             setFileName(name || "Extension Document.pdf");
+             setFileName(name);
              await processPdfData(pdf);
            } catch (error) {
              console.error("Message Load Error:", error);
