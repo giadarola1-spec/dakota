@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to CDN for reliable production behavior
@@ -689,6 +689,41 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Extension Integration Effect
+  useEffect(() => {
+    const handleHashChange = async () => {
+      const hash = window.location.hash.substring(1);
+      if (!hash) return;
+      
+      const params = new URLSearchParams(hash);
+      const pdfUrl = params.get('pdfUrl');
+      
+      if (pdfUrl) {
+        setIsProcessing(true);
+        try {
+          // Fetch the PDF
+          const response = await fetch(pdfUrl);
+          const blob = await response.blob();
+          const arrayBuffer = await blob.arrayBuffer();
+          
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          setPdfDoc(pdf);
+          setFileName("Extension Document.pdf"); 
+          
+          await processPdfData(pdf);
+        } catch (error) {
+           console.error("Extension Load Error:", error);
+        } finally {
+           setIsProcessing(false);
+        }
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   // Settings State
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useLocalStorage("dakota_isDarkMode", true);
@@ -711,6 +746,38 @@ export default function App() {
     accentHover: 'hover:bg-indigo-500',
   };
 
+  const processPdfData = async (pdf: any) => {
+    let fullText = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      
+      // Sort items by visual position (top-to-bottom, left-to-right)
+      // item.transform: [scaleX, skewY, skewX, scaleY, x, y]
+      const items = (textContent.items as any[]).filter(item => item.str !== undefined);
+      
+      items.sort((a, b) => {
+        const yDiff = b.transform[5] - a.transform[5];
+        if (Math.abs(yDiff) > 5) { // Threshold for "same line"
+          return yDiff;
+        }
+        return a.transform[4] - b.transform[4];
+      });
+
+      const pageText = items.map((item: any) => item.str).join(" ");
+      fullText += pageText + "\n";
+    }
+
+    const data = parseRateConfirmation(fullText);
+    setExtractedData(data);
+    
+    const steps = getBaseSteps(data);
+    setCurrentSteps(steps);
+    
+    setAppState('verify');
+    setCurrentStepIndex(0);
+  };
+
   const processFile = async (uploadedFile: File) => {
     if (!uploadedFile) return;
     
@@ -721,36 +788,7 @@ export default function App() {
       const arrayBuffer = await uploadedFile.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       setPdfDoc(pdf);
-
-      let fullText = "";
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        
-        // Sort items by visual position (top-to-bottom, left-to-right)
-        // item.transform: [scaleX, skewY, skewX, scaleY, x, y]
-        const items = (textContent.items as any[]).filter(item => item.str !== undefined);
-        
-        items.sort((a, b) => {
-          const yDiff = b.transform[5] - a.transform[5];
-          if (Math.abs(yDiff) > 5) { // Threshold for "same line"
-            return yDiff;
-          }
-          return a.transform[4] - b.transform[4];
-        });
-
-        const pageText = items.map((item: any) => item.str).join(" ");
-        fullText += pageText + "\n";
-      }
-
-      const data = parseRateConfirmation(fullText);
-      setExtractedData(data);
-      
-      const steps = getBaseSteps(data);
-      setCurrentSteps(steps);
-      
-      setAppState('verify');
-      setCurrentStepIndex(0);
+      await processPdfData(pdf);
 
     } catch (error) {
       console.error("PDF Error:", error);
@@ -758,6 +796,19 @@ export default function App() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const sendToGmail = () => {
+    if (!extractedData) return;
+    
+    window.parent.postMessage({
+        type: 'DAKOTA_COMPLETE',
+        payload: {
+            to: extractedData.brokerEmail || "",
+            subject: `Confirmation Load #${extractedData.loadNumber}`,
+            body: `Rate confirmed: $${extractedData.rate}. Thanks.`
+        }
+    }, "*");
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1094,13 +1145,22 @@ export default function App() {
             </span>
           )}
         </div>
-        <button 
-          onClick={() => setAppState('upload')}
-          className={`text-sm ${theme.textMuted} hover:${theme.text} flex items-center gap-2 transition-colors`}
-        >
-          <RefreshCw size={14} />
-          Start Over
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={sendToGmail}
+            className={`text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm font-medium`}
+          >
+            <Mail size={16} />
+            Confirm & Reply in Gmail
+          </button>
+          <button 
+            onClick={() => setAppState('upload')}
+            className={`text-sm ${theme.textMuted} hover:${theme.text} flex items-center gap-2 transition-colors`}
+          >
+            <RefreshCw size={14} />
+            Start Over
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

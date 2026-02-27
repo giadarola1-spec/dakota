@@ -47,6 +47,7 @@ export interface ParsedRateCon {
   deliveryTime: string;
   originAddress: string;
   destinationAddress: string;
+  brokerEmail?: string;
   rawTextPreview: string;
 }
 
@@ -219,6 +220,12 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     }
   }
   result.rate = bestRate || (text.match(PATTERNS.rate[0])?.[1]?.replace(/,/g, '') || "");
+  
+  // Extract Broker Email
+  const emailMatch = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/);
+  if (emailMatch) {
+    result.brokerEmail = emailMatch[0];
+  }
 
   // --- Multi-Stop Detection with Segmentation ---
   
