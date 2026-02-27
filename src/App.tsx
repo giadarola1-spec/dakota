@@ -683,10 +683,7 @@ export default function App() {
 
   // Loading Screen Effect
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 3000);
-    return () => clearTimeout(timer);
+    setIsLoading(false);
   }, []);
 
   // Extension Integration Effect
@@ -1146,13 +1143,6 @@ export default function App() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          <button 
-            onClick={sendToGmail}
-            className={`text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm font-medium`}
-          >
-            <Mail size={16} />
-            Confirm & Reply in Gmail
-          </button>
           <button 
             onClick={() => setAppState('upload')}
             className={`text-sm ${theme.textMuted} hover:${theme.text} flex items-center gap-2 transition-colors`}
