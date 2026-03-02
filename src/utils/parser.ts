@@ -24,8 +24,10 @@ const PATTERNS = {
   date: /\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/,
   timezone: /\b(EST|CST|MST|PST|EDT|CDT|MDT|PDT|AST|HST|AKST|AKDT|UTC|GMT)\b/i,
   address: [
-    /(\d+\s+[A-Z0-9\s\.,#-]{2,60}?[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
-    /\b([A-Z][A-Za-z \t\.\/]{1,30})(?:,|\s+)\s*([A-Z]{2})\b(?:\s*(\d{5}(?:-\d{4})?))?/i
+    /(\d{2,}\s+[A-Z0-9\s\n\.,#-]{2,100}?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
+    /\b([A-Z0-9\s\n\.,#-]{5,100}?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
+    /\b([A-Z][A-Za-z \t\n\.\/]{2,30})(?:,|\s+|\n)\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/i,
+    /\b([A-Z][A-Za-z \t\n\.\/]{2,30})(?:,|\s+|\n)\s*([A-Z]{2})\b(?:\s*(\d{5}(?:-\d{4})?))?/i
   ]
 };
 
@@ -92,13 +94,14 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
 
   const cleanAddress = (addr: string): string => {
     if (!addr) return "";
-    const cleaned = addr.replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF|PICK-UP\s*LOCATION|DELIVERY\s*LOCATION|DATE\s*TIME|NOTES|SPECIAL\s*INSTRUCTIONS|UP|PICK|INFO|CONTACT|NAME|PHONE|EMAIL|FAX|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|UNLOADING|RECEIPT|EXCHANGE|NOTE|CARRIER)\s*[:\/\-]?\s*)+/i, "").trim();
+    const cleaned = addr.replace(/\n/g, " ").replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF|PICK-UP\s*LOCATION|DELIVERY\s*LOCATION|DATE\s*TIME|NOTES|SPECIAL\s*INSTRUCTIONS|UP|PICK|INFO|CONTACT|NAME|PHONE|EMAIL|FAX|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|UNLOADING|RECEIPT|EXCHANGE|NOTE|CARRIER|COMMODITY|HANDLING|UNITS|STACKABLE|PIECES|DIMS|TEMP|TEMPERATURE|CONFIRM|RECEIPT|OF)\s*[:\/\-]?\s*)+/i, "").trim();
     
     const blacklist = [
       "1701 Edison Drive", "PO Box 9049", "Louisville, KY 40209", "Milford, OH 45150",
       "FLEET ONE FACTORING", "WEX", "PO BOX 94565", "CLEVELAND, OH 44101",
       "pickup / delivery", "pickup/delivery", "pickup / delivery OR BOTH",
-      "delivery OR BOTH", "pickup / delivery OR"
+      "delivery OR BOTH", "pickup / delivery OR", "Pallet Yes", "Piece 20000",
+      "Pallet", "Piece", "Commodity", "Handling Units"
     ];
     
     for (const item of blacklist) {
