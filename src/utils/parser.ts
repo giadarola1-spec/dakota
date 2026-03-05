@@ -20,7 +20,8 @@ const PATTERNS = {
     /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay|Amount\s*to\s*invoice)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i,
     /\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/
   ],
-  time: /(?:(?:Appt\s*|Appointment\s*Time\s*[:]?|Appointment\s*|Window\s*|ETA\s*|Scheduled\s*|Arrival\s*|Time\s*[:]?|Check-in|FCFS|ASAP|Delivery\s*Window|PU\s*Date\s*\/\s*Time|DEL\s*Date\s*\/\s*Time|Pick\s*up\s*time|Delivery\s*time|Schedule|Earliest|Latest|Appointment\s*Scheduled\s*For|Pick-up\s*Location|Delivery\s*Location)\s*[:.]?\s*)?(\d{1,2}:\d{2}\s*(?:AM|PM)?|\d{4}\s*hrs?|TBD|ASAP|FCFS)/i,
+  time: /(?:(?:Appt\s*|Appointment\s*Time\s*[:]?|Appointment\s*|Window\s*|ETA\s*|Scheduled\s*|Arrival\s*|Time\s*[:]?|Check-in|FCFS|ASAP|Delivery\s*Window|PU\s*Date\s*\/\s*Time|DEL\s*Date\s*\/\s*Time|Pick\s*up\s*time|Delivery\s*time|Schedule|Earliest|Latest|Appointment\s*Scheduled\s*For|Pick-up\s*Location|Delivery\s*Location)\s*[:.]?\s*)?(\d{1,2}[:.]\d{2}\s*(?:AM|PM)?|\d{4}\s*(?:hrs?|HRS?)?|TBD|ASAP|FCFS)(?:\s*[-–]\s*(\d{1,2}[:.]\d{2}\s*(?:AM|PM)?|\d{4}\s*(?:hrs?|HRS?)?))?/i,
+  stopReference: /(?:PU\s*Number|DO\s*Number|Ref\s*#|Reference\s*#|PO\s*#|Stop\s*Ref|Confirmation\s*#)\s*[:.]?\s*([A-Z0-9-]{4,})/i,
   date: /\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/,
   timezone: /\b(EST|CST|MST|PST|EDT|CDT|MDT|PDT|AST|HST|AKST|AKDT|UTC|GMT)\b/i,
   address: [
@@ -37,6 +38,7 @@ export interface Stop {
   date: string;
   time: string;
   label: string;
+  reference?: string;
 }
 
 export interface ParsedRateCon {
@@ -161,40 +163,49 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
 
   const normalizeTime = (t: string): string => {
     if (!t) return "";
-    const upper = t.toUpperCase();
+    const upper = t.toUpperCase().trim();
     if (upper === "TBD" || upper === "ASAP" || upper === "FCFS") return upper;
 
-    let clean = t.replace(/hrs?/i, '')
-                 .replace(/Appointment\s*Time\s*[:]?/i, '')
-                 .replace(/Appointment/i, '')
-                 .replace(/Appt/i, '')
-                 .replace(/Window/i, '')
-                 .replace(/ETA/i, '')
-                 .replace(/Scheduled/i, '')
-                 .replace(/Arrival/i, '')
-                 .replace(/Time\s*[:]?/i, '')
-                 .trim();
+    const parts = t.split(/[-–]/).map(p => p.trim());
     
-    const isPM = /PM/i.test(clean);
-    const isAM = /AM/i.test(clean);
-    clean = clean.replace(/(?:AM|PM)/i, '').trim();
-    
-    if (!clean.includes(':') && clean.length === 4 && !isNaN(Number(clean))) {
-      return `${clean.substring(0, 2)}:${clean.substring(2, 4)}`;
-    }
-
-    if (clean.includes(':')) {
-      let [hours, minutes] = clean.split(':');
-      let h = parseInt(hours, 10);
-      let m = minutes.substring(0, 2).padStart(2, '0');
+    const formatSingle = (val: string) => {
+      let clean = val.replace(/hrs?/i, '')
+                   .replace(/Appointment\s*Time\s*[:]?/i, '')
+                   .replace(/Appointment/i, '')
+                   .replace(/Appt/i, '')
+                   .replace(/Window/i, '')
+                   .replace(/ETA/i, '')
+                   .replace(/Scheduled/i, '')
+                   .replace(/Arrival/i, '')
+                   .replace(/Time\s*[:]?/i, '')
+                   .trim();
       
-      if (isPM && h < 12) h += 12;
-      if (isAM && h === 12) h = 0;
+      const isPM = /PM/i.test(clean);
+      const isAM = /AM/i.test(clean);
+      clean = clean.replace(/(?:AM|PM)/i, '').trim();
       
-      return `${h.toString().padStart(2, '0')}:${m}`;
-    }
+      if (!clean.includes(':') && !clean.includes('.') && clean.length === 4 && !isNaN(Number(clean))) {
+        return `${clean.substring(0, 2)}:${clean.substring(2, 4)}`;
+      }
 
-    return clean;
+      if (clean.includes(':') || clean.includes('.')) {
+        const separator = clean.includes(':') ? ':' : '.';
+        let [hours, minutes] = clean.split(separator);
+        let h = parseInt(hours, 10);
+        let m = minutes.substring(0, 2).padStart(2, '0');
+        
+        if (isPM && h < 12) h += 12;
+        if (isAM && h === 12) h = 0;
+        
+        return `${h.toString().padStart(2, '0')}:${m}`;
+      }
+      return clean;
+    };
+
+    if (parts.length > 1) {
+      return `${formatSingle(parts[0])} - ${formatSingle(parts[1])}`;
+    }
+    return formatSingle(parts[0]);
   };
 
   // --- Windowed Extraction for Header Fields ---
@@ -313,12 +324,15 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     
     // Windowed extraction within the stop section
     const timeMatch = section.match(PATTERNS.time);
-    let time = timeMatch ? normalizeTime(timeMatch[1]) : "";
+    let time = timeMatch ? normalizeTime(timeMatch[0]) : "";
     const tzMatch = section.match(PATTERNS.timezone);
     if (time && tzMatch) time += ` ${tzMatch[1].toUpperCase()}`;
 
     const dateMatch = section.match(PATTERNS.date);
     const date = dateMatch ? normalizeDate(dateMatch[1]) : "";
+
+    const refMatch = section.match(PATTERNS.stopReference);
+    const reference = refMatch ? refMatch[1] : "";
 
     // Address extraction: look for the first valid address in the section
     let address = "";
@@ -339,7 +353,8 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
       label: foundMarkers[i].label,
       address,
       date,
-      time
+      time,
+      reference
     });
   }
 

@@ -12,6 +12,19 @@ import { LoadingScreen } from './components/LoadingScreen';
 
 // --- Types ---
 
+type HistoryItem = {
+  id: string;
+  timestamp: number;
+  dateStr: string; // YYYY-MM-DD for grouping
+  loadNumber: string;
+  broker: string;
+  rate: string;
+  route: string;
+  notes: string;
+  chain: string;
+  rename: string;
+};
+
 type VerificationStep = {
   key: keyof ParsedRateCon | string;
   label: string;
@@ -803,6 +816,112 @@ const ManageView = ({
   );
 };
 
+const HistoryView = ({ 
+  theme, 
+  isDarkMode, 
+  history, 
+  onBack,
+  onSelectItem,
+  searchTerm
+}: {
+  theme: any,
+  isDarkMode: boolean,
+  history: HistoryItem[],
+  onBack: () => void,
+  onSelectItem: (item: HistoryItem) => void,
+  searchTerm: string
+}) => {
+  const filteredHistory = history.filter(item => 
+    item.loadNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.broker.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.route.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Group by date
+  const groups = filteredHistory.reduce((acc, item) => {
+    if (!acc[item.dateStr]) acc[item.dateStr] = [];
+    acc[item.dateStr].push(item);
+    return acc;
+  }, {} as Record<string, HistoryItem[]>);
+
+  const sortedDates = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr + 'T12:00:00'); // Avoid timezone shifts
+    return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-8 py-8 px-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <h2 className={`text-3xl font-display font-medium ${theme.text}`}>History</h2>
+          <p className={`${theme.textMuted} text-sm`}>Local storage of your processed loads</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={onBack}
+            className={`px-4 py-2 rounded-xl border ${theme.border} ${theme.textMuted} hover:${theme.text} hover:${theme.cardBg} transition-colors flex items-center gap-2`}
+          >
+            <ChevronLeft size={18} />
+            Back
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-12">
+        {sortedDates.map(date => (
+          <div key={date} className="space-y-4">
+            <h3 className={`text-sm font-bold uppercase tracking-widest ${theme.textMuted} flex items-center gap-3`}>
+              <span className="bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded text-[10px]">{groups[date].length}</span>
+              {formatDate(date)}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {groups[date].map(item => (
+                <div 
+                  key={item.id}
+                  onClick={() => onSelectItem(item)}
+                  className={`${theme.cardBg} border ${theme.border} p-5 rounded-2xl shadow-sm hover:border-indigo-500/50 transition-all cursor-pointer group relative overflow-hidden`}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h4 className={`font-bold ${theme.text} group-hover:text-indigo-500 transition-colors`}>#{item.loadNumber}</h4>
+                      <p className={`text-xs ${theme.textMuted} font-medium`}>{item.broker}</p>
+                    </div>
+                    <span className="text-emerald-500 font-mono text-sm font-bold">${item.rate}</span>
+                  </div>
+                  
+                  <div className={`text-[10px] ${theme.textMuted} font-mono line-clamp-2 mb-4 opacity-70`}>
+                    {item.route.split('\n')[0]} → {item.route.split('\n').pop()}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-white/5">
+                    <span className={`text-[10px] ${theme.textMuted}`}>{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <ChevronRight size={14} className={`${theme.textMuted} group-hover:translate-x-1 transition-transform`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {history.length === 0 && (
+          <div className="text-center py-20 space-y-4">
+            <div className={`w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto ${theme.textMuted}`}>
+              <FileText size={32} />
+            </div>
+            <p className={`${theme.textMuted} italic`}>No history found. Upload a RateCon to get started.</p>
+          </div>
+        )}
+
+        {history.length > 0 && filteredHistory.length === 0 && (
+          <p className={`text-center py-20 ${theme.textMuted} italic`}>No results matching "{searchTerm}"</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -810,13 +929,17 @@ export default function App() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   
-  // App State: 'upload' | 'verify' | 'results' | 'manage'
-  const [appState, setAppState] = useState<'upload' | 'verify' | 'results' | 'manage'>('upload');
+  // App State: 'upload' | 'verify' | 'results' | 'manage' | 'history'
+  const [appState, setAppState] = useState<'upload' | 'verify' | 'results' | 'manage' | 'history'>('upload');
   
   // Data State
   const [extractedData, setExtractedData] = useState<ParsedRateCon | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [currentSteps, setCurrentSteps] = useState<VerificationStep[]>([]);
+  
+  // History State
+  const [history, setHistory] = useLocalStorage<HistoryItem[]>("dakota_history", []);
+  const [searchTerm, setSearchTerm] = useState("");
   
   // Output States
   const [routeText, setRouteText] = useState("");
@@ -1158,6 +1281,22 @@ export default function App() {
     setNotesText(notes);
 
     setAppState('results');
+
+    // Save to History
+    const now = new Date();
+    const historyItem: HistoryItem = {
+      id: Math.random().toString(36).substring(2, 9),
+      timestamp: now.getTime(),
+      dateStr: now.toISOString().split('T')[0],
+      loadNumber: data.loadNumber || "UNKNOWN",
+      broker: broker,
+      rate: data.rate || "0",
+      route: route,
+      notes: notes,
+      chain: chain,
+      rename: rename
+    };
+    setHistory(prev => [historyItem, ...prev].slice(0, 100)); // Keep last 100
   };
 
   const generateChainString = (data: ParsedRateCon, tNum: string, brk: string, tm: string) => {
@@ -1569,8 +1708,34 @@ export default function App() {
               <div className="w-2.5 h-2.5 rounded-full bg-[#002868] shadow-sm" />
             </div>
           </div>
+
+          {/* Header Search Bar */}
+          <div className="flex-1 max-w-md mx-8 hidden sm:block">
+            <div className="relative group">
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${theme.textMuted} group-focus-within:text-indigo-500 transition-colors`} size={18} />
+              <input 
+                type="text"
+                placeholder="Search history (Load #, Broker, Route)..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  if (appState !== 'history' && e.target.value.length > 0) {
+                    setAppState('history');
+                  }
+                }}
+                className={`w-full pl-10 pr-4 py-2 rounded-xl border ${theme.border} ${theme.inputBg} ${theme.text} text-sm focus:outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/5 transition-all`}
+              />
+            </div>
+          </div>
           
           <div className="flex items-center gap-6">
+            <button 
+              onClick={() => setAppState('history')}
+              className={`text-sm font-medium transition-colors ${appState === 'history' ? 'text-indigo-500' : `${theme.textMuted} hover:${theme.text}`} flex items-center gap-2`}
+            >
+              <TrendingUp size={16} />
+              History
+            </button>
             <button 
               onClick={() => setAppState('manage')}
               className={`text-sm font-medium transition-colors ${appState === 'manage' ? 'text-indigo-500' : `${theme.textMuted} hover:${theme.text}`} flex items-center gap-2`}
@@ -1647,6 +1812,22 @@ export default function App() {
                 savedBrokers={savedBrokers}
                 setSavedBrokers={setSavedBrokers}
                 onBack={() => setAppState('upload')}
+              />
+            )}
+            {appState === 'history' && (
+              <HistoryView 
+                theme={theme}
+                isDarkMode={isDarkMode}
+                history={history}
+                onBack={() => setAppState('upload')}
+                searchTerm={searchTerm}
+                onSelectItem={(item) => {
+                  setRouteText(item.route);
+                  setNotesText(item.notes);
+                  setChainText(item.chain);
+                  setRenameText(item.rename);
+                  setAppState('results');
+                }}
               />
             )}
           </motion.div>
