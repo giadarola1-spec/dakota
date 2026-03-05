@@ -934,6 +934,8 @@ export default function App() {
   
   // Data State
   const [extractedData, setExtractedData] = useState<ParsedRateCon | null>(null);
+  const [isViewingHistory, setIsViewingHistory] = useState(false);
+  const [currentHistoryItem, setCurrentHistoryItem] = useState<HistoryItem | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [currentSteps, setCurrentSteps] = useState<VerificationStep[]>([]);
   
@@ -1122,6 +1124,8 @@ export default function App() {
   const processFile = async (uploadedFile: File) => {
     if (!uploadedFile) return;
     
+    setIsViewingHistory(false);
+    setCurrentHistoryItem(null);
     setFileName(uploadedFile.name);
     setIsProcessing(true);
 
@@ -1280,6 +1284,8 @@ export default function App() {
     notes += chain;
     setNotesText(notes);
 
+    setIsViewingHistory(false);
+    setCurrentHistoryItem(null);
     setAppState('results');
 
     // Save to History
@@ -1352,9 +1358,9 @@ export default function App() {
     return `${tNum}-${originState}-${destState}-${date}-C`;
   };
 
-  // Update chain and notes when dependencies change (if in results view)
+  // Update chain and notes when dependencies change (if in results view and NOT viewing history)
   useEffect(() => {
-    if (appState === 'results' && extractedData) {
+    if (appState === 'results' && extractedData && !isViewingHistory) {
       const chain = generateChainString(extractedData, truckNumber, broker, team);
       setChainText(chain);
       
@@ -1377,10 +1383,10 @@ export default function App() {
         return notes;
       });
     }
-  }, [truckNumber, broker, extractedData, team]);
+  }, [truckNumber, broker, extractedData, team, isViewingHistory, appState]);
 
   useEffect(() => {
-    if (appState === 'results' && extractedData) {
+    if (appState === 'results' && extractedData && !isViewingHistory) {
       let route = "";
       if (extractedData.stops && extractedData.stops.length > 0) {
         route = extractedData.stops.map(s => formatAddress(s.address || "Address Not Found", isSimplifiedAddress)).join("\n").toUpperCase();
@@ -1389,7 +1395,7 @@ export default function App() {
       }
       setRouteText(route);
     }
-  }, [isSimplifiedAddress, extractedData, appState]);
+  }, [isSimplifiedAddress, extractedData, appState, isViewingHistory]);
 
   const copyToClipboard = (text: string, setCopied: (v: boolean) => void) => {
     navigator.clipboard.writeText(text);
@@ -1525,17 +1531,21 @@ export default function App() {
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-3">
           <h2 className={`text-2xl font-display font-medium ${theme.text}`}>
-            {extractedData?.loadNumber || "Generated Output"}
+            {isViewingHistory ? currentHistoryItem?.loadNumber : (extractedData?.loadNumber || "Generated Output")}
           </h2>
-          {extractedData?.rate && (
+          {(isViewingHistory ? currentHistoryItem?.rate : extractedData?.rate) && (
             <span className={`text-lg ${theme.textMuted} opacity-60 font-normal`}>
-              ${extractedData.rate}
+              ${isViewingHistory ? currentHistoryItem?.rate : extractedData?.rate}
             </span>
           )}
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setAppState('upload')}
+            onClick={() => {
+              setAppState('upload');
+              setIsViewingHistory(false);
+              setCurrentHistoryItem(null);
+            }}
             className={`text-sm ${theme.textMuted} hover:${theme.text} flex items-center gap-2 transition-colors`}
           >
             <RefreshCw size={14} />
@@ -1819,9 +1829,15 @@ export default function App() {
                 theme={theme}
                 isDarkMode={isDarkMode}
                 history={history}
-                onBack={() => setAppState('upload')}
+                onBack={() => {
+                  setAppState('upload');
+                  setIsViewingHistory(false);
+                  setCurrentHistoryItem(null);
+                }}
                 searchTerm={searchTerm}
                 onSelectItem={(item) => {
+                  setIsViewingHistory(true);
+                  setCurrentHistoryItem(item);
                   setRouteText(item.route);
                   setNotesText(item.notes);
                   setChainText(item.chain);
