@@ -15,17 +15,17 @@ const PATTERNS = {
     /(\d+(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs|kg|kilograms)/i
   ],
   rate: [
-    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})(?:\.\d{2})?)/i,
-    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$\s*(\d+(?:\.\d{2})?)/i,
-    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i,
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay|Amount\s*to\s*invoice)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})(?:\.\d{2})?)/i,
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay|Amount\s*to\s*invoice)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$\s*(\d+(?:\.\d{2})?)/i,
+    /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay|Amount\s*to\s*invoice)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i,
     /\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/
   ],
   time: /(?:(?:Appt\s*|Appointment\s*Time\s*[:]?|Appointment\s*|Window\s*|ETA\s*|Scheduled\s*|Arrival\s*|Time\s*[:]?|Check-in|FCFS|ASAP|Delivery\s*Window|PU\s*Date\s*\/\s*Time|DEL\s*Date\s*\/\s*Time|Pick\s*up\s*time|Delivery\s*time|Schedule|Earliest|Latest|Appointment\s*Scheduled\s*For|Pick-up\s*Location|Delivery\s*Location)\s*[:.]?\s*)?(\d{1,2}:\d{2}\s*(?:AM|PM)?|\d{4}\s*hrs?|TBD|ASAP|FCFS)/i,
   date: /\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/,
   timezone: /\b(EST|CST|MST|PST|EDT|CDT|MDT|PDT|AST|HST|AKST|AKDT|UTC|GMT)\b/i,
   address: [
-    /(\d{2,}\s+[A-Z0-9\s\n\.,#-]{2,100}?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
-    /\b([A-Z0-9\s\n\.,#-]{5,100}?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
+    /(\d{2,}\s+[A-Z0-9\s\n\.,#:\/-]{2,120}?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
+    /\b([A-Z0-9\s\n\.,#:\/-]{5,120}?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
     /\b([A-Z][A-Za-z \t\n\.\/]{2,30})(?:,|\s+|\n)\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/i,
     /\b([A-Z][A-Za-z \t\n\.\/]{2,30})(?:,|\s+|\n)\s*([A-Z]{2})\b(?:\s*(\d{5}(?:-\d{4})?))?/i
   ]
@@ -90,11 +90,34 @@ function extractInWindow(text: string, anchors: (string | RegExp)[], patterns: R
 }
 
 export function parseRateConfirmation(text: string): ParsedRateCon {
+  // Normalize line endings and whitespace
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
+
+  // Fix "spaced out" text (common in some PDF exports where characters are separated by spaces)
+  // Example: "2 5 8 1 0 S R I D G E L A N D" -> "25810 SRIDGELAND"
+  // We look for sequences of single characters separated by single spaces
+  text = text.replace(/(?:^|(?<=\s))([A-Z0-9])\s(?=([A-Z0-9])(?:\s|$))/gi, '$1');
+  // Run it twice to catch overlapping matches
+  text = text.replace(/(?:^|(?<=\s))([A-Z0-9])\s(?=([A-Z0-9])(?:\s|$))/gi, '$1');
 
   const cleanAddress = (addr: string): string => {
     if (!addr) return "";
-    const cleaned = addr.replace(/\n/g, " ").replace(/^(?:\s*(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF|PICK-UP\s*LOCATION|DELIVERY\s*LOCATION|DATE\s*TIME|NOTES|SPECIAL\s*INSTRUCTIONS|UP|PICK|INFO|CONTACT|NAME|PHONE|EMAIL|FAX|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|UNLOADING|RECEIPT|EXCHANGE|NOTE|CARRIER|COMMODITY|HANDLING|UNITS|STACKABLE|PIECES|DIMS|TEMP|TEMPERATURE|CONFIRM|RECEIPT|OF)\s*[:\/\-]?\s*)+/i, "").trim();
+    
+    // Replace newlines with spaces and normalize whitespace
+    let cleaned = addr.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
+    
+    // Remove leading noise (labels at the start)
+    // We also handle cases where a number from a previous field is caught (e.g., "480 Reference Numbers Address:")
+    const prefixPattern = /^(?:\s*(?:\d+\s+)?(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DO|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF|PICK-UP\s*LOCATION|DELIVERY\s*LOCATION|DATE\s*TIME|NOTES|SPECIAL\s*INSTRUCTIONS|UP|PICK|INFO|CONTACT|NAME|PHONE|EMAIL|FAX|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|UNLOADING|RECEIPT|EXCHANGE|NOTE|CARRIER|COMMODITY|HANDLING|UNITS|STACKABLE|PIECES|DIMS|TEMP|TEMPERATURE|CONFIRM|RECEIPT|OF|REFERENCE\s*NUMBERS|REF\s*#|REFERENCE)\s*[:\/\-]?\s*)+/i;
+    cleaned = cleaned.replace(prefixPattern, "").trim();
+    
+    // Handle cases like "480 Address: 711..." where a number from a previous field is caught
+    // We remove any leading numbers if they are immediately followed by an address label or section header
+    cleaned = cleaned.replace(/^\d+\s+(?:ADDRESS|LOCATION|SHIPPER|CONSIGNEE|PICKUP|DELIVERY|REFERENCE\s*NUMBERS)[:\-]?\s*/i, "").trim();
+
+    // Remove trailing noise (labels that might be caught from adjacent columns)
+    const suffixPattern = /(?:\s*(?:REFERENCE\s*NUMBERS|REF\s*#|BOL\s*#|PICKUP\s*#|PU\s*#|DO\s*#|STOP\s*#|NOTES|SPECIAL\s*INSTRUCTIONS|CONTACT|PHONE|EMAIL|FAX|DATE|TIME|APPOINTMENT|APPT|WINDOW|ETA|SCHEDULED|ARRIVAL|CHECK-IN|FCFS|ASAP|DELIVERY|PICKUP|SHIPPER|CONSIGNEE|ORIGIN|DESTINATION|LOCATION|ADDRESS|FROM|TO|RECEIVER|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY|SHIPPING|RECEIVING|DROP|UP|PICK|INFO|NAME|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|RECEIPT|EXCHANGE|NOTE|CARRIER|COMMODITY|HANDLING|UNITS|STACKABLE|PIECES|DIMS|TEMP|CONFIRM|OF)\s*[:\/\-]?\s*)+$/i;
+    cleaned = cleaned.replace(suffixPattern, "").trim();
     
     const blacklist = [
       "1701 Edison Drive", "PO Box 9049", "Louisville, KY 40209", "Milford, OH 45150",
@@ -177,7 +200,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   // --- Windowed Extraction for Header Fields ---
   
   result.loadNumber = extractInWindow(text, 
-    ['Traffix Load #', 'Load #', 'Order #', 'PO #', 'PO#', 'Shipment ID', 'Pro #', 'Ref #', 'Reference #', 'Booking #', 'Confirmation #', 'Trip #', 'Job #', 'Convoy ID', 'TQL PO#'], 
+    ['Traffix Load #', 'Load #', 'Order #', 'PO #', 'PO#', 'Shipment ID', 'Pro #', 'PRO NUMBER', 'Reference #', 'Booking #', 'Confirmation #', 'Trip #', 'Job #', 'Convoy ID', 'TQL PO#'], 
     [/\s*[:.]?\s*([A-Z0-9-]{4,})/i, /([A-Z0-9-]{4,})/i]
   ) || (text.match(PATTERNS.loadNumber[0])?.[1] || "");
 
@@ -187,7 +210,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   )) || normalizeWeight(text.match(PATTERNS.weight[0])?.[1] || "");
 
   // Rate extraction with scoring
-  const rateAnchors = ['Rate', 'Total', 'Amount', 'Pay', 'Flat Rate', 'Carrier Pay', 'Linehaul', 'All-in', 'Grand Total', 'Agreed Amount'];
+  const rateAnchors = ['Rate', 'Total', 'Amount', 'Pay', 'Flat Rate', 'Carrier Pay', 'Linehaul', 'All-in', 'Grand Total', 'Agreed Amount', 'Amount to invoice'];
   let bestRate = "";
   let bestScore = -100;
 
@@ -233,6 +256,8 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   // --- Multi-Stop Detection with Segmentation ---
   
   const stopMarkers = [
+    { pattern: /(?:PU|DO|Stop)\s*#?\s*(\d+)/i, type: 'auto', priority: 4 },
+    { pattern: /#\s*(\d+)\s*(Shipper|Consignee|Destination)/i, type: 'auto', priority: 4 },
     { pattern: /(?:Shipper|Origin|Pickup|Pick-up)\s*-\s*(?:Pickup|Stop)\s*(\d+)\s*of\s*(\d+)/i, type: 'pickup', priority: 3 },
     { pattern: /(?:Consignee|Destination|Delivery)\s*-\s*(?:Delivery|Stop)\s*(\d+)\s*of\s*(\d+)/i, type: 'delivery', priority: 3 },
     { pattern: /Stop\s*#?\s*(\d+)\s*[:\-]?\s*(Pick|Del)/i, type: 'auto', priority: 2 },
@@ -251,7 +276,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
       let label = "";
       if (type === 'auto') {
         const sub = match[0].toLowerCase();
-        type = sub.includes('pick') || sub.includes('shipper') ? 'pickup' : 'delivery';
+        type = sub.includes('pick') || sub.includes('shipper') || sub.includes('pu') ? 'pickup' : 'delivery';
       }
       if (match[1] && match[2]) {
         label = `${type.charAt(0).toUpperCase() + type.slice(1)} ${match[1]} of ${match[2]}`;

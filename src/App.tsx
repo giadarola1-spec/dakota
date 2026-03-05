@@ -1067,19 +1067,39 @@ export default function App() {
   };
 
   const handleDataChange = (val: string) => {
-    if (!extractedData || !currentSteps[currentStepIndex]) return;
+    if (!currentSteps[currentStepIndex]) return;
     const step = currentSteps[currentStepIndex];
     
-    if (step.stopIndex !== undefined && step.field) {
-      const newStops = [...extractedData.stops];
-      newStops[step.stopIndex] = {
-        ...newStops[step.stopIndex],
-        [step.field]: val
-      };
-      setExtractedData({ ...extractedData, stops: newStops });
-    } else {
-      setExtractedData({ ...extractedData, [step.key as keyof ParsedRateCon]: val });
-    }
+    setExtractedData(prev => {
+      if (!prev) return prev;
+      
+      const newData = { ...prev };
+      
+      if (step.stopIndex !== undefined && step.field) {
+        const newStops = [...prev.stops];
+        newStops[step.stopIndex] = {
+          ...newStops[step.stopIndex],
+          [step.field]: val
+        };
+        newData.stops = newStops;
+        
+        // Sync root fields if first/last stop changed
+        if (step.stopIndex === 0) {
+          if (step.field === 'address') newData.originAddress = val;
+          if (step.field === 'date') newData.pickupDate = val;
+          if (step.field === 'time') newData.pickupTime = val;
+        }
+        if (step.stopIndex === prev.stops.length - 1) {
+          if (step.field === 'address') newData.destinationAddress = val;
+          if (step.field === 'time') newData.deliveryTime = val;
+        }
+      } else {
+        // @ts-ignore - dynamic key assignment
+        newData[step.key as keyof ParsedRateCon] = val;
+      }
+      
+      return newData;
+    });
   };
 
   // Keyboard Navigation
