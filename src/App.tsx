@@ -93,9 +93,16 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
   if (!simplified || !fullAddress) return fullAddress;
 
   const extractCity = (partBefore: string, state: string, zip: string) => {
+    // Strip leading suite/unit info if it's at the very beginning
+    // e.g., "STE B Indianapolis" -> "Indianapolis"
+    // e.g., "UNIT 101 Chicago" -> "Chicago"
+    let cleanedPart = partBefore.trim();
+    const suiteRegex = /^(?:STE|UNIT|SUITE|BLDG|APT|#)\s*[A-Z0-9-]+\s+/i;
+    cleanedPart = cleanedPart.replace(suiteRegex, "").trim();
+
     // Strategy 1: If there's a comma, assume City is after the last comma
-    if (partBefore.includes(',')) {
-      const parts = partBefore.split(',');
+    if (cleanedPart.includes(',')) {
+      const parts = cleanedPart.split(',');
       const city = parts[parts.length - 1].trim();
       // Ensure the city part isn't empty or just a number (suite number?)
       if (city && isNaN(Number(city))) {
@@ -108,12 +115,12 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
     // Allow for optional dot, optional comma, and whitespace
     const regex = new RegExp(`\\b(?:${suffixes.join("|")})\\.?\\s*,?\\s+(.*)$`, "i");
     
-    const match = partBefore.match(regex);
+    const match = cleanedPart.match(regex);
     if (match && match[1].trim().length > 0) {
       return `${match[1].trim().toUpperCase()}, ${state.toUpperCase()} ${zip}`;
     }
     
-    return `${partBefore.toUpperCase()}, ${state.toUpperCase()} ${zip}`;
+    return `${cleanedPart.toUpperCase()}, ${state.toUpperCase()} ${zip}`;
   };
 
   // 1. Find State and Zip at the end (Zip is optional)
