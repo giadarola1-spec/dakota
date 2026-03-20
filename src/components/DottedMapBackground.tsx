@@ -62,23 +62,14 @@ export function DottedMapBackground({ className, color = "currentColor" }: Dotte
 
       {/* Illuminated Layer (Follows Mouse) */}
       <div 
-        className="absolute inset-0 opacity-40 transition-opacity duration-300"
+        className="absolute inset-0 opacity-80 transition-opacity duration-300"
         style={{
           backgroundImage: svgMap,
           backgroundRepeat: svgMap.startsWith('url') ? 'no-repeat' : 'repeat',
           backgroundPosition: 'center',
           backgroundSize: svgMap.startsWith('url') ? 'contain' : '20px 20px',
-          maskImage: `radial-gradient(circle 150px at ${mousePos.x}px ${mousePos.y}px, black 0%, transparent 100%)`,
-          WebkitMaskImage: `radial-gradient(circle 150px at ${mousePos.x}px ${mousePos.y}px, black 0%, transparent 100%)`
-        }}
-      />
-      
-      {/* Extra Glow Spot */}
-      <div 
-        className="absolute pointer-events-none blur-3xl opacity-20 bg-indigo-500 rounded-full w-64 h-64 -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ease-out"
-        style={{
-          left: mousePos.x,
-          top: mousePos.y,
+          maskImage: `radial-gradient(circle 200px at ${mousePos.x}px ${mousePos.y}px, black 0%, transparent 80%)`,
+          WebkitMaskImage: `radial-gradient(circle 200px at ${mousePos.x}px ${mousePos.y}px, black 0%, transparent 80%)`
         }}
       />
     </div>

@@ -949,6 +949,7 @@ export default function App() {
   
   // Data State
   const [extractedData, setExtractedData] = useState<ParsedRateCon | null>(null);
+  const extractedDataRef = useRef<ParsedRateCon | null>(null);
   const [isViewingHistory, setIsViewingHistory] = useState(false);
   const [currentHistoryItem, setCurrentHistoryItem] = useState<HistoryItem | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -974,6 +975,11 @@ export default function App() {
   const [renameText, setRenameText] = useState("");
   const [copiedRename, setCopiedRename] = useState(false);
   const [team, setTeam] = useLocalStorage<'green' | 'purple' | 'red' | 'blue' | 'none'>("dakota_team", 'none');
+
+  // Update ref whenever state changes
+  useEffect(() => {
+    extractedDataRef.current = extractedData;
+  }, [extractedData]);
 
   // Loading Screen Effect
   useEffect(() => {
@@ -1240,6 +1246,7 @@ export default function App() {
         newData[step.key as keyof ParsedRateCon] = val;
       }
       
+      extractedDataRef.current = newData;
       return newData;
     });
   };
@@ -1268,7 +1275,8 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [appState, currentStepIndex, extractedData]);
 
-  const finishVerification = (data: ParsedRateCon | null = extractedData) => {
+  const finishVerification = (dataOverride: ParsedRateCon | null = null) => {
+    const data = dataOverride || extractedDataRef.current;
     if (!data) return;
     
     // Format Outputs
