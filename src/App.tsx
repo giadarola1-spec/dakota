@@ -952,6 +952,8 @@ export default function App() {
   const extractedDataRef = useRef<ParsedRateCon | null>(null);
   const [isViewingHistory, setIsViewingHistory] = useState(false);
   const [currentHistoryItem, setCurrentHistoryItem] = useState<HistoryItem | null>(null);
+  const [showPdfInResults, setShowPdfInResults] = useState(false);
+  const [pdfLoadNumber, setPdfLoadNumber] = useState<string | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [currentSteps, setCurrentSteps] = useState<VerificationStep[]>([]);
   
@@ -1134,6 +1136,7 @@ export default function App() {
 
     const data = parseRateConfirmation(fullText);
     setExtractedData(data);
+    setPdfLoadNumber(data.loadNumber);
     
     const steps = getBaseSteps(data);
     setCurrentSteps(steps);
@@ -1154,6 +1157,7 @@ export default function App() {
       const arrayBuffer = await uploadedFile.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       setPdfDoc(pdf);
+      setShowPdfInResults(false);
       await processPdfData(pdf);
 
     } catch (error) {
@@ -1549,7 +1553,19 @@ export default function App() {
     );
   };
 
-  const renderResults = () => (
+  const startOver = () => {
+    setAppState('upload');
+    setIsViewingHistory(false);
+    setCurrentHistoryItem(null);
+    setShowPdfInResults(false);
+    setPdfLoadNumber(null);
+    setPdfDoc(null);
+  };
+
+  const renderResults = () => {
+    const isCurrentPdf = pdfDoc && pdfLoadNumber === (isViewingHistory ? currentHistoryItem?.loadNumber : extractedData?.loadNumber);
+
+    return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-3">
@@ -1563,12 +1579,17 @@ export default function App() {
           )}
         </div>
         <div className="flex items-center gap-3">
+          {isCurrentPdf && (
+            <button
+              onClick={() => setShowPdfInResults(!showPdfInResults)}
+              className={`px-4 py-2 rounded-lg border ${theme.border} ${theme.textMuted} hover:${theme.text} hover:${theme.cardBg} transition-all flex items-center gap-2 shadow-sm text-sm`}
+            >
+              <FileText size={16} className="text-indigo-500" />
+              {showPdfInResults ? 'Hide RateCon' : 'View RateCon'}
+            </button>
+          )}
           <button 
-            onClick={() => {
-              setAppState('upload');
-              setIsViewingHistory(false);
-              setCurrentHistoryItem(null);
-            }}
+            onClick={startOver}
             className={`text-sm ${theme.textMuted} hover:${theme.text} flex items-center gap-2 transition-colors`}
           >
             <RefreshCw size={14} />
@@ -1576,6 +1597,22 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      {showPdfInResults && isCurrentPdf && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="h-[600px] rounded-2xl overflow-hidden border border-indigo-500/30 shadow-2xl shadow-indigo-500/10"
+        >
+          <PdfViewer 
+            pdfDocument={pdfDoc} 
+            highlightText="" 
+            isDarkMode={isDarkMode} 
+            isAutoZoomEnabled={false}
+            dragSensitivity={dragSensitivity}
+          />
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Box 1: Route */}
@@ -1708,7 +1745,8 @@ export default function App() {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.text} font-sans selection:bg-indigo-500/30 transition-colors duration-300 flex flex-col relative overflow-hidden`}>
