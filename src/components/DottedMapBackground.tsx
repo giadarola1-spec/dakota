@@ -7,9 +7,6 @@ interface DottedMapBackgroundProps {
 }
 
 export function DottedMapBackground({ className, color = "currentColor" }: DottedMapBackgroundProps) {
-  const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
-  const containerRef = useRef<HTMLDivElement>(null);
-
   const svgMap = useMemo(() => {
     try {
       const map = new DottedMap({ height: 60, grid: "diagonal" });
@@ -28,23 +25,8 @@ export function DottedMapBackground({ className, color = "currentColor" }: Dotte
     }
   }, [color]);
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      setMousePos({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
   return (
     <div 
-      ref={containerRef}
       className={`absolute inset-0 z-0 overflow-hidden pointer-events-none ${className}`}
     >
       {/* Base Map (Dim) */}
@@ -68,8 +50,8 @@ export function DottedMapBackground({ className, color = "currentColor" }: Dotte
           backgroundRepeat: svgMap.startsWith('url') ? 'no-repeat' : 'repeat',
           backgroundPosition: 'center',
           backgroundSize: svgMap.startsWith('url') ? 'contain' : '20px 20px',
-          maskImage: `radial-gradient(circle 200px at ${mousePos.x}px ${mousePos.y}px, black 0%, transparent 80%)`,
-          WebkitMaskImage: `radial-gradient(circle 200px at ${mousePos.x}px ${mousePos.y}px, black 0%, transparent 80%)`
+          maskImage: `radial-gradient(circle 200px at var(--mouse-x) var(--mouse-y), black 0%, transparent 80%)`,
+          WebkitMaskImage: `radial-gradient(circle 200px at var(--mouse-x) var(--mouse-y), black 0%, transparent 80%)`
         }}
       />
     </div>

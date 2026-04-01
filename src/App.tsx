@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to CDN for reliable production behavior
@@ -9,6 +9,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.624/b
 import { parseRateConfirmation, ParsedRateCon } from './utils/parser';
 import { DottedMapBackground } from './components/DottedMapBackground';
 import { LoadingScreen } from './components/LoadingScreen';
+import { DriverNumberModal } from './components/DriverNumberModal';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">
@@ -736,7 +737,7 @@ const ManageView = ({
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Trucks Manager */}
-        <div className={`${theme.cardBg} rounded-2xl border ${theme.border} p-6 shadow-sm`}>
+        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} p-6 shadow-sm`}>
           <div className="flex items-center justify-between mb-6">
             <h3 className={`text-lg font-medium ${theme.text} flex items-center gap-2`}>
                 <Truck size={20} className="text-indigo-500" /> Trucks
@@ -765,11 +766,11 @@ const ManageView = ({
 
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
             {savedTrucks.map(t => (
-              <div key={t} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'} group hover:border-indigo-500/30 transition-colors`}>
+              <div key={t} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'} group hover:border-indigo-500/30 transition-colors glass-card`}>
                 <span className={`font-mono font-medium ${theme.text}`}>{t}</span>
                 <button 
                   onClick={(e) => removeTruck(t, e)}
-                  className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                  className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 glass-button border-none"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -782,7 +783,7 @@ const ManageView = ({
         </div>
 
         {/* Brokers Manager */}
-        <div className={`${theme.cardBg} rounded-2xl border ${theme.border} p-6 shadow-sm`}>
+        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} p-6 shadow-sm`}>
           <div className="flex items-center justify-between mb-6">
             <h3 className={`text-lg font-medium ${theme.text} flex items-center gap-2`}>
                 <Building2 size={20} className="text-indigo-500" /> Brokers
@@ -803,7 +804,7 @@ const ManageView = ({
             />
             <button 
               onClick={addBroker}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg transition-colors"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg transition-colors glass-button border-none"
             >
               <Plus size={20} />
             </button>
@@ -811,11 +812,11 @@ const ManageView = ({
 
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
             {savedBrokers.map(b => (
-              <div key={b} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'} group hover:border-indigo-500/30 transition-colors`}>
+              <div key={b} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'} group hover:border-indigo-500/30 transition-colors glass-card`}>
                 <span className={`font-medium ${theme.text}`}>{b}</span>
                 <button 
                   onClick={(e) => removeBroker(b, e)}
-                  className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                  className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 glass-button border-none"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -896,7 +897,7 @@ const HistoryView = ({
                 <div 
                   key={item.id}
                   onClick={() => onSelectItem(item)}
-                  className={`${theme.cardBg} border ${theme.border} p-5 rounded-2xl shadow-sm hover:border-indigo-500/50 transition-all cursor-pointer group relative overflow-hidden`}
+                  className={`${theme.cardBg} glass-card border ${theme.border} p-5 rounded-2xl shadow-sm hover:border-indigo-500/50 transition-all cursor-pointer group relative overflow-hidden`}
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div>
@@ -956,6 +957,7 @@ export default function App() {
   const [pdfLoadNumber, setPdfLoadNumber] = useState<string | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [currentSteps, setCurrentSteps] = useState<VerificationStep[]>([]);
+  const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   
   // History State
   const [history, setHistory] = useLocalStorage<HistoryItem[]>("dakota_history", []);
@@ -986,6 +988,16 @@ export default function App() {
   // Loading Screen Effect
   useEffect(() => {
     setIsLoading(false);
+  }, []);
+
+  // Global Mouse Position for Glass Effects
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      document.documentElement.style.setProperty('--mouse-x', `${e.clientX}px`);
+      document.documentElement.style.setProperty('--mouse-y', `${e.clientY}px`);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
   // Extension Integration Effect
@@ -1098,19 +1110,19 @@ export default function App() {
   const [dragSensitivity, setDragSensitivity] = useLocalStorage("dakota_dragSensitivity", 1.5);
 
   // --- Styles Helper ---
-  const theme = {
-    bg: isDarkMode ? 'bg-[#0B1121]' : 'bg-slate-50',
+  const theme = React.useMemo(() => ({
+    bg: isDarkMode ? 'bg-[#020617]' : 'bg-slate-50',
     text: isDarkMode ? 'text-white' : 'text-slate-900',
     textMuted: isDarkMode ? 'text-slate-400' : 'text-slate-500',
     border: isDarkMode ? 'border-white/10' : 'border-slate-200',
-    cardBg: isDarkMode ? 'bg-slate-900' : 'bg-white',
-    cardHover: isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50',
-    inputBg: isDarkMode ? 'bg-slate-950' : 'bg-slate-100',
-    headerBg: isDarkMode ? 'bg-[#0B1121]/80' : 'bg-white/80',
-    accent: 'text-indigo-500',
+    cardBg: isDarkMode ? 'liquid-glass-dark' : 'liquid-glass',
+    cardHover: isDarkMode ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50',
+    inputBg: isDarkMode ? 'bg-white/[0.03]' : 'bg-slate-100',
+    headerBg: isDarkMode ? 'bg-black/20' : 'bg-white/80',
+    accent: 'text-indigo-400',
     accentBg: 'bg-indigo-600',
     accentHover: 'hover:bg-indigo-500',
-  };
+  }), [isDarkMode]);
 
   const processPdfData = async (pdf: any) => {
     let fullText = "";
@@ -1206,7 +1218,7 @@ export default function App() {
     if (currentStepIndex < currentSteps.length - 1) {
       setCurrentStepIndex(prev => prev + 1);
     } else {
-      finishVerification();
+      setIsDriverModalOpen(true);
     }
   };
 
@@ -1215,6 +1227,16 @@ export default function App() {
       setCurrentStepIndex(prev => prev - 1);
     } else {
       setAppState('upload');
+    }
+  };
+
+  const handleDriverNumberConfirm = (num: string) => {
+    setTruckNumber(num);
+    setIsDriverModalOpen(false);
+    
+    // If we were in the middle of a flow, finish it
+    if (appState === 'verify') {
+      finishVerification(null, num);
     }
   };
 
@@ -1279,10 +1301,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [appState, currentStepIndex, extractedData]);
 
-  const finishVerification = (dataOverride: ParsedRateCon | null = null) => {
+  const finishVerification = (dataOverride: ParsedRateCon | null = null, truckNumberOverride: string | null = null) => {
     const data = dataOverride || extractedDataRef.current;
     if (!data) return;
     
+    const tNum = truckNumberOverride || truckNumber;
+
     // Format Outputs
     let route = "";
     if (data.stops && data.stops.length > 0) {
@@ -1292,10 +1316,10 @@ export default function App() {
     }
     setRouteText(route);
 
-    const chain = generateChainString(data, truckNumber, broker, team);
+    const chain = generateChainString(data, tNum, broker, team);
     setChainText(chain);
 
-    const rename = generateRenameString(data, truckNumber);
+    const rename = generateRenameString(data, tNum);
     setRenameText(rename);
 
     let notes = `W${data.weight || "?"}\n`;
@@ -1489,7 +1513,7 @@ export default function App() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
-            className={`${theme.cardBg} border ${theme.border} p-8 rounded-3xl shadow-2xl relative overflow-hidden`}
+            className={`${theme.cardBg} glass-card border ${theme.border} p-8 rounded-3xl shadow-2xl relative overflow-hidden`}
           >
             {/* Background Glow */}
             {isDarkMode && <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />}
@@ -1523,14 +1547,14 @@ export default function App() {
               <div className="pt-6 flex items-center gap-4">
                 <button 
                   onClick={handlePrevStep}
-                  className={`px-6 py-3 rounded-xl border ${theme.border} ${theme.textMuted} hover:${theme.cardBg} hover:${theme.text} transition-colors flex items-center gap-2`}
+                  className={`px-6 py-3 rounded-xl border ${theme.border} ${theme.textMuted} hover:${theme.text} transition-colors flex items-center gap-2 glass-button`}
                 >
                   <ChevronLeft size={18} />
                   Back
                 </button>
                 <button 
                   onClick={handleNextStep}
-                  className={`flex-1 px-6 py-3 rounded-xl ${theme.accentBg} ${theme.accentHover} text-white font-medium shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 group`}
+                  className={`flex-1 px-6 py-3 rounded-xl ${theme.accentBg} ${theme.accentHover} text-white font-medium shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 group glass-button border-none`}
                 >
                   {currentStepIndex === currentSteps.length - 1 ? 'Finish & Generate' : 'Confirm & Next'}
                   <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
@@ -1616,12 +1640,12 @@ export default function App() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Box 1: Route */}
-        <div className={`${theme.cardBg} rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
+        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
           <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
             <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>ROUTE</span>
             <button 
               onClick={() => copyToClipboard(routeText, setCopiedRoute)}
-              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30`}
+              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30 glass-button`}
             >
               {copiedRoute ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               {copiedRoute ? "COPIED" : "COPY"}
@@ -1636,12 +1660,12 @@ export default function App() {
         </div>
 
         {/* Box 2: Notes */}
-        <div className={`${theme.cardBg} rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
+        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
           <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
             <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>NOTES</span>
             <button 
               onClick={() => copyToClipboard(notesText, setCopiedNotes)}
-              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30`}
+              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30 glass-button`}
             >
               {copiedNotes ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               {copiedNotes ? "COPIED" : "COPY"}
@@ -1656,7 +1680,7 @@ export default function App() {
         </div>
 
         {/* Box 3: Chain (Full Width) */}
-        <div className={`md:col-span-2 ${theme.cardBg} rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
+        <div className={`md:col-span-2 ${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
           <div className={`px-6 py-4 border-b ${theme.border} flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
             <div className="flex items-center gap-4 flex-wrap">
               <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>CHAIN</span>
@@ -1674,7 +1698,7 @@ export default function App() {
                   <button
                     key={t}
                     onClick={() => setTruckNumber(t)}
-                    className={`px-2 py-1 text-xs rounded border ${truckNumber === t ? 'bg-indigo-500 text-white border-indigo-500' : `${theme.textMuted} border-transparent hover:bg-white/5`}`}
+                    className={`px-2 py-1 text-xs rounded border ${truckNumber === t ? 'bg-indigo-500 text-white border-indigo-500' : `${theme.textMuted} border-transparent hover:bg-white/5`} glass-button`}
                   >
                     {t}
                   </button>
@@ -1687,7 +1711,7 @@ export default function App() {
                   <button 
                     key={b}
                     onClick={() => setBroker(b)}
-                    className={`px-2 py-1 text-xs rounded border ${broker === b ? 'bg-indigo-500 text-white border-indigo-500' : `${theme.textMuted} border-transparent hover:bg-white/5`}`}
+                    className={`px-2 py-1 text-xs rounded border ${broker === b ? 'bg-indigo-500 text-white border-indigo-500' : `${theme.textMuted} border-transparent hover:bg-white/5`} glass-button`}
                   >
                     {b}
                   </button>
@@ -1704,7 +1728,7 @@ export default function App() {
 
             <button 
               onClick={() => copyToClipboard(chainText, setCopiedChain)}
-              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30`}
+              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30 glass-button`}
             >
               {copiedChain ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               {copiedChain ? "COPIED" : "COPY"}
@@ -1722,12 +1746,12 @@ export default function App() {
         </div>
 
         {/* Box 4: Rename (Full Width) */}
-        <div className={`md:col-span-2 ${theme.cardBg} rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
+        <div className={`md:col-span-2 ${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
           <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
             <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>RENAME</span>
             <button 
               onClick={() => copyToClipboard(renameText, setCopiedRename)}
-              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30`}
+              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30 glass-button`}
             >
               {copiedRename ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               {copiedRename ? "COPIED" : "COPY"}
@@ -1750,6 +1774,13 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.text} font-sans selection:bg-indigo-500/30 transition-colors duration-300 flex flex-col relative overflow-hidden`}>
+      {isDarkMode && (
+        <div className="atmospheric-bg">
+          <div className="atmosphere-orb w-[600px] h-[600px] bg-indigo-600/20 -top-[200px] -left-[100px]" />
+          <div className="atmosphere-orb w-[500px] h-[500px] bg-purple-600/10 bottom-[10%] -right-[100px]" style={{ animationDelay: '-5s' }} />
+          <div className="atmosphere-orb w-[400px] h-[400px] bg-blue-600/10 top-[40%] left-[20%]" style={{ animationDelay: '-12s' }} />
+        </div>
+      )}
       <AnimatePresence>
         {isLoading && <LoadingScreen isDarkMode={isDarkMode} />}
         {isProcessing && (
@@ -1769,7 +1800,7 @@ export default function App() {
       <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#4F46E5" : "#94A3B8"} />
       
       {/* Header */}
-      <header className={`border-b ${theme.border} sticky top-0 z-20 ${theme.headerBg} backdrop-blur-xl transition-colors duration-300 flex-none`}>
+      <header className={`border-b ${theme.border} sticky top-0 z-20 ${theme.headerBg} backdrop-blur-xl transition-colors duration-300 flex-none glass-card border-x-0 border-t-0 rounded-none`}>
         <div className="w-full px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setAppState('upload')}>
             <DakotaLogo className="w-7 h-7" />
@@ -1847,7 +1878,7 @@ export default function App() {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                className={`flex-1 flex flex-col items-center justify-center text-center space-y-6 transition-all duration-300 cursor-pointer rounded-3xl border-2 border-dashed ${isDragging ? 'border-indigo-500 bg-indigo-500/5 opacity-100 scale-[1.02]' : `${theme.border} opacity-50 hover:opacity-100`}`}
+                className={`flex-1 flex flex-col items-center justify-center text-center space-y-6 transition-all duration-300 cursor-pointer rounded-3xl border-2 border-dashed ${isDragging ? 'border-indigo-500 bg-indigo-500/5 opacity-100 scale-[1.02]' : `${theme.border} opacity-50 hover:opacity-100`} glass-card`}
               >
                 <input 
                   type="file" 
@@ -1855,7 +1886,7 @@ export default function App() {
                   onChange={handleFileUpload}
                   className="hidden" 
                 />
-                <div className={`w-24 h-24 rounded-full ${theme.cardBg} border ${theme.border} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm ${isDragging ? 'border-indigo-500 text-indigo-500' : ''}`}>
+                <div className={`w-24 h-24 rounded-full ${theme.cardBg} border ${theme.border} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm ${isDragging ? 'border-indigo-500 text-indigo-500' : ''} glass-card`}>
                   <Upload size={40} className={isDragging ? 'text-indigo-500' : theme.textMuted} />
                 </div>
                 <div className="space-y-2">
@@ -1923,7 +1954,7 @@ export default function App() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className={`fixed right-0 top-0 bottom-0 w-80 ${isDarkMode ? 'bg-[#0F172A]' : 'bg-white'} border-l ${theme.border} z-50 shadow-2xl p-6 flex flex-col`}
+              className={`fixed right-0 top-0 bottom-0 w-80 ${isDarkMode ? 'bg-[#0F172A]' : 'bg-white'} border-l ${theme.border} z-50 shadow-2xl p-6 flex flex-col glass-card rounded-none border-y-0 border-r-0`}
             >
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-xl font-bold font-sans">Menu</h2>
@@ -1934,7 +1965,7 @@ export default function App() {
 
               <div className="space-y-6 flex-1">
                 {/* Team Selector */}
-                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg}`}>
+                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium text-sm">Team Color</span>
                   </div>
@@ -1949,7 +1980,7 @@ export default function App() {
                       <button 
                         key={t.id}
                         onClick={() => setTeam(t.id as any)}
-                        className={`h-8 rounded-lg border flex items-center justify-center transition-all ${team === t.id ? 'ring-2 ring-offset-2 ring-indigo-500 border-transparent' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                        className={`h-8 rounded-lg border flex items-center justify-center transition-all ${team === t.id ? 'ring-2 ring-offset-2 ring-indigo-500 border-transparent' : 'border-transparent opacity-50 hover:opacity-100'} glass-button`}
                         style={{ backgroundColor: t.id === 'none' ? undefined : 'transparent' }}
                       >
                          {t.id === 'none' ? <X size={14} className="text-white" /> : <span className="text-xl">{t.label}</span>}
@@ -1958,8 +1989,22 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Appearance Section */}
+                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
+                  <button 
+                    onClick={() => {
+                      setIsDriverModalOpen(true);
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between mb-2 hover:text-indigo-500 transition-colors"
+                  >
+                    <span className="font-medium text-sm">Set Driver Number</span>
+                    <Hash size={18} className="text-indigo-400" />
+                  </button>
+                </div>
+
                 {/* Theme Toggle */}
-                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg}`}>
+                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium text-sm">Appearance</span>
                     {isDarkMode ? <Moon size={18} className="text-indigo-400" /> : <Sun size={18} className="text-amber-500" />}
@@ -1967,13 +2012,13 @@ export default function App() {
                   <div className="flex gap-2 bg-black/5 p-1 rounded-lg">
                     <button 
                       onClick={() => setIsDarkMode(false)}
-                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${!isDarkMode ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${!isDarkMode ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'} glass-button`}
                     >
                       Light
                     </button>
                     <button 
                       onClick={() => setIsDarkMode(true)}
-                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${isDarkMode ? 'bg-slate-700 shadow text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${isDarkMode ? 'bg-slate-700 shadow text-white' : 'text-slate-500 hover:text-slate-700'} glass-button`}
                     >
                       Dark
                     </button>
@@ -1981,7 +2026,7 @@ export default function App() {
                 </div>
 
                 {/* Address Format Toggle */}
-                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg}`}>
+                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium text-sm">Address Format</span>
                     <MapPin size={18} className="text-indigo-400" />
@@ -1989,13 +2034,13 @@ export default function App() {
                   <div className="flex gap-2 bg-black/5 p-1 rounded-lg">
                     <button 
                       onClick={() => setIsSimplifiedAddress(false)}
-                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${!isSimplifiedAddress ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${!isSimplifiedAddress ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'} glass-button`}
                     >
                       Full
                     </button>
                     <button 
                       onClick={() => setIsSimplifiedAddress(true)}
-                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${isSimplifiedAddress ? 'bg-indigo-500 shadow text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${isSimplifiedAddress ? 'bg-indigo-500 shadow text-white' : 'text-slate-500 hover:text-slate-700'} glass-button`}
                     >
                       City/Zip
                     </button>
@@ -2003,7 +2048,7 @@ export default function App() {
                 </div>
 
                 {/* Drag Sensitivity Slider */}
-                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg}`}>
+                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-medium text-sm">Drag Sensitivity</span>
                     <Sliders size={18} className="text-indigo-400" />
@@ -2058,6 +2103,17 @@ export default function App() {
           </>
         )}
       </AnimatePresence>
+
+      <DriverNumberModal 
+        isOpen={isDriverModalOpen}
+        onClose={() => {
+          setIsDriverModalOpen(false);
+          if (appState === 'verify') finishVerification();
+        }}
+        onConfirm={handleDriverNumberConfirm}
+        isDarkMode={isDarkMode}
+        theme={theme}
+      />
     </div>
   );
 }
