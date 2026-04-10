@@ -340,6 +340,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
       if (!pageData) return;
       
       const { page, viewport } = pageData;
+      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
       
       // Reset zoom if disabled or no text
       if (!isAutoZoomEnabled || !highlightText || highlightText.length < 2) {
@@ -363,14 +364,6 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
           return a.transform[4] - b.transform[4];
         });
 
-        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-        let cleanSearch = normalize(highlightText);
-        if (cleanSearch.endsWith('lbs')) cleanSearch = cleanSearch.replace(/lbs$/, '');
-        const timeMatch = cleanSearch.match(/^(\d{4})(?:est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
-        if (timeMatch) cleanSearch = timeMatch[1];
-
-        if (cleanSearch.length < 2) return;
-
         // Build a map of characters to items
         let combinedText = "";
         const charToItemMap: { item: any, indexInItem: number }[] = [];
@@ -386,10 +379,29 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
           charToItemMap.push({ item: null, indexInItem: -1 });
         });
 
-        // Use a regex that ignores non-alphanumeric characters
-        const escapedSearch = cleanSearch.split('').join('[^a-z0-9]*');
-        const regex = new RegExp(escapedSearch, 'i');
-        const match = combinedText.match(regex);
+        // Strategy 1: Specific Match (Respects separators in search string)
+        const escapedSpecific = highlightText.toLowerCase().trim()
+          .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // Escape regex chars
+          .split('')
+          .map(char => char === ' ' ? '\\s+' : char + '[^a-z0-9]*')
+          .join('');
+        
+        const specificRegex = new RegExp(escapedSpecific, 'i');
+        let match = combinedText.match(specificRegex);
+
+        // Strategy 2: Fallback to Fuzzy Alphanumeric (Current behavior)
+        if (!match) {
+          let cleanSearch = normalize(highlightText);
+          if (cleanSearch.endsWith('lbs')) cleanSearch = cleanSearch.replace(/lbs$/, '');
+          const timeMatch = cleanSearch.match(/^(\d{4})(?:est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
+          if (timeMatch) cleanSearch = timeMatch[1];
+
+          if (cleanSearch.length >= 2) {
+            const escapedFuzzy = cleanSearch.split('').join('[^a-z0-9]*');
+            const fuzzyRegex = new RegExp(escapedFuzzy, 'i');
+            match = combinedText.match(fuzzyRegex);
+          }
+        }
 
         if (match && match.index !== undefined) {
           const startIndex = match.index;
@@ -1023,15 +1035,68 @@ export default function App() {
     e.preventDefault();
     e.stopPropagation();
     
-    // Adjust position to keep it on screen
-    const x = e.clientX;
-    const y = e.clientY;
+    let selectedText = "";
+    const target = e.target as HTMLTextAreaElement | HTMLInputElement;
     
+    if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+      const start = target.selectionStart || 0;
+      const end = target.selectionEnd || 0;
+      
+      if (start !== end) {
+        // User has selected a specific part
+        selectedText = text.substring(start, end);
+      } else {
+        // 1. Try to get the specific word under the cursor first
+        let wordStart = start;
+        while (wordStart > 0 && !/[\s\n]/.test(text[wordStart - 1])) {
+          wordStart--;
+        }
+        let wordEnd = start;
+        while (wordEnd < text.length && !/[\s\n]/.test(text[wordEnd])) {
+          wordEnd++;
+        }
+        const word = text.substring(wordStart, wordEnd).trim();
+        
+        // If the word is a label (ends with :) or empty, fallback to the whole line
+        if (!word || word.endsWith(':')) {
+          const lines = text.split('\n');
+          let currentPos = 0;
+          for (const line of lines) {
+            if (start >= currentPos && start <= currentPos + line.length) {
+              selectedText = line;
+              break;
+            }
+            currentPos += line.length + 1;
+          }
+        } else {
+          selectedText = word;
+        }
+      }
+    }
+
+    if (!selectedText) selectedText = text.split('\n')[0];
+
+    // Clean the text for better PDF matching
+    // Remove common labels and separators
+    let cleanText = selectedText
+      .replace(/^(PICKUP|DELIVERY|ORIGIN|DESTINATION|STOP \d+|LOAD|RATE|W|WEIGHT|PU|DEL)[:\s]*/i, "")
+      .replace(/\s*@\s*/, " ")
+      .trim();
+
+    // Special case for weight: if it starts with W and then numbers, just take the numbers
+    const weightMatch = selectedText.match(/^W(\d+)/i);
+    if (weightMatch) {
+      cleanText = weightMatch[1];
+    }
+
+    // If the cleaned text is too short, fallback to the original selected text
+    if (cleanText.length < 2) cleanText = selectedText.trim();
+
     setQuickLook({
       isOpen: true,
-      x,
-      y,
-      text: text.split('\n')[0].trim() || text.trim()
+      x: e.clientX,
+      y: e.clientY,
+      text: cleanText
     });
   };
 
@@ -1994,7 +2059,9 @@ export default function App() {
               height: '300px',
               zIndex: 100,
             }}
-            className={`${theme.cardBg} glass-card border-2 border-indigo-500/50 rounded-2xl shadow-2xl overflow-hidden pointer-events-none`}
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.stopPropagation()}
+            className={`${theme.cardBg} glass-card border-2 border-indigo-500/50 rounded-2xl shadow-2xl overflow-hidden`}
           >
             <div className="absolute top-2 left-3 z-10 bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-lg">
               Quick Look
