@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to CDN for reliable production behavior
@@ -10,6 +10,7 @@ import { parseRateConfirmation, ParsedRateCon } from './utils/parser';
 import { DottedMapBackground } from './components/DottedMapBackground';
 import { LoadingScreen } from './components/LoadingScreen';
 import { DriverNumberModal } from './components/DriverNumberModal';
+import { TemplatesView } from './components/TemplatesView';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">
@@ -945,8 +946,8 @@ export default function App() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   
-  // App State: 'upload' | 'verify' | 'results' | 'manage' | 'history'
-  const [appState, setAppState] = useState<'upload' | 'verify' | 'results' | 'manage' | 'history'>('upload');
+  // App State: 'upload' | 'verify' | 'results' | 'manage' | 'history' | 'templates'
+  const [appState, setAppState] = useState<'upload' | 'verify' | 'results' | 'manage' | 'history' | 'templates'>('upload');
   
   // Data State
   const [extractedData, setExtractedData] = useState<ParsedRateCon | null>(null);
@@ -1828,6 +1829,13 @@ export default function App() {
           
           <div className="flex items-center gap-6">
             <button 
+              onClick={() => setAppState('templates')}
+              className={`text-sm font-medium transition-colors ${appState === 'templates' ? 'text-indigo-500' : `${theme.textMuted} hover:${theme.text}`} flex items-center gap-2`}
+            >
+              <ClipboardList size={16} />
+              Templates
+            </button>
+            <button 
               onClick={() => setAppState('history')}
               className={`text-sm font-medium transition-colors ${appState === 'history' ? 'text-indigo-500' : `${theme.textMuted} hover:${theme.text}`} flex items-center gap-2`}
             >
@@ -1934,6 +1942,13 @@ export default function App() {
                 }}
               />
             )}
+            {appState === 'templates' && (
+              <TemplatesView 
+                theme={theme}
+                isDarkMode={isDarkMode}
+                onBack={() => setAppState('upload')}
+              />
+            )}
           </motion.div>
         </AnimatePresence>
       </main>
@@ -1964,6 +1979,40 @@ export default function App() {
               </div>
 
               <div className="space-y-6 flex-1">
+                {/* Navigation Links (Mobile) */}
+                <div className="md:hidden space-y-2 mb-6">
+                  <button 
+                    onClick={() => {
+                      setAppState('templates');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border ${theme.border} ${appState === 'templates' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/50' : `${theme.textMuted} ${theme.cardBg}`} glass-card`}
+                  >
+                    <ClipboardList size={20} />
+                    <span className="font-medium">Templates</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setAppState('history');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border ${theme.border} ${appState === 'history' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/50' : `${theme.textMuted} ${theme.cardBg}`} glass-card`}
+                  >
+                    <TrendingUp size={20} />
+                    <span className="font-medium">History</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setAppState('manage');
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border ${theme.border} ${appState === 'manage' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/50' : `${theme.textMuted} ${theme.cardBg}`} glass-card`}
+                  >
+                    <Settings size={20} />
+                    <span className="font-medium">Manage Data</span>
+                  </button>
+                </div>
+
                 {/* Team Selector */}
                 <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
                   <div className="flex items-center justify-between mb-2">
