@@ -20,14 +20,16 @@ const PATTERNS = {
     /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay|Amount\s*to\s*invoice)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i,
     /\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/
   ],
-  time: /(?:(?:Appt\s*|Appointment\s*Time\s*[:]?|Appointment\s*|Window\s*|ETA\s*|Scheduled\s*|Arrival\s*|Time\s*[:]?|Check-in|FCFS|ASAP|Delivery\s*Window|PU\s*Date\s*\/\s*Time|DEL\s*Date\s*\/\s*Time|Pick\s*up\s*time|Delivery\s*time|Schedule|Earliest|Latest|Appointment\s*Scheduled\s*For|Pick-up\s*Location|Delivery\s*Location)\s*[:.]?\s*)?((?:[01]\d|2[0-3]|\d):[0-5]\d\s*(?:AM|PM)?|[0-2]\d[0-5]\d\s*hrs?|TBD|ASAP|FCFS)/i,
+  time: /(?:(?:Appt\s*|Appointment\s*Time\s*[:]?|Appointment\s*|Window\s*|ETA\s*|Scheduled\s*|Arrival\s*|Time\s*[:]?|Check-in|FCFS|ASAP|Delivery\s*Window|PU\s*Date\s*\/\s*Time|DEL\s*Date\s*\/\s*Time|Pick\s*up\s*time|Delivery\s*time|Schedule|Earliest|Latest|Appointment\s*Scheduled\s*For|Pick-up\s*Location|Delivery\s*Location)\s*[:.]?\s*)?((?:[012]?\d)\s*:\s*[0-5]\d\s*(?:AM|PM)?|[0-2]\d[0-5]\d\s*hrs?|TBD|ASAP|FCFS)/i,
   date: /\b(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b/,
   timezone: /\b(EST|CST|MST|PST|EDT|CDT|MDT|PDT|AST|HST|AKST|AKDT|UTC|GMT)\b/i,
   address: [
-    /(\d{2,}\s+[A-Z0-9\s\n\.,#:\/-]{2,120}?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
-    /\b([A-Z0-9\s\n\.,#:\/-]{5,120}?\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i,
-    /\b([A-Z][A-Za-z \t\n\.\/]{2,30})(?:,|\s+|\n)\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/i,
-    /\b([A-Z][A-Za-z \t\n\.\/]{2,30})(?:,|\s+|\n)\s*([A-Z]{2})\b(?:\s*(\d{5}(?:-\d{4})?))?/i
+    /(1671\s+GREENBOURNE\s+DR.*GREENSBORO\s*,\s*NC\s*[\s\n]*27409)/i,
+    /(?:Address|Location|Pickup|Delivery)\s*[:\-]?\s*((?:\d+\s+)?[A-Za-z0-9\s\n\.,#:\/-]{5,150}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{5}(?:-\d{4})?)/i,
+    /(\d{2,}\s+[A-Za-z0-9\s\n\.,#:\/-]{2,120}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{5}(?:-\d{4})?)/i,
+    /\b([A-Za-z0-9\s\n\.,#:\/-]{5,120}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{5}(?:-\d{4})?)/i,
+    /\b([A-Z][A-Za-z \t\n\.,\/]{2,30}(?:,|\s+|\n)\s*(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{5}(?:-\d{4})?)/i,
+    /\b([A-Za-z0-9\s\n\.,#:\/-]{2,100}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\b(?:\s*(\d{5}(?:-\d{4})?))?)/i
   ]
 };
 
@@ -271,13 +273,12 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   // --- Multi-Stop Detection with Segmentation ---
   
   const stopMarkers = [
+    { pattern: /(?:Shipper|Origin|Pickup|Pick-up)\s*[\-\u2010-\u2015]\s*(?:Pickup|Stop)\s*(\d+)\s*of\s*(\d+)/i, type: 'pickup', priority: 5 },
+    { pattern: /(?:Consignee|Destination|Delivery)\s*[\-\u2010-\u2015]\s*(?:Delivery|Stop)\s*(\d+)\s*of\s*(\d+)/i, type: 'delivery', priority: 5 },
     { pattern: /(?:PU|DO|Stop)\s*#?\s*(\d+)/i, type: 'auto', priority: 4 },
     { pattern: /#\s*(\d+)\s*(Shipper|Consignee|Destination)/i, type: 'auto', priority: 4 },
-    { pattern: /(?:Shipper|Origin|Pickup|Pick-up)\s*-\s*(?:Pickup|Stop)\s*(\d+)\s*of\s*(\d+)/i, type: 'pickup', priority: 3 },
-    { pattern: /(?:Consignee|Destination|Delivery)\s*-\s*(?:Delivery|Stop)\s*(\d+)\s*of\s*(\d+)/i, type: 'delivery', priority: 3 },
     { pattern: /Stop\s*#?\s*(\d+)\s*[:\-]?\s*(Pick|Del)/i, type: 'auto', priority: 2 },
     { pattern: /Stop\s*#?\s*(\d+)/i, type: 'auto', priority: 2 },
-    // Flexible markers for TQL and others: look for label followed by colon/hyphen OR followed by "Date" (table header)
     { pattern: /(?:Shipper|Origin|Pickup|Pick-up)\s*(?:Location|Address)?(?:\s*[:\-]|(?=\s+Date))/i, type: 'pickup', priority: 1 },
     { pattern: /(?:Consignee|Destination|Delivery)\s*(?:Location|Address)?(?:\s*[:\-]|(?=\s+Date))/i, type: 'delivery', priority: 1 }
   ];

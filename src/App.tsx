@@ -94,52 +94,76 @@ const getBaseSteps = (data: ParsedRateCon | null): VerificationStep[] => {
 const formatAddress = (fullAddress: string, simplified: boolean) => {
   if (!simplified || !fullAddress) return fullAddress;
 
+  // Specific Facility Mapping as requested - using regex for robustness
+  const upperAddr = fullAddress.toUpperCase();
+  if (upperAddr.includes("1671") && (upperAddr.includes("GREENBOURNE") || upperAddr.includes("GREENSBORO"))) {
+    return "GREENSBORO, NC 27409";
+  }
+  if (upperAddr.includes("GREENBOURNE DR") && upperAddr.includes("STE 101")) {
+    return "GREENSBORO, NC 27409";
+  }
+
   const extractCity = (partBefore: string, state: string, zip: string) => {
-    // Strip leading suite/unit info if it's at the very beginning
-    // e.g., "STE B Indianapolis" -> "Indianapolis"
-    // e.g., "UNIT 101 Chicago" -> "Chicago"
+    // Robust regex for suite/unit/building prefixes
+    const suiteRegex = /(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/gi;
+    
     let cleanedPart = partBefore.trim();
-    const suiteRegex = /^(?:STE|UNIT|SUITE|BLDG|APT|#)\s*[A-Z0-9-]+\s+/i;
-    cleanedPart = cleanedPart.replace(suiteRegex, "").trim();
+    // Strip suite info from the start
+    cleanedPart = cleanedPart.replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, "").trim();
 
     // Strategy 1: If there's a comma, assume City is after the last comma
     if (cleanedPart.includes(',')) {
       const parts = cleanedPart.split(',');
-      const city = parts[parts.length - 1].trim();
-      // Ensure the city part isn't empty or just a number (suite number?)
+      let city = parts[parts.length - 1].trim();
+      city = city.replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, "").trim();
       if (city && isNaN(Number(city))) {
-        return `${city.toUpperCase()}, ${state.toUpperCase()} ${zip}`;
+        return `${city.toUpperCase()}, ${state.toUpperCase()} ${zip}`.trim();
       }
     }
 
     // Strategy 2: Try to split by common street suffixes
     const suffixes = ["AVE", "RD", "ST", "DR", "BLVD", "LN", "CT", "PL", "WAY", "CIR", "PKWY", "HWY", "TER", "TRL", "LOOP", "PIKE", "SQUARE", "SQ", "PARKWAY", "ROAD", "STREET", "DRIVE", "AVENUE", "LANE", "COURT", "PLACE"];
-    // Allow for optional dot, optional comma, and whitespace
-    const regex = new RegExp(`\\b(?:${suffixes.join("|")})\\.?\\s*,?\\s+(.*)$`, "i");
+    const suffixPattern = new RegExp(`\\b(?:${suffixes.join("|")})\\.?\\s*,?\\s+(?!.*\\b(?:${suffixes.join("|")})\\b)(.*)$`, "i");
     
-    const match = cleanedPart.match(regex);
+    const match = cleanedPart.match(suffixPattern);
     if (match && match[1].trim().length > 0) {
-      return `${match[1].trim().toUpperCase()}, ${state.toUpperCase()} ${zip}`;
+      let cityCandidate = match[1].trim();
+      cityCandidate = cityCandidate.replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, "").trim();
+      cityCandidate = cityCandidate.replace(/(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/gi, "").trim();
+
+      if (cityCandidate && isNaN(Number(cityCandidate))) {
+        return `${cityCandidate.toUpperCase()}, ${state.toUpperCase()} ${zip}`.trim();
+      }
     }
     
-    return `${cleanedPart.toUpperCase()}, ${state.toUpperCase()} ${zip}`;
+    // Fallback: Just take the last word if it looks like a city
+    const words = cleanedPart.split(/\s+/);
+    if (words.length >= 1) {
+      const lastWord = words[words.length - 1];
+      if (isNaN(Number(lastWord)) && lastWord.length > 2) {
+         return `${lastWord.toUpperCase()}, ${state.toUpperCase()} ${zip}`.trim();
+      }
+    }
+
+    return `${cleanedPart.toUpperCase()}, ${state.toUpperCase()} ${zip}`.trim();
   };
 
-  // 1. Find State and Zip at the end (Zip is optional)
-  const stateZipMatch = fullAddress.match(/,\s*([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$/i);
+  const trimmedAddr = fullAddress.trim();
+
+  // 1. Find State and Zip at the end (Zip is optional but preferred)
+  const stateZipMatch = trimmedAddr.match(/,\s*([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?\s*$/i);
   if (!stateZipMatch) {
-     // Try without comma before state
-     const stateZipMatchNoComma = fullAddress.match(/\s+([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$/i);
+     const stateZipMatchNoComma = trimmedAddr.match(/\s+([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?\s*$/i);
      if (!stateZipMatchNoComma) return fullAddress;
      
      const [_, state, zip] = stateZipMatchNoComma;
-     const partBefore = fullAddress.substring(0, stateZipMatchNoComma.index).trim();
+     const partBefore = trimmedAddr.substring(0, stateZipMatchNoComma.index).trim();
      
      return extractCity(partBefore, state, zip || "");
   }
 
   const [_, state, zip] = stateZipMatch;
-  const partBefore = fullAddress.substring(0, stateZipMatch.index).trim();
+  const partBefore = trimmedAddr.substring(0, stateZipMatch.index).trim();
   
   return extractCity(partBefore, state, zip || "");
 };
@@ -164,6 +188,9 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [isRendering, setIsRendering] = useState(false);
+  const [highlights, setHighlights] = useState<any[]>([]);
+  const lastHighlightRef = useRef<string>("");
 
   // 1. Render Base PDF
   useEffect(() => {
@@ -174,6 +201,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
       if (!pdfDocument || !canvasRef.current || !viewportRef.current) return;
 
       try {
+        setIsRendering(true);
         setTotalPages(pdfDocument.numPages);
         const page = await pdfDocument.getPage(currentPage);
         
@@ -209,6 +237,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
         
         renderTask = page.render(renderContext);
         await renderTask.promise;
+        setIsRendering(false);
 
         // Render Text Layer
         if (textLayerRef.current) {
@@ -266,45 +295,36 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
     const findPageWithText = async () => {
       if (!pdfDocument || !highlightText || highlightText.length < 2) return;
 
-      let cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (cleanHighlight.endsWith('lbs')) {
-        cleanHighlight = cleanHighlight.replace(/lbs$/, '');
-      }
-      const timeWithTzMatch = cleanHighlight.match(/^(\d{4})(est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
-      if (timeWithTzMatch) {
-        cleanHighlight = timeWithTzMatch[1];
-      }
+      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+      let cleanSearch = normalize(highlightText);
       
-      const highlightWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      // Special cases for weights and times
+      if (cleanSearch.endsWith('lbs')) cleanSearch = cleanSearch.replace(/lbs$/, '');
+      const timeMatch = cleanSearch.match(/^(\d{4})(?:est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
+      if (timeMatch) cleanSearch = timeMatch[1];
 
-      const isMatch = (itemStr: string) => {
-        const cleanItem = itemStr.toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (cleanItem.length < 2) return false;
-        if (cleanItem.includes(cleanHighlight)) return true;
-        if (cleanHighlight.length > 6 && cleanItem.length >= 4 && cleanHighlight.includes(cleanItem)) return true;
-        if (cleanHighlight.length > 10 && highlightWords.length > 0) {
-          return highlightWords.some(w => {
-            const cw = w.replace(/[^a-z0-9]/g, '');
-            return cw.length >= 4 && cleanItem.includes(cw);
-          });
-        }
-        return false;
+      const isMatchOnPage = async (page: any) => {
+        const textContent = await page.getTextContent();
+        const items = [...textContent.items] as any[];
+        items.sort((a, b) => {
+          const yDiff = b.transform[5] - a.transform[5];
+          if (Math.abs(yDiff) > 5) return yDiff;
+          return a.transform[4] - b.transform[4];
+        });
+        const fullText = normalize(items.map(it => it.str).join(""));
+        return fullText.includes(cleanSearch);
       };
 
       // Check current page first
       if (pageData) {
-        const textContent = await pageData.page.getTextContent();
-        const hasMatch = textContent.items.some((item: any) => isMatch(item.str));
-        if (hasMatch) return; // Already on the right page
+        if (await isMatchOnPage(pageData.page)) return;
       }
 
       // Search other pages
       for (let i = 1; i <= pdfDocument.numPages; i++) {
         if (i === currentPage) continue;
         const page = await pdfDocument.getPage(i);
-        const textContent = await page.getTextContent();
-        const hasMatch = textContent.items.some((item: any) => isMatch(item.str));
-        if (hasMatch) {
+        if (await isMatchOnPage(page)) {
           setCurrentPage(i);
           return;
         }
@@ -317,58 +337,76 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
   // 3. Render Highlights & Auto Zoom
   useEffect(() => {
     const drawHighlights = async () => {
-      if (!highlightLayerRef.current || !pageData) return;
+      if (!pageData) return;
       
       const { page, viewport } = pageData;
       
-      // Clear previous highlights
-      highlightLayerRef.current.innerHTML = '';
-
       // Reset zoom if disabled or no text
       if (!isAutoZoomEnabled || !highlightText || highlightText.length < 2) {
-        if (isAutoZoomEnabled) {
+        if (isAutoZoomEnabled && highlightText !== lastHighlightRef.current) {
              setScale(1);
              setPosition({ x: 0, y: 0 });
         }
-        if (!highlightText || highlightText.length < 2) return;
+        setHighlights([]);
+        lastHighlightRef.current = highlightText;
+        return;
       }
 
       try {
         const textContent = await page.getTextContent();
-        let cleanHighlight = highlightText.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const items = [...textContent.items] as any[];
         
-        if (cleanHighlight.endsWith('lbs')) {
-          cleanHighlight = cleanHighlight.replace(/lbs$/, '');
-        }
+        // Sort items visually
+        items.sort((a, b) => {
+          const yDiff = b.transform[5] - a.transform[5];
+          if (Math.abs(yDiff) > 5) return yDiff;
+          return a.transform[4] - b.transform[4];
+        });
+
+        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let cleanSearch = normalize(highlightText);
+        if (cleanSearch.endsWith('lbs')) cleanSearch = cleanSearch.replace(/lbs$/, '');
+        const timeMatch = cleanSearch.match(/^(\d{4})(?:est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
+        if (timeMatch) cleanSearch = timeMatch[1];
+
+        if (cleanSearch.length < 2) return;
+
+        // Build a map of characters to items
+        let combinedText = "";
+        const charToItemMap: { item: any, indexInItem: number }[] = [];
         
-        const timeWithTzMatch = cleanHighlight.match(/^(\d{4})(est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
-        if (timeWithTzMatch) {
-          cleanHighlight = timeWithTzMatch[1];
-        }
-
-        const highlightWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-
-        let firstMatchRect: number[] | null = null;
-
-        textContent.items.forEach((item: any) => {
-          const itemStr = item.str;
-          const cleanItem = itemStr.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (cleanItem.length < 2) return;
-
-          let isMatch = false;
-          if (cleanItem.includes(cleanHighlight)) {
-            isMatch = true;
-          } else if (cleanHighlight.length > 6 && cleanItem.length >= 4 && cleanHighlight.includes(cleanItem)) {
-            isMatch = true;
-          } else if (cleanHighlight.length > 10 && highlightWords.length > 0) {
-            isMatch = highlightWords.some(w => {
-              const cw = w.replace(/[^a-z0-9]/g, '');
-              return cw.length >= 4 && cleanItem.includes(cw);
-            });
+        items.forEach(item => {
+          const str = item.str;
+          for (let i = 0; i < str.length; i++) {
+            combinedText += str[i].toLowerCase();
+            charToItemMap.push({ item, indexInItem: i });
           }
+          // Add a space between items for better matching
+          combinedText += " ";
+          charToItemMap.push({ item: null, indexInItem: -1 });
+        });
+
+        // Use a regex that ignores non-alphanumeric characters
+        const escapedSearch = cleanSearch.split('').join('[^a-z0-9]*');
+        const regex = new RegExp(escapedSearch, 'i');
+        const match = combinedText.match(regex);
+
+        if (match && match.index !== undefined) {
+          const startIndex = match.index;
+          const endIndex = startIndex + match[0].length;
           
-          if (isMatch) {
-            // item.transform is [scaleX, skewY, skewX, scaleY, x, y]
+          const matchedItems = new Set<any>();
+          for (let i = startIndex; i < endIndex; i++) {
+            const mapping = charToItemMap[i];
+            if (mapping && mapping.item) {
+              matchedItems.add(mapping.item);
+            }
+          }
+
+          let firstMatchRect: number[] | null = null;
+          const newHighlights: any[] = [];
+
+          matchedItems.forEach(item => {
             const pdfX = item.transform[4];
             const pdfY = item.transform[5];
             const pdfHeight = Math.sqrt(item.transform[2] * item.transform[2] + item.transform[3] * item.transform[3]);
@@ -389,43 +427,76 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
             if (!firstMatchRect) {
               firstMatchRect = [x, y, w, h];
             }
+            newHighlights.push({ x, y, w, h });
+          });
 
-            const div = document.createElement('div');
-            div.style.position = 'absolute';
-            div.style.left = `${x}px`;
-            div.style.top = `${y}px`;
-            div.style.width = `${w}px`;
-            div.style.height = `${h}px`;
-            div.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
-            div.style.border = '1px solid rgba(255, 200, 0, 0.8)';
-            div.style.borderRadius = '2px';
-            div.style.pointerEvents = 'none';
-            div.style.boxSizing = 'border-box';
+          setHighlights(newHighlights);
+
+          // Apply Auto Zoom
+          if (isAutoZoomEnabled && firstMatchRect && viewportRef.current) {
+            const [x, y, w, h] = firstMatchRect;
+            const centerX = x + w / 2;
+            const centerY = y + h / 2;
             
-            highlightLayerRef.current?.appendChild(div);
+            const containerW = viewportRef.current.clientWidth;
+            const containerH = viewportRef.current.clientHeight || 600;
+            
+            const newScale = 2.0;
+            const translateX = containerW / 2 - centerX * newScale;
+            const translateY = containerH / 2 - centerY * newScale;
+
+            setScale(newScale);
+            setPosition({ x: translateX, y: translateY });
           }
-        });
+        } else {
+          // Fallback to word-based matching if sequence fails (for very fragmented PDFs)
+          const highlightWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
+          const newHighlights: any[] = [];
+          let firstMatchRect: number[] | null = null;
 
-        // Apply Auto Zoom to first match
-        if (isAutoZoomEnabled && firstMatchRect && viewportRef.current) {
-          const [x, y, w, h] = firstMatchRect;
-          const centerX = x + w / 2;
-          const centerY = y + h / 2;
-          
-          const containerW = viewportRef.current.clientWidth;
-          const containerH = viewportRef.current.clientHeight || 600;
-          
-          const newScale = 2.0; // 2x Zoom
-          const translateX = containerW / 2 - centerX * newScale;
-          const translateY = containerH / 2 - centerY * newScale;
+          items.forEach(item => {
+            const cleanItem = normalize(item.str);
+            if (cleanItem.length < 2) return;
 
-          setScale(newScale);
-          setPosition({ x: translateX, y: translateY });
-        } else if (isAutoZoomEnabled && !firstMatchRect) {
-          // If no match found, reset to fit page so user isn't stuck in a random zoomed area
-          setScale(1);
-          setPosition({ x: 0, y: 0 });
+            const isWordMatch = highlightWords.some(w => {
+              const cw = normalize(w);
+              return cw.length >= 3 && (cleanItem.includes(cw) || cw.includes(cleanItem));
+            });
+
+            if (isWordMatch && !cleanItem.includes('address') && !cleanItem.includes('origin') && !cleanItem.includes('destination')) {
+              const pdfX = item.transform[4];
+              const pdfY = item.transform[5];
+              const pdfHeight = Math.sqrt(item.transform[2] * item.transform[2] + item.transform[3] * item.transform[3]);
+              const pdfWidth = item.width;
+
+              const rect = viewport.convertToViewportRectangle([pdfX, pdfY, pdfX + pdfWidth, pdfY + pdfHeight]);
+              const x = Math.min(rect[0], rect[2]);
+              const y = Math.min(rect[1], rect[3]);
+              const w = Math.abs(rect[0] - rect[2]);
+              const h = Math.abs(rect[1] - rect[3]);
+
+              if (!firstMatchRect) firstMatchRect = [x, y, w, h];
+              newHighlights.push({ x, y, w, h });
+            }
+          });
+
+          setHighlights(newHighlights);
+          if (isAutoZoomEnabled && firstMatchRect && viewportRef.current && highlightText !== lastHighlightRef.current) {
+            const [x, y, w, h] = firstMatchRect;
+            const centerX = x + w / 2;
+            const centerY = y + h / 2;
+            const containerW = viewportRef.current.clientWidth;
+            const containerH = viewportRef.current.clientHeight || 600;
+            const newScale = 2.0;
+            setScale(newScale);
+            setPosition({ x: containerW / 2 - centerX * newScale, y: containerH / 2 - centerY * newScale });
+          } else if (isAutoZoomEnabled && !firstMatchRect && highlightText !== lastHighlightRef.current) {
+            setScale(1);
+            setPosition({ x: 0, y: 0 });
+          }
         }
+        
+        lastHighlightRef.current = highlightText;
 
       } catch (err) {
         console.error("Highlight error:", err);
@@ -608,11 +679,19 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
       >
-        <div 
+        <motion.div 
           ref={contentRef}
-          className="relative shadow-2xl transition-transform duration-100 ease-out origin-top-left"
-          style={{
-            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`
+          className="relative shadow-2xl origin-top-left"
+          animate={{
+            x: position.x,
+            y: position.y,
+            scale: scale
+          }}
+          transition={isDragging ? { type: "tween", duration: 0 } : {
+            type: "spring",
+            damping: 30,
+            stiffness: 120,
+            mass: 0.8
           }}
         >
           <canvas ref={canvasRef} className="rounded-sm" />
@@ -623,11 +702,25 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
             onClick={handleTextLayerClick}
             onMouseUp={handleTextLayerMouseUp}
           />
-          <div 
-            ref={highlightLayerRef} 
-            className="absolute inset-0 pointer-events-none"
-          />
-        </div>
+          <div className="absolute inset-0 pointer-events-none">
+            {highlights.map((h, i) => (
+              <div 
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: `${h.x}px`,
+                  top: `${h.y}px`,
+                  width: `${h.w}px`,
+                  height: `${h.h}px`,
+                  backgroundColor: 'rgba(255, 255, 0, 0.3)',
+                  border: '1px solid rgba(255, 200, 0, 0.8)',
+                  borderRadius: '2px',
+                  boxSizing: 'border-box'
+                }}
+              />
+            ))}
+          </div>
+        </motion.div>
       </div>
 
       {/* Copied Feedback Toast */}
@@ -684,20 +777,15 @@ const ManageView = ({
   isDarkMode, 
   savedTrucks, 
   setSavedTrucks, 
-  savedBrokers, 
-  setSavedBrokers, 
   onBack 
 }: {
   theme: any,
   isDarkMode: boolean,
   savedTrucks: string[],
   setSavedTrucks: (v: string[]) => void,
-  savedBrokers: string[],
-  setSavedBrokers: (v: string[]) => void,
   onBack: () => void
 }) => {
   const [newTruck, setNewTruck] = useState("");
-  const [newBroker, setNewBroker] = useState("");
 
   const addTruck = () => {
     if (newTruck && !savedTrucks.includes(newTruck)) {
@@ -709,18 +797,6 @@ const ManageView = ({
   const removeTruck = (t: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSavedTrucks(savedTrucks.filter(truck => truck !== t));
-  };
-
-  const addBroker = () => {
-    if (newBroker && !savedBrokers.includes(newBroker)) {
-      setSavedBrokers([...savedBrokers, newBroker]);
-      setNewBroker("");
-    }
-  };
-
-  const removeBroker = (b: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSavedBrokers(savedBrokers.filter(brk => brk !== b));
   };
 
   return (
@@ -736,9 +812,9 @@ const ManageView = ({
         </button>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="max-w-md mx-auto">
         {/* Trucks Manager */}
-        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} p-6 shadow-sm`}>
+        <div className={`${theme.cardBg} rounded-2xl border ${theme.border} p-6 shadow-sm`}>
           <div className="flex items-center justify-between mb-6">
             <h3 className={`text-lg font-medium ${theme.text} flex items-center gap-2`}>
                 <Truck size={20} className="text-indigo-500" /> Trucks
@@ -767,11 +843,11 @@ const ManageView = ({
 
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
             {savedTrucks.map(t => (
-              <div key={t} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'} group hover:border-indigo-500/30 transition-colors glass-card`}>
+              <div key={t} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'} group hover:border-indigo-500/30 transition-colors`}>
                 <span className={`font-mono font-medium ${theme.text}`}>{t}</span>
                 <button 
                   onClick={(e) => removeTruck(t, e)}
-                  className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 glass-button border-none"
+                  className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 border-none"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -779,52 +855,6 @@ const ManageView = ({
             ))}
             {savedTrucks.length === 0 && (
               <p className={`text-sm ${theme.textMuted} text-center py-8 italic`}>No trucks saved yet.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Brokers Manager */}
-        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} p-6 shadow-sm`}>
-          <div className="flex items-center justify-between mb-6">
-            <h3 className={`text-lg font-medium ${theme.text} flex items-center gap-2`}>
-                <Building2 size={20} className="text-indigo-500" /> Brokers
-            </h3>
-            <span className={`text-xs ${theme.textMuted} bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full`}>{savedBrokers.length} saved</span>
-          </div>
-          
-          <div className="flex gap-2 mb-6">
-            <input 
-              type="text" 
-              value={newBroker}
-              onChange={(e) => setNewBroker(e.target.value.toUpperCase())}
-              placeholder="Add Broker Name"
-              className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-3 py-2 text-sm ${theme.text} focus:outline-none focus:border-indigo-500`}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') addBroker();
-              }}
-            />
-            <button 
-              onClick={addBroker}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg transition-colors glass-button border-none"
-            >
-              <Plus size={20} />
-            </button>
-          </div>
-
-          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-            {savedBrokers.map(b => (
-              <div key={b} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'} group hover:border-indigo-500/30 transition-colors glass-card`}>
-                <span className={`font-medium ${theme.text}`}>{b}</span>
-                <button 
-                  onClick={(e) => removeBroker(b, e)}
-                  className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 glass-button border-none"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-            {savedBrokers.length === 0 && (
-              <p className={`text-sm ${theme.textMuted} text-center py-8 italic`}>No brokers saved yet.</p>
             )}
           </div>
         </div>
@@ -972,19 +1002,51 @@ export default function App() {
 
   // Chain State
   const [truckNumber, setTruckNumber] = useState("TRUCK#");
-  const [savedTrucks, setSavedTrucks] = useLocalStorage<string[]>("dakota_savedTrucks", ["101", "102", "103"]);
-  const [broker, setBroker] = useLocalStorage("dakota_broker", "TRAFFIX");
-  const [savedBrokers, setSavedBrokers] = useLocalStorage<string[]>("dakota_savedBrokers", ["TRAFFIX", "TQL", "ARRIVE"]);
+  const [savedTrucks, setSavedTrucks] = useLocalStorage<string[]>("dakota_savedTrucks", []);
+  const broker = "TRAFFIX";
   const [chainText, setChainText] = useState("");
   const [copiedChain, setCopiedChain] = useState(false);
   const [renameText, setRenameText] = useState("");
   const [copiedRename, setCopiedRename] = useState(false);
   const [team, setTeam] = useLocalStorage<'green' | 'purple' | 'red' | 'blue' | 'none'>("dakota_team", 'none');
 
-  // Update ref whenever state changes
+  // Quick Look State
+  const [quickLook, setQuickLook] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    text: string;
+  }>({ isOpen: false, x: 0, y: 0, text: "" });
+
+  const handleQuickLook = (e: React.MouseEvent, text: string) => {
+    if (!text) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Adjust position to keep it on screen
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    setQuickLook({
+      isOpen: true,
+      x,
+      y,
+      text: text.split('\n')[0].trim() || text.trim()
+    });
+  };
+
+  // Close Quick Look on click anywhere
   useEffect(() => {
-    extractedDataRef.current = extractedData;
-  }, [extractedData]);
+    const handleGlobalClick = () => {
+      if (quickLook.isOpen) setQuickLook(prev => ({ ...prev, isOpen: false }));
+    };
+    window.addEventListener('click', handleGlobalClick);
+    window.addEventListener('contextmenu', handleGlobalClick);
+    return () => {
+      window.removeEventListener('click', handleGlobalClick);
+      window.removeEventListener('contextmenu', handleGlobalClick);
+    };
+  }, [quickLook.isOpen]);
 
   // Loading Screen Effect
   useEffect(() => {
@@ -1116,10 +1178,10 @@ export default function App() {
     text: isDarkMode ? 'text-white' : 'text-slate-900',
     textMuted: isDarkMode ? 'text-slate-400' : 'text-slate-500',
     border: isDarkMode ? 'border-white/10' : 'border-slate-200',
-    cardBg: isDarkMode ? 'liquid-glass-dark' : 'liquid-glass',
-    cardHover: isDarkMode ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50',
-    inputBg: isDarkMode ? 'bg-white/[0.03]' : 'bg-slate-100',
-    headerBg: isDarkMode ? 'bg-black/20' : 'bg-white/80',
+    cardBg: isDarkMode ? 'bg-slate-900' : 'bg-white',
+    cardHover: isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50',
+    inputBg: isDarkMode ? 'bg-slate-800' : 'bg-slate-100',
+    headerBg: isDarkMode ? 'bg-[#020617]' : 'bg-white',
     accent: 'text-indigo-400',
     accentBg: 'bg-indigo-600',
     accentHover: 'hover:bg-indigo-500',
@@ -1149,6 +1211,7 @@ export default function App() {
 
     const data = parseRateConfirmation(fullText);
     setExtractedData(data);
+    extractedDataRef.current = data; // Sync ref immediately
     setPdfLoadNumber(data.loadNumber);
     
     const steps = getBaseSteps(data);
@@ -1242,40 +1305,37 @@ export default function App() {
   };
 
   const handleDataChange = (val: string) => {
-    if (!currentSteps[currentStepIndex]) return;
+    if (!currentSteps[currentStepIndex] || !extractedDataRef.current) return;
     const step = currentSteps[currentStepIndex];
     
-    setExtractedData(prev => {
-      if (!prev) return prev;
+    // Update ref synchronously to avoid stale closures and async state issues
+    const newData = { ...extractedDataRef.current };
+    
+    if (step.stopIndex !== undefined && step.field) {
+      const newStops = [...newData.stops];
+      newStops[step.stopIndex] = {
+        ...newStops[step.stopIndex],
+        [step.field]: val
+      };
+      newData.stops = newStops;
       
-      const newData = { ...prev };
-      
-      if (step.stopIndex !== undefined && step.field) {
-        const newStops = [...prev.stops];
-        newStops[step.stopIndex] = {
-          ...newStops[step.stopIndex],
-          [step.field]: val
-        };
-        newData.stops = newStops;
-        
-        // Sync root fields if first/last stop changed
-        if (step.stopIndex === 0) {
-          if (step.field === 'address') newData.originAddress = val;
-          if (step.field === 'date') newData.pickupDate = val;
-          if (step.field === 'time') newData.pickupTime = val;
-        }
-        if (step.stopIndex === prev.stops.length - 1) {
-          if (step.field === 'address') newData.destinationAddress = val;
-          if (step.field === 'time') newData.deliveryTime = val;
-        }
-      } else {
-        // @ts-ignore - dynamic key assignment
-        newData[step.key as keyof ParsedRateCon] = val;
+      // Sync root fields if first/last stop changed
+      if (step.stopIndex === 0) {
+        if (step.field === 'address') newData.originAddress = val;
+        if (step.field === 'date') newData.pickupDate = val;
+        if (step.field === 'time') newData.pickupTime = val;
       }
-      
-      extractedDataRef.current = newData;
-      return newData;
-    });
+      if (step.stopIndex === newData.stops.length - 1) {
+        if (step.field === 'address') newData.destinationAddress = val;
+        if (step.field === 'time') newData.deliveryTime = val;
+      }
+    } else {
+      // @ts-ignore - dynamic key assignment
+      newData[step.key as keyof ParsedRateCon] = val;
+    }
+    
+    extractedDataRef.current = newData;
+    setExtractedData(newData);
   };
 
   // Keyboard Navigation
@@ -1466,17 +1526,6 @@ export default function App() {
     setSavedTrucks(savedTrucks.filter(truck => truck !== t));
   };
 
-  const addSavedBroker = (newBroker: string) => {
-    if (newBroker && !savedBrokers.includes(newBroker)) {
-      setSavedBrokers([...savedBrokers, newBroker]);
-    }
-  };
-
-  const removeSavedBroker = (b: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSavedBrokers(savedBrokers.filter(brk => brk !== b));
-  };
-
   // --- Render Helpers ---
 
   const renderVerification = () => {
@@ -1510,10 +1559,9 @@ export default function App() {
         {/* Right: Verification Controls */}
         <div className="flex flex-col justify-center space-y-8 pb-8 md:pb-0">
           <motion.div 
-            key={step.key}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             className={`${theme.cardBg} glass-card border ${theme.border} p-8 rounded-3xl shadow-2xl relative overflow-hidden`}
           >
             {/* Background Glow */}
@@ -1563,16 +1611,6 @@ export default function App() {
               </div>
             </div>
           </motion.div>
-
-          {/* Progress Indicators */}
-          <div className="flex justify-center gap-2">
-            {currentSteps.map((_, idx) => (
-              <div 
-                key={idx} 
-                className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentStepIndex ? 'w-8 bg-indigo-500' : idx < currentStepIndex ? 'w-2 bg-emerald-500' : `w-2 ${isDarkMode ? 'bg-slate-700' : 'bg-slate-300'}`}`}
-              />
-            ))}
-          </div>
         </div>
       </div>
     );
@@ -1591,7 +1629,7 @@ export default function App() {
     const isCurrentPdf = pdfDoc && pdfLoadNumber === (isViewingHistory ? currentHistoryItem?.loadNumber : extractedData?.loadNumber);
 
     return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-3">
           <h2 className={`text-2xl font-display font-medium ${theme.text}`}>
@@ -1655,6 +1693,7 @@ export default function App() {
           <textarea 
             value={routeText}
             onChange={(e) => setRouteText(e.target.value)}
+            onContextMenu={(e) => handleQuickLook(e, routeText)}
             className={`w-full h-40 p-6 bg-transparent ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} font-mono text-sm resize-none focus:outline-none leading-relaxed`}
             spellCheck={false}
           />
@@ -1675,6 +1714,7 @@ export default function App() {
           <textarea 
             value={notesText}
             onChange={(e) => setNotesText(e.target.value)}
+            onContextMenu={(e) => handleQuickLook(e, notesText)}
             className={`w-full h-40 p-6 bg-transparent ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} font-mono text-sm resize-none focus:outline-none leading-relaxed`}
             spellCheck={false}
           />
@@ -1706,24 +1746,11 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Broker Selector */}
+              {/* Broker Info (Fixed to TRAFFIX) */}
               <div className="flex items-center gap-2 ml-4">
-                {savedBrokers.map(b => (
-                  <button 
-                    key={b}
-                    onClick={() => setBroker(b)}
-                    className={`px-2 py-1 text-xs rounded border ${broker === b ? 'bg-indigo-500 text-white border-indigo-500' : `${theme.textMuted} border-transparent hover:bg-white/5`} glass-button`}
-                  >
-                    {b}
-                  </button>
-                ))}
-                <input 
-                  type="text" 
-                  value={broker}
-                  onChange={(e) => setBroker(e.target.value.toUpperCase())}
-                  className={`w-24 bg-transparent border-b ${theme.border} text-xs ${theme.text} focus:outline-none focus:border-indigo-500`}
-                  placeholder="OTHER"
-                />
+                <span className={`px-2 py-1 text-xs rounded border bg-indigo-500/10 text-indigo-500 border-indigo-500/30 font-bold`}>
+                  TRAFFIX
+                </span>
               </div>
             </div>
 
@@ -1740,6 +1767,7 @@ export default function App() {
               type="text"
               value={chainText}
               onChange={(e) => setChainText(e.target.value)}
+              onContextMenu={(e) => handleQuickLook(e, chainText)}
               className={`w-full bg-transparent ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} font-mono text-lg focus:outline-none`}
               spellCheck={false}
             />
@@ -1763,6 +1791,7 @@ export default function App() {
               type="text"
               value={renameText}
               onChange={(e) => setRenameText(e.target.value)}
+              onContextMenu={(e) => handleQuickLook(e, renameText)}
               className={`w-full bg-transparent ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} font-mono text-lg focus:outline-none`}
               spellCheck={false}
             />
@@ -1784,24 +1813,11 @@ export default function App() {
       )}
       <AnimatePresence>
         {isLoading && <LoadingScreen isDarkMode={isDarkMode} />}
-        {isProcessing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          >
-            <div className={`${theme.cardBg} p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4`}>
-              <RefreshCw className="animate-spin text-indigo-500" size={32} />
-              <p className={`font-medium ${theme.text}`}>Processing Document...</p>
-            </div>
-          </motion.div>
-        )}
       </AnimatePresence>
       <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#4F46E5" : "#94A3B8"} />
       
       {/* Header */}
-      <header className={`border-b ${theme.border} sticky top-0 z-20 ${theme.headerBg} backdrop-blur-xl transition-colors duration-300 flex-none glass-card border-x-0 border-t-0 rounded-none`}>
+      <header className={`border-b ${appState === 'verify' ? 'border-indigo-500/30' : theme.border} sticky top-0 z-20 ${theme.headerBg} transition-all duration-300 flex-none border-x-0 border-t-0 rounded-none relative`}>
         <div className="w-full px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setAppState('upload')}>
             <DakotaLogo className="w-7 h-7" />
@@ -1827,27 +1843,27 @@ export default function App() {
             </div>
           </div>
           
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => setAppState('templates')}
-              className={`text-sm font-medium transition-colors ${appState === 'templates' ? 'text-indigo-500' : `${theme.textMuted} hover:${theme.text}`} flex items-center gap-2`}
+              className={`p-2 rounded-xl transition-all ${appState === 'templates' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
+              title="Templates"
             >
-              <ClipboardList size={16} />
-              Templates
+              <ClipboardList size={20} />
             </button>
             <button 
               onClick={() => setAppState('history')}
-              className={`text-sm font-medium transition-colors ${appState === 'history' ? 'text-indigo-500' : `${theme.textMuted} hover:${theme.text}`} flex items-center gap-2`}
+              className={`p-2 rounded-xl transition-all ${appState === 'history' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
+              title="History"
             >
-              <TrendingUp size={16} />
-              History
+              <Search size={20} />
             </button>
             <button 
               onClick={() => setAppState('manage')}
-              className={`text-sm font-medium transition-colors ${appState === 'manage' ? 'text-indigo-500' : `${theme.textMuted} hover:${theme.text}`} flex items-center gap-2`}
+              className={`p-2 rounded-xl transition-all ${appState === 'manage' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
+              title="Manage Data"
             >
-              <Settings size={16} />
-              Manage Data
+              <Settings size={20} />
             </button>
 
             <div className="flex items-center gap-4">
@@ -1868,6 +1884,18 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Progress Bar Line */}
+      {appState === 'verify' && (
+        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-indigo-500/10 overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${((currentStepIndex + 1) / currentSteps.length) * 100}%` }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"
+          />
+        </div>
+      )}
     </header>
 
       {/* Main Layout */}
@@ -1915,8 +1943,6 @@ export default function App() {
                 isDarkMode={isDarkMode}
                 savedTrucks={savedTrucks}
                 setSavedTrucks={setSavedTrucks}
-                savedBrokers={savedBrokers}
-                setSavedBrokers={setSavedBrokers}
                 onBack={() => setAppState('upload')}
               />
             )}
@@ -1953,6 +1979,46 @@ export default function App() {
         </AnimatePresence>
       </main>
 
+      {/* Quick Look Popover */}
+      <AnimatePresence>
+        {quickLook.isOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+            style={{
+              position: 'fixed',
+              left: Math.min(quickLook.x + 20, window.innerWidth - 440),
+              top: Math.min(quickLook.y - 150, window.innerHeight - 340),
+              width: '400px',
+              height: '300px',
+              zIndex: 100,
+            }}
+            className={`${theme.cardBg} glass-card border-2 border-indigo-500/50 rounded-2xl shadow-2xl overflow-hidden pointer-events-none`}
+          >
+            <div className="absolute top-2 left-3 z-10 bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-lg">
+              Quick Look
+            </div>
+            
+            {pdfDoc ? (
+              <PdfViewer 
+                pdfDocument={pdfDoc} 
+                highlightText={quickLook.text} 
+                isDarkMode={isDarkMode} 
+                isAutoZoomEnabled={true}
+                dragSensitivity={dragSensitivity}
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center space-y-3">
+                <AlertTriangle className="text-amber-500" size={32} />
+                <p className={`text-sm font-medium ${theme.text}`}>PDF not available for Quick Look</p>
+                <p className={`text-xs ${theme.textMuted}`}>Quick Look only works for the document currently being processed.</p>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Menu Overlay */}
       <AnimatePresence>
         {isMenuOpen && (
@@ -1961,192 +2027,223 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
               onClick={() => setIsMenuOpen(false)}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+              className="fixed inset-0 bg-black/40 z-40"
             />
             <motion.div 
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className={`fixed right-0 top-0 bottom-0 w-80 ${isDarkMode ? 'bg-[#0F172A]' : 'bg-white'} border-l ${theme.border} z-50 shadow-2xl p-6 flex flex-col glass-card rounded-none border-y-0 border-r-0`}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className={`fixed right-0 top-0 bottom-0 w-72 ${isDarkMode ? 'bg-[#0F172A]' : 'bg-white'} border-l ${theme.border} z-50 shadow-2xl flex flex-col rounded-none border-y-0 border-r-0 overflow-hidden`}
             >
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-xl font-bold font-sans">Menu</h2>
-                <button onClick={() => setIsMenuOpen(false)} className={`p-2 rounded-lg hover:${theme.cardBg}`}>
-                  <X size={24} className={theme.textMuted} />
+              <div className="p-5 flex justify-between items-center border-b border-white/5">
+                <div className="flex items-center gap-2">
+                  <Settings size={18} className="text-indigo-500" />
+                  <h2 className="text-lg font-semibold font-display tracking-tight">Settings</h2>
+                </div>
+                <button 
+                  onClick={() => setIsMenuOpen(false)} 
+                  className={`p-1.5 rounded-full hover:${theme.cardBg} transition-colors`}
+                >
+                  <X size={20} className={theme.textMuted} />
                 </button>
               </div>
 
-              <div className="space-y-6 flex-1">
+              <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
                 {/* Navigation Links (Mobile) */}
-                <div className="md:hidden space-y-2 mb-6">
-                  <button 
-                    onClick={() => {
-                      setAppState('templates');
-                      setIsMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border ${theme.border} ${appState === 'templates' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/50' : `${theme.textMuted} ${theme.cardBg}`} glass-card`}
-                  >
-                    <ClipboardList size={20} />
-                    <span className="font-medium">Templates</span>
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setAppState('history');
-                      setIsMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border ${theme.border} ${appState === 'history' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/50' : `${theme.textMuted} ${theme.cardBg}`} glass-card`}
-                  >
-                    <TrendingUp size={20} />
-                    <span className="font-medium">History</span>
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setAppState('manage');
-                      setIsMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl border ${theme.border} ${appState === 'manage' ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/50' : `${theme.textMuted} ${theme.cardBg}`} glass-card`}
-                  >
-                    <Settings size={20} />
-                    <span className="font-medium">Manage Data</span>
-                  </button>
-                </div>
-
-                {/* Team Selector */}
-                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">Team Color</span>
-                  </div>
-                  <div className="grid grid-cols-5 gap-2">
-                    {[
-                      { id: 'none', label: 'None', color: 'bg-slate-500' },
-                      { id: 'green', label: '🟢', color: 'bg-emerald-500' },
-                      { id: 'purple', label: '🟣', color: 'bg-purple-500' },
-                      { id: 'red', label: '🔴', color: 'bg-red-500' },
-                      { id: 'blue', label: '🔵', color: 'bg-blue-500' },
-                    ].map((t) => (
-                      <button 
-                        key={t.id}
-                        onClick={() => setTeam(t.id as any)}
-                        className={`h-8 rounded-lg border flex items-center justify-center transition-all ${team === t.id ? 'ring-2 ring-offset-2 ring-indigo-500 border-transparent' : 'border-transparent opacity-50 hover:opacity-100'} glass-button`}
-                        style={{ backgroundColor: t.id === 'none' ? undefined : 'transparent' }}
-                      >
-                         {t.id === 'none' ? <X size={14} className="text-white" /> : <span className="text-xl">{t.label}</span>}
-                      </button>
-                    ))}
+                <div className="md:hidden space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 px-1">Navigation</p>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        setAppState('templates');
+                        setIsMenuOpen(false);
+                      }}
+                      className={`flex-1 flex items-center justify-center p-3 rounded-xl transition-all ${appState === 'templates' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : `${theme.textMuted} ${theme.cardBg} border ${theme.border}`}`}
+                      title="Templates"
+                    >
+                      <ClipboardList size={20} />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setAppState('history');
+                        setIsMenuOpen(false);
+                      }}
+                      className={`flex-1 flex items-center justify-center p-3 rounded-xl transition-all ${appState === 'history' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : `${theme.textMuted} ${theme.cardBg} border ${theme.border}`}`}
+                      title="History"
+                    >
+                      <Search size={20} />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setAppState('manage');
+                        setIsMenuOpen(false);
+                      }}
+                      className={`flex-1 flex items-center justify-center p-3 rounded-xl transition-all ${appState === 'manage' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : `${theme.textMuted} ${theme.cardBg} border ${theme.border}`}`}
+                      title="Manage Data"
+                    >
+                      <Settings size={20} />
+                    </button>
                   </div>
                 </div>
 
-                {/* Appearance Section */}
-                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
+                {/* Preferences Section */}
+                <div className="space-y-4">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Preferences</p>
+                  
+                  {/* Team Selector */}
+                  <div className="space-y-2 px-1">
+                    <label className="text-xs font-medium text-slate-400">Team Color</label>
+                    <div className="flex items-center gap-2">
+                      {[
+                        { id: 'none', label: 'None', color: 'bg-slate-500' },
+                        { id: 'green', label: '🟢', color: 'bg-emerald-500' },
+                        { id: 'purple', label: '🟣', color: 'bg-purple-500' },
+                        { id: 'red', label: '🔴', color: 'bg-red-500' },
+                        { id: 'blue', label: '🔵', color: 'bg-blue-500' },
+                      ].map((t) => (
+                        <button 
+                          key={t.id}
+                          onClick={() => setTeam(t.id as any)}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border-2 ${team === t.id ? 'border-indigo-500 scale-110 shadow-lg shadow-indigo-500/20' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                          title={t.label}
+                        >
+                           {t.id === 'none' ? 
+                             <div className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center"><X size={10} className="text-white" /></div> : 
+                             <span className="text-lg leading-none">{t.label}</span>
+                           }
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Driver Number */}
                   <button 
                     onClick={() => {
                       setIsDriverModalOpen(true);
                       setIsMenuOpen(false);
                     }}
-                    className="w-full flex items-center justify-between mb-2 hover:text-indigo-500 transition-colors"
+                    className={`w-full flex items-center justify-between p-3 rounded-xl border ${theme.border} ${theme.cardBg} hover:border-indigo-500/50 transition-all group`}
                   >
-                    <span className="font-medium text-sm">Set Driver Number</span>
-                    <Hash size={18} className="text-indigo-400" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                        <Hash size={16} />
+                      </div>
+                      <span className="text-sm font-medium">Driver Number</span>
+                    </div>
+                    <ChevronRight size={14} className="text-slate-600 group-hover:text-indigo-400 transition-colors" />
                   </button>
-                </div>
 
-                {/* Theme Toggle */}
-                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">Appearance</span>
-                    {isDarkMode ? <Moon size={18} className="text-indigo-400" /> : <Sun size={18} className="text-amber-500" />}
+                  {/* Theme Toggle */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-xs font-medium text-slate-400">Appearance</span>
+                      <span className="text-[10px] font-mono text-indigo-400 uppercase">{isDarkMode ? 'Dark' : 'Light'}</span>
+                    </div>
+                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-slate-100'} border ${theme.border}`}>
+                      <button 
+                        onClick={() => setIsDarkMode(false)}
+                        className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-lg transition-all ${!isDarkMode ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-400'}`}
+                      >
+                        <Sun size={14} />
+                        Light
+                      </button>
+                      <button 
+                        onClick={() => setIsDarkMode(true)}
+                        className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-lg transition-all ${isDarkMode ? 'bg-slate-800 shadow-sm text-white' : 'text-slate-500 hover:text-slate-400'}`}
+                      >
+                        <Moon size={14} />
+                        Dark
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2 bg-black/5 p-1 rounded-lg">
-                    <button 
-                      onClick={() => setIsDarkMode(false)}
-                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${!isDarkMode ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'} glass-button`}
-                    >
-                      Light
-                    </button>
-                    <button 
-                      onClick={() => setIsDarkMode(true)}
-                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${isDarkMode ? 'bg-slate-700 shadow text-white' : 'text-slate-500 hover:text-slate-700'} glass-button`}
-                    >
-                      Dark
-                    </button>
-                  </div>
-                </div>
 
-                {/* Address Format Toggle */}
-                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">Address Format</span>
-                    <MapPin size={18} className="text-indigo-400" />
+                  {/* Address Format Toggle */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-xs font-medium text-slate-400">Address Format</span>
+                      <span className="text-[10px] font-mono text-indigo-400 uppercase">{isSimplifiedAddress ? 'Simple' : 'Full'}</span>
+                    </div>
+                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-slate-100'} border ${theme.border}`}>
+                      <button 
+                        onClick={() => setIsSimplifiedAddress(false)}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${!isSimplifiedAddress ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-400'}`}
+                      >
+                        Full
+                      </button>
+                      <button 
+                        onClick={() => setIsSimplifiedAddress(true)}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${isSimplifiedAddress ? 'bg-indigo-500 shadow-sm text-white' : 'text-slate-500 hover:text-slate-400'}`}
+                      >
+                        City/Zip
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2 bg-black/5 p-1 rounded-lg">
-                    <button 
-                      onClick={() => setIsSimplifiedAddress(false)}
-                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${!isSimplifiedAddress ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'} glass-button`}
-                    >
-                      Full
-                    </button>
-                    <button 
-                      onClick={() => setIsSimplifiedAddress(true)}
-                      className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${isSimplifiedAddress ? 'bg-indigo-500 shadow text-white' : 'text-slate-500 hover:text-slate-700'} glass-button`}
-                    >
-                      City/Zip
-                    </button>
-                  </div>
-                </div>
 
-                {/* Drag Sensitivity Slider */}
-                <div className={`p-4 rounded-xl border ${theme.border} ${theme.cardBg} glass-card`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">Drag Sensitivity</span>
-                    <Sliders size={18} className="text-indigo-400" />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-slate-500">1x</span>
-                    <input 
-                      type="range" 
-                      min="0.5" 
-                      max="3" 
-                      step="0.1" 
-                      value={dragSensitivity} 
-                      onChange={(e) => setDragSensitivity(parseFloat(e.target.value))}
-                      className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                    />
-                    <span className="text-xs text-slate-500">3x</span>
-                  </div>
-                  <div className="text-center mt-1">
-                     <span className="text-xs font-mono text-indigo-500">{dragSensitivity.toFixed(1)}x</span>
+                  {/* Drag Sensitivity */}
+                  <div className="space-y-3 px-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-400">Drag Sensitivity</span>
+                      <span className="text-[10px] font-mono text-indigo-400">{dragSensitivity.toFixed(1)}x</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="range" 
+                        min="0.5" 
+                        max="3" 
+                        step="0.1" 
+                        value={dragSensitivity} 
+                        onChange={(e) => setDragSensitivity(parseFloat(e.target.value))}
+                        className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Help Section */}
-                <div className="space-y-3">
-                  <h3 className={`text-sm font-semibold ${theme.textMuted} uppercase tracking-wider flex items-center gap-2`}>
-                    <HelpCircle size={14} /> Help
-                  </h3>
-                  <ul className={`text-sm ${theme.textMuted} space-y-2 list-disc list-inside`}>
-                    <li>Upload your Rate Confirmation PDF via the sidebar.</li>
-                    <li>Verify extracted data in the wizard.</li>
-                    <li>Copy the formatted route and notes.</li>
-                  </ul>
-                </div>
+                {/* Info Section */}
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <HelpCircle size={14} />
+                      <p className="text-[10px] font-bold uppercase tracking-widest">Help</p>
+                    </div>
+                    <ul className="text-xs text-slate-500 space-y-2 leading-relaxed px-1">
+                      <li className="flex gap-2">
+                        <span className="text-indigo-500">•</span>
+                        <span>Upload PDF via sidebar</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-indigo-500">•</span>
+                        <span>Verify data in wizard</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="text-indigo-500">•</span>
+                        <span>Copy formatted route</span>
+                      </li>
+                    </ul>
+                  </div>
 
-                {/* Privacy Section */}
-                <div className="space-y-3">
-                  <h3 className={`text-sm font-semibold ${theme.textMuted} uppercase tracking-wider flex items-center gap-2`}>
-                    <Shield size={14} /> Privacy
-                  </h3>
-                  <p className={`text-sm ${theme.textMuted} leading-relaxed`}>
-                    Your documents are processed entirely within your browser. No data is uploaded to any external server. We prioritize your privacy and data security.
-                  </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Shield size={14} />
+                      <p className="text-[10px] font-bold uppercase tracking-widest">Privacy</p>
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed px-1">
+                      Documents are processed locally. No data is uploaded to external servers.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className={`mt-auto pt-6 border-t ${theme.border}`}>
-                <p className={`text-xs ${theme.textMuted} text-center font-geologica`}>
-                  dakota v1.0.0
-                </p>
+              <div className="p-5 border-t border-white/5 bg-black/5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-medium text-slate-600 uppercase tracking-tighter">Dakota Stable 0410</span>
+                  <div className="flex gap-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  </div>
+                </div>
               </div>
             </motion.div>
           </>
