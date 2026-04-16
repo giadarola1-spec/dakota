@@ -43,12 +43,12 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
       <div className="w-full lg:w-[30%] h-full bg-white flex flex-col p-8 md:p-12 relative z-10 shadow-[20px_0_50px_rgba(0,0,0,0.05)]">
         {/* Header with Logo */}
         <div className="flex items-center gap-4 mb-20">
-          <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
+          <div className="p-2 bg-zinc-50 rounded-xl border border-zinc-100/50">
             <DakotaLogo className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-2xl font-geologica font-bold tracking-tight text-slate-900 lowercase">dakota</h1>
-            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400" style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}>STABLE 0410</p>
+            <h1 className="text-2xl font-geologica font-bold tracking-tight text-zinc-900 lowercase">dakota</h1>
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-400" style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}>STABLE 0410</p>
           </div>
         </div>
 
@@ -59,21 +59,21 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <h2 className="text-4xl font-display font-medium text-slate-900 mb-6 leading-tight">
+            <h2 className="text-4xl font-display font-medium text-zinc-900 mb-6 leading-tight">
               Billing made faster. <br />
-              <span className="text-indigo-600">200% faster.</span>
+              <span className="text-zinc-500">200% faster.</span>
             </h2>
-            <p className="text-base text-slate-500 font-light mb-12 leading-relaxed">
+            <p className="text-base text-zinc-500 font-light mb-12 leading-relaxed">
               Automate your rate confirmation processing with tactical precision.
             </p>
           </motion.div>
 
           {/* Team Selector */}
           <div className="space-y-4 mb-12">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-1">Tactical Unit</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 px-1">Tactical Unit</p>
             <div className="flex items-center gap-3">
               {[
-                { id: 'none', label: 'None', color: 'bg-slate-200' },
+                { id: 'none', label: 'None', color: 'bg-zinc-200' },
                 { id: 'green', label: '🟢', color: 'bg-emerald-500' },
                 { id: 'purple', label: '🟣', color: 'bg-purple-500' },
                 { id: 'red', label: '🔴', color: 'bg-red-500' },
@@ -82,12 +82,12 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
                 <button 
                   key={t.id}
                   onClick={() => setTeam(t.id as any)}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border-2 ${team === t.id ? 'border-indigo-600 scale-110 shadow-lg shadow-indigo-600/20' : 'border-slate-100 opacity-60 hover:opacity-100 hover:border-slate-200'}`}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border-2 ${team === t.id ? 'border-zinc-900 scale-110 shadow-lg shadow-zinc-900/10' : 'border-zinc-100 opacity-60 hover:opacity-100 hover:border-zinc-200'}`}
                   title={t.label}
                 >
                    {t.id === 'none' ? 
-                     <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center"><X size={12} className="text-slate-400" /></div> : 
-                     <span className="text-xl leading-none">{t.label}</span>
+                     <div className="w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center"><X size={12} className="text-zinc-400" /></div> : 
+                     <span className="text-xl leading-none">{t.id === 'none' ? '' : t.label}</span>
                    }
                 </button>
               ))}
@@ -98,7 +98,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={onGetStarted}
-            className="w-full py-5 bg-slate-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20 transition-all flex items-center justify-center gap-2 group"
+            className="w-full py-5 bg-zinc-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-zinc-900/10 hover:shadow-zinc-900/20 transition-all flex items-center justify-center gap-2 group"
           >
             Get Started
             <ChevronRight className="group-hover:translate-x-1 transition-transform" />
@@ -106,25 +106,25 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="mt-auto pt-8 border-t border-slate-100 flex flex-col gap-1">
-          <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">
+        <div className="mt-auto pt-8 border-t border-zinc-100 flex flex-col gap-1">
+          <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
             Dakota Intelligence Systems © 2026
           </p>
-          <p className="text-[10px] font-bold text-slate-500/60 uppercase tracking-widest flex items-center gap-1.5">
+          <p className="text-[10px] font-bold text-zinc-500/60 uppercase tracking-widest flex items-center gap-1.5">
             Made in green team <span className="text-emerald-500">💚</span>
           </p>
         </div>
       </div>
 
       {/* 70% Right: Decorative Background Inspired by MongoDB UI */}
-      <div className="hidden lg:flex flex-1 lg:w-[70%] relative bg-[#020617] overflow-hidden">
+      <div className="hidden lg:flex flex-1 lg:w-[70%] relative bg-[#0a0a0a] overflow-hidden">
         {/* Large Decorative SVG Background (Masked Shapes) */}
         <div className="absolute inset-0 z-0">
-          <svg className="w-full h-full opacity-40" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+          <svg className="w-full h-full opacity-30" viewBox="0 0 1000 1000" preserveAspectRatio="none">
             <defs>
               <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style={{ stopColor: '#002868', stopOpacity: 0.8 }} />
-                <stop offset="100%" style={{ stopColor: '#BF0A30', stopOpacity: 0.4 }} />
+                <stop offset="0%" style={{ stopColor: '#1a1a1a', stopOpacity: 0.8 }} />
+                <stop offset="100%" style={{ stopColor: '#2a2a2a', stopOpacity: 0.4 }} />
               </linearGradient>
             </defs>
             <path d="M 0,0 L 1000,0 L 1000,1000 L 0,1000 Z" fill="url(#grad1)" />
@@ -140,17 +140,17 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
             className="relative w-full h-full max-w-4xl"
           >
             {/* Large Brackets Symbols */}
-            <div className="absolute top-20 right-20 text-[20rem] font-mono font-bold text-white/5 leading-none select-none">
+            <div className="absolute top-20 right-20 text-[20rem] font-mono font-bold text-white/[0.02] leading-none select-none">
               {"{ }"}
             </div>
 
             {/* Asterisk Symbol */}
-            <div className="absolute bottom-10 right-40 text-[15rem] font-bold text-white/5 leading-none select-none rotate-12">
+            <div className="absolute bottom-10 right-40 text-[15rem] font-bold text-white/[0.02] leading-none select-none rotate-12">
               *
             </div>
 
             {/* Slashes */}
-            <div className="absolute top-40 left-20 text-[10rem] font-mono font-light text-white/5 leading-none select-none -rotate-12">
+            <div className="absolute top-40 left-20 text-[10rem] font-mono font-light text-white/[0.02] leading-none select-none -rotate-12">
               / /
             </div>
 
@@ -161,7 +161,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
                 rotate: [0, 5, 0] 
               }}
               transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute top-1/2 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]" 
+              className="absolute top-1/2 left-1/4 w-96 h-96 bg-zinc-500/10 rounded-full blur-[100px]" 
             />
             <motion.div 
               animate={{ 
@@ -169,7 +169,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
                 y: [0, 20, 0] 
               }}
               transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute bottom-1/4 left-1/2 w-64 h-64 bg-red-500/10 rounded-full blur-[80px]" 
+              className="absolute bottom-1/4 left-1/2 w-64 h-64 bg-zinc-300/5 rounded-full blur-[80px]" 
             />
           </motion.div>
         </div>
@@ -182,18 +182,18 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
             transition={{ delay: 0.6 }}
             className="space-y-6"
           >
-            <h3 className="text-3xl font-display font-medium text-white italic opacity-80">
+            <h3 className="text-3xl font-display font-medium text-white italic opacity-60">
               Tactical Logistics.
             </h3>
-            <p className="text-slate-300 text-lg font-light leading-relaxed">
+            <p className="text-zinc-400 text-lg font-light leading-relaxed">
               Experience the next generation of logistics automation. Designed for performance, built for speed.
             </p>
-            <div className="w-12 h-1 bg-white/20 rounded-full" />
+            <div className="w-12 h-1 bg-white/10 rounded-full" />
           </motion.div>
         </div>
         
         {/* Subtle Grid */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+        <div className="absolute inset-0 opacity-[0.02] pointer-events-none" 
           style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '60px 60px' }} 
         />
       </div>

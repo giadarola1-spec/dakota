@@ -62,10 +62,10 @@ export const DriverNumberModal: React.FC<DriverNumberModalProps> = ({
           onClick={e => e.stopPropagation()}
         >
           {/* Background Glow */}
-          {isDarkMode && <div className="absolute -top-24 -right-24 w-80 h-80 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />}
+          {isDarkMode && <div className="absolute -top-24 -right-24 w-80 h-80 bg-zinc-500/5 rounded-full blur-[100px] pointer-events-none" />}
           
           <div className="relative z-10 flex flex-col items-center text-center space-y-8">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+            <div className="w-16 h-16 rounded-2xl bg-zinc-500/10 flex items-center justify-center text-zinc-500">
               <Hash size={32} />
             </div>
             
@@ -91,11 +91,11 @@ export const DriverNumberModal: React.FC<DriverNumberModalProps> = ({
                       stiffness: 400,
                       mass: 0.6
                     }}
-                    className={`w-14 h-20 rounded-2xl border-2 ${theme.border} ${theme.inputBg} flex items-center justify-center text-3xl font-mono font-bold ${theme.text} shadow-xl shadow-indigo-500/10 relative group`}
+                    className={`w-14 h-20 rounded-2xl border-2 ${theme.border} ${theme.inputBg} flex items-center justify-center text-3xl font-mono font-bold ${theme.text} shadow-xl shadow-zinc-950/10 relative group`}
                   >
                     <motion.div 
                       layoutId="liquid-bg"
-                      className="absolute inset-0 bg-indigo-500/5 rounded-2xl blur-sm group-hover:bg-indigo-500/10 transition-colors" 
+                      className="absolute inset-0 bg-zinc-500/5 rounded-2xl blur-sm group-hover:bg-zinc-500/10 transition-colors" 
                     />
                     <span className="relative z-10">{digit}</span>
                   </motion.div>
@@ -111,11 +111,11 @@ export const DriverNumberModal: React.FC<DriverNumberModalProps> = ({
                 >
                   <motion.div 
                     animate={{ 
-                      opacity: [0.2, 0.5, 0.2],
+                      opacity: [0.1, 0.3, 0.1],
                       scale: [1, 1.1, 1]
                     }}
                     transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-0 bg-indigo-500/10 blur-md"
+                    className="absolute inset-0 bg-zinc-500/5 blur-md"
                   />
                   <span className="text-2xl font-mono relative z-10">_</span>
                 </motion.div>
@@ -126,7 +126,7 @@ export const DriverNumberModal: React.FC<DriverNumberModalProps> = ({
               <button
                 onClick={() => onConfirm(digits.join(''))}
                 disabled={digits.length === 0}
-                className={`w-full py-4 rounded-2xl ${theme.accentBg} ${theme.accentHover} text-white font-bold shadow-xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`w-full py-4 rounded-2xl ${theme.accentBg} ${theme.accentHover} text-white font-bold shadow-xl shadow-zinc-900/20 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 Confirm Number
                 <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />

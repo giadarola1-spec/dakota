@@ -626,7 +626,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
           <button 
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="hover:text-indigo-400 disabled:opacity-30 transition-colors"
+            className="hover:text-zinc-300 disabled:opacity-30 transition-colors"
           >
             <ChevronLeft size={16} />
           </button>
@@ -634,7 +634,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
           <button 
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="hover:text-indigo-400 disabled:opacity-30 transition-colors"
+            className="hover:text-zinc-300 disabled:opacity-30 transition-colors"
           >
             <ChevronRight size={16} />
           </button>
@@ -830,7 +830,7 @@ const ManageView = ({
         <div className={`${theme.cardBg} rounded-2xl border ${theme.border} p-6 shadow-sm`}>
           <div className="flex items-center justify-between mb-6">
             <h3 className={`text-lg font-medium ${theme.text} flex items-center gap-2`}>
-                <Truck size={20} className="text-indigo-500" /> Trucks
+                <Truck size={20} className="text-zinc-500" /> Trucks
             </h3>
             <span className={`text-xs ${theme.textMuted} bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full`}>{savedTrucks.length} saved</span>
           </div>
@@ -841,14 +841,14 @@ const ManageView = ({
               value={newTruck}
               onChange={(e) => setNewTruck(e.target.value.toUpperCase())}
               placeholder="Add Truck #"
-              className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-3 py-2 text-sm ${theme.text} focus:outline-none focus:border-indigo-500`}
+              className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-3 py-2 text-sm ${theme.text} focus:outline-none focus:border-zinc-500`}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') addTruck();
               }}
             />
             <button 
               onClick={addTruck}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg transition-colors"
+              className="bg-zinc-800 hover:bg-zinc-700 text-white p-2 rounded-lg transition-colors"
             >
               <Plus size={20} />
             </button>
@@ -856,7 +856,7 @@ const ManageView = ({
 
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
             {savedTrucks.map(t => (
-              <div key={t} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'} group hover:border-indigo-500/30 transition-colors`}>
+              <div key={t} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'} group hover:border-zinc-500/30 transition-colors`}>
                 <span className={`font-mono font-medium ${theme.text}`}>{t}</span>
                 <button 
                   onClick={(e) => removeTruck(t, e)}
@@ -933,7 +933,7 @@ const HistoryView = ({
         {sortedDates.map(date => (
           <div key={date} className="space-y-4">
             <h3 className={`text-sm font-bold uppercase tracking-widest ${theme.textMuted} flex items-center gap-3`}>
-              <span className="bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded text-[10px]">{groups[date].length}</span>
+              <span className="bg-zinc-500/10 text-zinc-500 px-2 py-0.5 rounded text-[10px]">{groups[date].length}</span>
               {formatDate(date)}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -941,11 +941,11 @@ const HistoryView = ({
                 <div 
                   key={item.id}
                   onClick={() => onSelectItem(item)}
-                  className={`${theme.cardBg} glass-card border ${theme.border} p-5 rounded-2xl shadow-sm hover:border-indigo-500/50 transition-all cursor-pointer group relative overflow-hidden`}
+                  className={`${theme.cardBg} glass-card border ${theme.border} p-5 rounded-2xl shadow-sm hover:border-zinc-500/50 transition-all cursor-pointer group relative overflow-hidden`}
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h4 className={`font-bold ${theme.text} group-hover:text-indigo-500 transition-colors`}>#{item.loadNumber}</h4>
+                      <h4 className={`font-bold ${theme.text} group-hover:text-zinc-400 transition-colors`}>#{item.loadNumber}</h4>
                       <p className={`text-xs ${theme.textMuted} font-medium`}>{item.broker}</p>
                     </div>
                     <span className="text-emerald-500 font-mono text-sm font-bold">${item.rate}</span>
@@ -1292,17 +1292,17 @@ export default function App() {
 
   // --- Styles Helper ---
   const theme = React.useMemo(() => ({
-    bg: isDarkMode ? 'bg-[#020617]' : 'bg-slate-50',
-    text: isDarkMode ? 'text-white' : 'text-slate-900',
-    textMuted: isDarkMode ? 'text-slate-400' : 'text-slate-500',
-    border: isDarkMode ? 'border-white/10' : 'border-slate-200',
-    cardBg: isDarkMode ? 'bg-slate-900' : 'bg-white',
-    cardHover: isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50',
-    inputBg: isDarkMode ? 'bg-slate-800' : 'bg-slate-100',
-    headerBg: isDarkMode ? 'bg-[#020617]' : 'bg-white',
-    accent: 'text-indigo-400',
-    accentBg: 'bg-indigo-600',
-    accentHover: 'hover:bg-indigo-500',
+    bg: isDarkMode ? 'bg-[#0a0a0a]' : 'bg-white',
+    text: isDarkMode ? 'text-white' : 'text-zinc-900',
+    textMuted: isDarkMode ? 'text-zinc-400' : 'text-zinc-500',
+    border: isDarkMode ? 'border-zinc-800' : 'border-zinc-200',
+    cardBg: isDarkMode ? 'bg-[#121212]' : 'bg-white',
+    cardHover: isDarkMode ? 'hover:bg-[#1a1a1a]' : 'hover:bg-zinc-50',
+    inputBg: isDarkMode ? 'bg-[#1a1a1a]' : 'bg-zinc-100',
+    headerBg: isDarkMode ? 'bg-[#0a0a0a]/80' : 'bg-white/80',
+    accent: isDarkMode ? 'text-white' : 'text-zinc-900',
+    accentBg: isDarkMode ? 'bg-zinc-700' : 'bg-zinc-900',
+    accentHover: isDarkMode ? 'hover:bg-zinc-600' : 'hover:bg-zinc-800',
   }), [isDarkMode]);
 
   const processPdfData = async (pdf: any) => {
@@ -1667,7 +1667,7 @@ export default function App() {
           {/* Zoom Toggle */}
           <button 
             onClick={() => setIsAutoZoomEnabled(!isAutoZoomEnabled)}
-            className={`absolute bottom-4 right-4 p-2 rounded-lg shadow-lg backdrop-blur-md border transition-all ${isAutoZoomEnabled ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/10 text-slate-400 border-white/10 hover:bg-white/20'}`}
+            className={`absolute bottom-4 right-4 p-2 rounded-lg shadow-lg backdrop-blur-md border transition-all ${isAutoZoomEnabled ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-white/10 text-zinc-400 border-white/10 hover:bg-white/20'}`}
             title={isAutoZoomEnabled ? "Disable Auto Zoom" : "Enable Auto Zoom"}
           >
             <RefreshCw size={20} className={isAutoZoomEnabled ? "" : "opacity-50"} />
@@ -1683,11 +1683,11 @@ export default function App() {
             className={`${theme.cardBg} glass-card border ${theme.border} p-8 rounded-3xl shadow-2xl relative overflow-hidden`}
           >
             {/* Background Glow */}
-            {isDarkMode && <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />}
+            {isDarkMode && <div className="absolute -top-20 -right-20 w-64 h-64 bg-zinc-500/10 rounded-full blur-3xl pointer-events-none" />}
 
             <div className="relative z-10 space-y-6">
               <div className="flex items-center justify-between">
-                <span className={`text-xs font-medium ${isDarkMode ? 'text-indigo-400 border-indigo-500/30' : 'text-indigo-600 border-indigo-200'} uppercase tracking-widest border px-3 py-1 rounded-full`}>
+                <span className={`text-xs font-medium ${isDarkMode ? 'text-zinc-400 border-zinc-700' : 'text-zinc-600 border-zinc-200'} uppercase tracking-widest border px-3 py-1 rounded-full`}>
                   Step {currentStepIndex + 1} of {currentSteps.length}
                 </span>
                 <span className={`${theme.textMuted} text-xs`}>Human Supervision Required</span>
@@ -1710,7 +1710,7 @@ export default function App() {
                         handleTripleClickMap(e, value);
                       }
                     }}
-                    className={`w-full ${theme.inputBg} border ${theme.border} rounded-xl px-4 py-4 text-xl ${theme.text} font-mono focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all`}
+                    className={`w-full ${theme.inputBg} border ${theme.border} rounded-xl px-4 py-4 text-xl ${theme.text} font-mono focus:outline-none focus:border-zinc-500/50 focus:ring-1 focus:ring-zinc-500/50 transition-all`}
                   />
                   <Edit2 className={`absolute right-4 top-1/2 -translate-y-1/2 ${theme.textMuted} w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity`} />
                 </div>
@@ -1726,7 +1726,7 @@ export default function App() {
                 </button>
                 <button 
                   onClick={handleNextStep}
-                  className={`flex-1 px-6 py-3 rounded-xl ${theme.accentBg} ${theme.accentHover} text-white font-medium shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 group glass-button border-none`}
+                  className={`flex-1 px-6 py-3 rounded-xl ${theme.accentBg} ${theme.accentHover} text-white font-medium shadow-lg shadow-zinc-900/25 transition-all flex items-center justify-center gap-2 group glass-button border-none`}
                 >
                   {currentStepIndex === currentSteps.length - 1 ? 'Finish & Generate' : 'Confirm & Next'}
                   <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
@@ -1770,7 +1770,7 @@ export default function App() {
               onClick={() => setShowPdfInResults(!showPdfInResults)}
               className={`px-4 py-2 rounded-lg border ${theme.border} ${theme.textMuted} hover:${theme.text} hover:${theme.cardBg} transition-all flex items-center gap-2 shadow-sm text-sm`}
             >
-              <FileText size={16} className="text-indigo-500" />
+              <FileText size={16} className="text-zinc-500" />
               {showPdfInResults ? 'Hide RateCon' : 'View RateCon'}
             </button>
           )}
@@ -1788,7 +1788,7 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="h-[600px] rounded-2xl overflow-hidden border border-indigo-500/30 shadow-2xl shadow-indigo-500/10"
+          className="h-[600px] rounded-2xl overflow-hidden border border-zinc-500/20 shadow-2xl shadow-zinc-950/20"
         >
           <PdfViewer 
             pdfDocument={pdfDoc} 
@@ -1802,12 +1802,12 @@ export default function App() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Box 1: Route */}
-        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
+        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-zinc-500/30 transition-colors group shadow-sm`}>
           <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
             <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>ROUTE</span>
             <button 
               onClick={() => copyToClipboard(routeText, setCopiedRoute)}
-              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30 glass-button`}
+              className={`${theme.textMuted} hover:text-zinc-500 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-zinc-200'} px-3 py-1.5 rounded-lg border hover:border-zinc-500/30 glass-button`}
             >
               {copiedRoute ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               {copiedRoute ? "COPIED" : "COPY"}
@@ -1824,12 +1824,12 @@ export default function App() {
         </div>
 
         {/* Box 2: Notes */}
-        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
+        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-zinc-500/30 transition-colors group shadow-sm`}>
           <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
             <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>NOTES</span>
             <button 
               onClick={() => copyToClipboard(notesText, setCopiedNotes)}
-              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30 glass-button`}
+              className={`${theme.textMuted} hover:text-zinc-500 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-zinc-200'} px-3 py-1.5 rounded-lg border hover:border-zinc-500/30 glass-button`}
             >
               {copiedNotes ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               {copiedNotes ? "COPIED" : "COPY"}
@@ -1846,7 +1846,7 @@ export default function App() {
         </div>
 
         {/* Box 3: Chain (Full Width) */}
-        <div className={`md:col-span-2 ${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
+        <div className={`md:col-span-2 ${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-zinc-500/30 transition-colors group shadow-sm`}>
           <div className={`px-6 py-4 border-b ${theme.border} flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
             <div className="flex items-center gap-4 flex-wrap">
               <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>CHAIN</span>
@@ -1857,14 +1857,14 @@ export default function App() {
                   type="text" 
                   value={truckNumber}
                   onChange={(e) => setTruckNumber(e.target.value.toUpperCase())}
-                  className={`w-16 bg-transparent border-b ${theme.border} text-xs ${theme.text} focus:outline-none focus:border-indigo-500 font-mono`}
+                  className={`w-16 bg-transparent border-b ${theme.border} text-xs ${theme.text} focus:outline-none focus:border-zinc-500 font-mono`}
                   placeholder="TRUCK#"
                 />
                 {savedTrucks.map(t => (
                   <button
                     key={t}
                     onClick={() => setTruckNumber(t)}
-                    className={`px-2 py-1 text-xs rounded border ${truckNumber === t ? 'bg-indigo-500 text-white border-indigo-500' : `${theme.textMuted} border-transparent hover:bg-white/5`} glass-button`}
+                    className={`px-2 py-1 text-xs rounded border ${truckNumber === t ? 'bg-zinc-800 text-white border-zinc-700' : `${theme.textMuted} border-transparent hover:bg-white/5`} glass-button`}
                   >
                     {t}
                   </button>
@@ -1873,7 +1873,7 @@ export default function App() {
 
               {/* Broker Info (Fixed to TRAFFIX) */}
               <div className="flex items-center gap-2 ml-4">
-                <span className={`px-2 py-1 text-xs rounded border bg-indigo-500/10 text-indigo-500 border-indigo-500/30 font-bold`}>
+                <span className={`px-2 py-1 text-xs rounded border bg-zinc-500/10 text-zinc-500 border-zinc-500/30 font-bold`}>
                   TRAFFIX
                 </span>
               </div>
@@ -1881,7 +1881,7 @@ export default function App() {
 
             <button 
               onClick={() => copyToClipboard(chainText, setCopiedChain)}
-              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30 glass-button`}
+              className={`${theme.textMuted} hover:text-zinc-500 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-zinc-200'} px-3 py-1.5 rounded-lg border hover:border-zinc-500/30 glass-button`}
             >
               {copiedChain ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               {copiedChain ? "COPIED" : "COPY"}
@@ -1900,12 +1900,12 @@ export default function App() {
         </div>
 
         {/* Box 4: Rename (Full Width) */}
-        <div className={`md:col-span-2 ${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-indigo-500/30 transition-colors group shadow-sm`}>
+        <div className={`md:col-span-2 ${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-zinc-500/30 transition-colors group shadow-sm`}>
           <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
             <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>RENAME</span>
             <button 
               onClick={() => copyToClipboard(renameText, setCopiedRename)}
-              className={`${theme.textMuted} hover:text-indigo-400 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'} px-3 py-1.5 rounded-lg border hover:border-indigo-500/30 glass-button`}
+              className={`${theme.textMuted} hover:text-zinc-500 transition-colors flex items-center gap-1.5 text-xs font-medium ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-white border-zinc-200'} px-3 py-1.5 rounded-lg border hover:border-zinc-500/30 glass-button`}
             >
               {copiedRename ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               {copiedRename ? "COPIED" : "COPY"}
@@ -1928,7 +1928,7 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen ${theme.bg} ${theme.text} font-sans selection:bg-indigo-500/30 transition-colors duration-300 flex flex-col relative overflow-hidden`}>
+    <div className={`min-h-screen ${theme.bg} ${theme.text} font-sans selection:bg-zinc-500/30 transition-colors duration-300 flex flex-col relative overflow-hidden`}>
       <AnimatePresence>
         {!hasSeenWelcome && (
           <WelcomeView 
@@ -1943,18 +1943,18 @@ export default function App() {
 
       {isDarkMode && (
         <div className="atmospheric-bg">
-          <div className="atmosphere-orb w-[600px] h-[600px] bg-indigo-600/20 -top-[200px] -left-[100px]" />
-          <div className="atmosphere-orb w-[500px] h-[500px] bg-purple-600/10 bottom-[10%] -right-[100px]" style={{ animationDelay: '-5s' }} />
-          <div className="atmosphere-orb w-[400px] h-[400px] bg-blue-600/10 top-[40%] left-[20%]" style={{ animationDelay: '-12s' }} />
+          <div className="atmosphere-orb w-[600px] h-[600px] bg-zinc-600/10 -top-[200px] -left-[100px]" />
+          <div className="atmosphere-orb w-[500px] h-[500px] bg-zinc-800/10 bottom-[10%] -right-[100px]" style={{ animationDelay: '-5s' }} />
+          <div className="atmosphere-orb w-[400px] h-[400px] bg-zinc-700/5 top-[40%] left-[20%]" style={{ animationDelay: '-12s' }} />
         </div>
       )}
       <AnimatePresence>
         {isLoading && <LoadingScreen isDarkMode={isDarkMode} />}
       </AnimatePresence>
-      <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#4F46E5" : "#94A3B8"} />
+      <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#27272a" : "#d4d4d8"} />
       
       {/* Header */}
-      <header className={`border-b ${appState === 'verify' ? 'border-indigo-500/30' : theme.border} sticky top-0 z-20 ${theme.headerBg} transition-all duration-300 flex-none border-x-0 border-t-0 rounded-none relative`}>
+      <header className={`border-b ${appState === 'verify' ? 'border-zinc-700' : theme.border} sticky top-0 z-20 ${theme.headerBg} transition-all duration-300 flex-none border-x-0 border-t-0 rounded-none relative`}>
         <div className="w-full px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setAppState('upload')}>
             <DakotaLogo className="w-7 h-7" />
@@ -1964,7 +1964,7 @@ export default function App() {
           {/* Header Search Bar */}
           <div className="flex-1 max-w-md mx-8 hidden sm:block">
             <div className="relative group">
-              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${theme.textMuted} group-focus-within:text-indigo-500 transition-colors`} size={18} />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${theme.textMuted} group-focus-within:text-zinc-500 transition-colors`} size={18} />
               <input 
                 type="text"
                 placeholder="Search history (Load #, Broker, Route)..."
@@ -1975,7 +1975,7 @@ export default function App() {
                     setAppState('history');
                   }
                 }}
-                className={`w-full pl-10 pr-4 py-2 rounded-xl border ${theme.border} ${theme.inputBg} ${theme.text} text-sm focus:outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/5 transition-all`}
+                className={`w-full pl-10 pr-4 py-2 rounded-xl border ${theme.border} ${theme.inputBg} ${theme.text} text-sm focus:outline-none focus:border-zinc-500/50 focus:ring-4 focus:ring-zinc-500/5 transition-all`}
               />
             </div>
           </div>
@@ -1983,21 +1983,21 @@ export default function App() {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setAppState('templates')}
-              className={`p-2 rounded-xl transition-all ${appState === 'templates' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
+              className={`p-2 rounded-xl transition-all ${appState === 'templates' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
               title="Templates"
             >
               <ClipboardList size={20} />
             </button>
             <button 
               onClick={() => setAppState('history')}
-              className={`p-2 rounded-xl transition-all ${appState === 'history' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
+              className={`p-2 rounded-xl transition-all ${appState === 'history' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
               title="History"
             >
               <Search size={20} />
             </button>
             <button 
               onClick={() => setAppState('manage')}
-              className={`p-2 rounded-xl transition-all ${appState === 'manage' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
+              className={`p-2 rounded-xl transition-all ${appState === 'manage' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
               title="Manage Data"
             >
               <Settings size={20} />
@@ -2006,9 +2006,9 @@ export default function App() {
             <div className="flex items-center gap-4">
             {appState !== 'upload' && (
               <div className={`hidden md:flex items-center gap-2 text-xs font-medium ${theme.textMuted} ${theme.cardBg} px-3 py-1.5 rounded-full border ${theme.border}`}>
-                <span className={appState === 'verify' ? 'text-indigo-500' : ''}>Verify</span>
+                <span className={appState === 'verify' ? 'text-zinc-500 dark:text-zinc-400 font-bold' : ''}>Verify</span>
                 <ChevronRight size={12} />
-                <span className={appState === 'results' ? 'text-indigo-500' : ''}>Results</span>
+                <span className={appState === 'results' ? 'text-zinc-500 dark:text-zinc-400 font-bold' : ''}>Results</span>
               </div>
             )}
             
@@ -2024,12 +2024,12 @@ export default function App() {
 
       {/* Progress Bar Line */}
       {appState === 'verify' && (
-        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-indigo-500/10 overflow-hidden">
+        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/10 dark:bg-zinc-800 overflow-hidden">
           <motion.div 
             initial={{ width: 0 }}
             animate={{ width: `${((currentStepIndex + 1) / currentSteps.length) * 100}%` }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className="h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]"
+            className="h-full bg-zinc-900 dark:bg-white shadow-[0_0_10px_rgba(255,255,255,0.3)]"
           />
         </div>
       )}
@@ -2051,7 +2051,7 @@ export default function App() {
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                className={`flex-1 flex flex-col items-center justify-center text-center space-y-6 transition-all duration-300 cursor-pointer rounded-3xl border-2 border-dashed ${isDragging ? 'border-indigo-500 bg-indigo-500/5 opacity-100 scale-[1.02]' : `${theme.border} opacity-50 hover:opacity-100`} glass-card`}
+                className={`flex-1 flex flex-col items-center justify-center text-center space-y-6 transition-all duration-300 cursor-pointer rounded-3xl border-2 border-dashed ${isDragging ? 'border-zinc-500 bg-zinc-500/5 opacity-100 scale-[1.02]' : `${theme.border} opacity-50 hover:opacity-100`} glass-card`}
               >
                 <input 
                   type="file" 
@@ -2059,11 +2059,11 @@ export default function App() {
                   onChange={handleFileUpload}
                   className="hidden" 
                 />
-                <div className={`w-24 h-24 rounded-full ${theme.cardBg} border ${theme.border} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm ${isDragging ? 'border-indigo-500 text-indigo-500' : ''} glass-card`}>
-                  <Upload size={40} className={isDragging ? 'text-indigo-500' : theme.textMuted} />
+                <div className={`w-24 h-24 rounded-full ${theme.cardBg} border ${theme.border} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm ${isDragging ? 'border-zinc-500 text-zinc-500' : ''} glass-card`}>
+                  <Upload size={40} className={isDragging ? 'text-zinc-500' : theme.textMuted} />
                 </div>
                 <div className="space-y-2">
-                  <h2 className={`text-xl font-medium ${isDragging ? 'text-indigo-500' : theme.text}`}>
+                  <h2 className={`text-xl font-medium ${isDragging ? 'text-zinc-500' : theme.text}`}>
                     {isDragging ? 'Drop PDF here' : 'No Document Selected'}
                   </h2>
                   <p className={`text-sm ${theme.textMuted}`}>
@@ -2133,9 +2133,9 @@ export default function App() {
             }}
             onClick={(e) => e.stopPropagation()}
             onContextMenu={(e) => e.stopPropagation()}
-            className={`${theme.cardBg} glass-card border-2 border-indigo-500/50 rounded-2xl shadow-2xl overflow-hidden`}
+            className={`${theme.cardBg} glass-card border-2 border-zinc-500/50 rounded-2xl shadow-2xl overflow-hidden`}
           >
-            <div className="absolute top-2 left-3 z-10 bg-indigo-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-lg">
+            <div className="absolute top-2 left-3 z-10 bg-zinc-800 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-lg">
               Quick Look
             </div>
             
@@ -2179,7 +2179,7 @@ export default function App() {
             >
               <div className="p-5 flex justify-between items-center border-b border-white/5">
                 <div className="flex items-center gap-2">
-                  <Settings size={18} className="text-indigo-500" />
+                  <Settings size={18} className="text-zinc-500" />
                   <h2 className="text-lg font-semibold font-display tracking-tight">Settings</h2>
                 </div>
                 <button 
@@ -2200,7 +2200,7 @@ export default function App() {
                         setAppState('templates');
                         setIsMenuOpen(false);
                       }}
-                      className={`flex-1 flex items-center justify-center p-3 rounded-xl transition-all ${appState === 'templates' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : `${theme.textMuted} ${theme.cardBg} border ${theme.border}`}`}
+                      className={`flex-1 flex items-center justify-center p-3 rounded-xl transition-all ${appState === 'templates' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/20' : `${theme.textMuted} ${theme.cardBg} border ${theme.border}`}`}
                       title="Templates"
                     >
                       <ClipboardList size={20} />
@@ -2210,7 +2210,7 @@ export default function App() {
                         setAppState('history');
                         setIsMenuOpen(false);
                       }}
-                      className={`flex-1 flex items-center justify-center p-3 rounded-xl transition-all ${appState === 'history' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : `${theme.textMuted} ${theme.cardBg} border ${theme.border}`}`}
+                      className={`flex-1 flex items-center justify-center p-3 rounded-xl transition-all ${appState === 'history' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/20' : `${theme.textMuted} ${theme.cardBg} border ${theme.border}`}`}
                       title="History"
                     >
                       <Search size={20} />
@@ -2220,7 +2220,7 @@ export default function App() {
                         setAppState('manage');
                         setIsMenuOpen(false);
                       }}
-                      className={`flex-1 flex items-center justify-center p-3 rounded-xl transition-all ${appState === 'manage' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : `${theme.textMuted} ${theme.cardBg} border ${theme.border}`}`}
+                      className={`flex-1 flex items-center justify-center p-3 rounded-xl transition-all ${appState === 'manage' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/20' : `${theme.textMuted} ${theme.cardBg} border ${theme.border}`}`}
                       title="Manage Data"
                     >
                       <Settings size={20} />
@@ -2246,7 +2246,7 @@ export default function App() {
                         <button 
                           key={t.id}
                           onClick={() => setTeam(t.id as any)}
-                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border-2 ${team === t.id ? 'border-indigo-500 scale-110 shadow-lg shadow-indigo-500/20' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border-2 ${team === t.id ? 'border-zinc-800 dark:border-zinc-200 scale-110 shadow-lg shadow-zinc-500/20' : 'border-transparent opacity-60 hover:opacity-100'}`}
                           title={t.label}
                         >
                            {t.id === 'none' ? 
@@ -2264,22 +2264,22 @@ export default function App() {
                       setIsDriverModalOpen(true);
                       setIsMenuOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl border ${theme.border} ${theme.cardBg} hover:border-indigo-500/50 transition-all group`}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl border ${theme.border} ${theme.cardBg} hover:border-zinc-500/50 transition-all group`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                      <div className="w-8 h-8 rounded-lg bg-zinc-500/10 flex items-center justify-center text-zinc-500">
                         <Hash size={16} />
                       </div>
                       <span className="text-sm font-medium">Driver Number</span>
                     </div>
-                    <ChevronRight size={14} className="text-slate-600 group-hover:text-indigo-400 transition-colors" />
+                    <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-400 transition-colors" />
                   </button>
 
                   {/* Theme Toggle */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
                       <span className="text-xs font-medium text-slate-400">Appearance</span>
-                      <span className="text-[10px] font-mono text-indigo-400 uppercase">{isDarkMode ? 'Dark' : 'Light'}</span>
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase">{isDarkMode ? 'Dark' : 'Light'}</span>
                     </div>
                     <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-slate-100'} border ${theme.border}`}>
                       <button 
@@ -2303,7 +2303,7 @@ export default function App() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
                       <span className="text-xs font-medium text-slate-400">Address Format</span>
-                      <span className="text-[10px] font-mono text-indigo-400 uppercase">{isSimplifiedAddress ? 'Simple' : 'Full'}</span>
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase">{isSimplifiedAddress ? 'Simple' : 'Full'}</span>
                     </div>
                     <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-slate-100'} border ${theme.border}`}>
                       <button 
@@ -2314,7 +2314,7 @@ export default function App() {
                       </button>
                       <button 
                         onClick={() => setIsSimplifiedAddress(true)}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${isSimplifiedAddress ? 'bg-indigo-500 shadow-sm text-white' : 'text-slate-500 hover:text-slate-400'}`}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${isSimplifiedAddress ? 'bg-zinc-800 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
                       >
                         City/Zip
                       </button>
@@ -2325,7 +2325,7 @@ export default function App() {
                   <div className="space-y-3 px-1">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-slate-400">Drag Sensitivity</span>
-                      <span className="text-[10px] font-mono text-indigo-400">{dragSensitivity.toFixed(1)}x</span>
+                      <span className="text-[10px] font-mono text-zinc-400">{dragSensitivity.toFixed(1)}x</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <input 
@@ -2335,7 +2335,7 @@ export default function App() {
                         step="0.1" 
                         value={dragSensitivity} 
                         onChange={(e) => setDragSensitivity(parseFloat(e.target.value))}
-                        className="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                        className="flex-1 h-1.5 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-zinc-500"
                       />
                     </div>
                   </div>
@@ -2350,15 +2350,15 @@ export default function App() {
                     </div>
                     <ul className="text-xs text-slate-500 space-y-2 leading-relaxed px-1">
                       <li className="flex gap-2">
-                        <span className="text-indigo-500">•</span>
+                        <span className="text-zinc-500">•</span>
                         <span>Upload PDF via sidebar</span>
                       </li>
                       <li className="flex gap-2">
-                        <span className="text-indigo-500">•</span>
+                        <span className="text-zinc-500">•</span>
                         <span>Verify data in wizard</span>
                       </li>
                       <li className="flex gap-2">
-                        <span className="text-indigo-500">•</span>
+                        <span className="text-zinc-500">•</span>
                         <span>Copy formatted route</span>
                       </li>
                     </ul>

@@ -149,7 +149,7 @@ Kind regards.`;
                     type="date" 
                     value={getInputValueDate(dates.pickupArrived)}
                     onChange={(e) => updateDate('pickupArrived', e.target.value)}
-                    className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-indigo-500`}
+                    className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-zinc-500`}
                   />
                   <input 
                     type="text" 
@@ -157,9 +157,9 @@ Kind regards.`;
                     onChange={(e) => handleTimeChange('pickupArrived', e.target.value)}
                     onFocus={handleFocus}
                     placeholder="HH:mm"
-                    className={`w-24 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-indigo-500 font-mono`}
+                    className={`w-24 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-zinc-500 font-mono`}
                   />
-                  <button onClick={() => setNow('pickupArrived')} className={`p-1.5 rounded-lg border ${theme.border} ${theme.textMuted} hover:text-indigo-500 transition-colors`}>
+                  <button onClick={() => setNow('pickupArrived')} className={`p-1.5 rounded-lg border ${theme.border} ${theme.textMuted} hover:text-zinc-500 transition-colors`}>
                     <Clock size={14} />
                   </button>
                 </div>
@@ -172,7 +172,7 @@ Kind regards.`;
                     type="date" 
                     value={getInputValueDate(dates.pickupCompleted)}
                     onChange={(e) => updateDate('pickupCompleted', e.target.value)}
-                    className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-indigo-500`}
+                    className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-zinc-500`}
                   />
                   <input 
                     type="text" 
@@ -180,9 +180,9 @@ Kind regards.`;
                     onChange={(e) => handleTimeChange('pickupCompleted', e.target.value)}
                     onFocus={handleFocus}
                     placeholder="HH:mm"
-                    className={`w-24 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-indigo-500 font-mono`}
+                    className={`w-24 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-zinc-500 font-mono`}
                   />
-                  <button onClick={() => setNow('pickupCompleted')} className={`p-1.5 rounded-lg border ${theme.border} ${theme.textMuted} hover:text-indigo-500 transition-colors`}>
+                  <button onClick={() => setNow('pickupCompleted')} className={`p-1.5 rounded-lg border ${theme.border} ${theme.textMuted} hover:text-zinc-500 transition-colors`}>
                     <Clock size={14} />
                   </button>
                 </div>
@@ -218,7 +218,7 @@ Kind regards.`;
                     type="date" 
                     value={getInputValueDate(dates.deliveryArrived)}
                     onChange={(e) => updateDate('deliveryArrived', e.target.value)}
-                    className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-indigo-500`}
+                    className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-zinc-500`}
                   />
                   <input 
                     type="text" 
@@ -226,9 +226,9 @@ Kind regards.`;
                     onChange={(e) => handleTimeChange('deliveryArrived', e.target.value)}
                     onFocus={handleFocus}
                     placeholder="HH:mm"
-                    className={`w-24 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-indigo-500 font-mono`}
+                    className={`w-24 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-zinc-500 font-mono`}
                   />
-                  <button onClick={() => setNow('deliveryArrived')} className={`p-1.5 rounded-lg border ${theme.border} ${theme.textMuted} hover:text-indigo-500 transition-colors`}>
+                  <button onClick={() => setNow('deliveryArrived')} className={`p-1.5 rounded-lg border ${theme.border} ${theme.textMuted} hover:text-zinc-500 transition-colors`}>
                     <Clock size={14} />
                   </button>
                 </div>
@@ -241,7 +241,7 @@ Kind regards.`;
                     type="date" 
                     value={getInputValueDate(dates.deliveryCompleted)}
                     onChange={(e) => updateDate('deliveryCompleted', e.target.value)}
-                    className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-indigo-500`}
+                    className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-zinc-500`}
                   />
                   <input 
                     type="text" 
@@ -249,9 +249,9 @@ Kind regards.`;
                     onChange={(e) => handleTimeChange('deliveryCompleted', e.target.value)}
                     onFocus={handleFocus}
                     placeholder="HH:mm"
-                    className={`w-24 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-indigo-500 font-mono`}
+                    className={`w-24 ${theme.inputBg} border ${theme.border} rounded-lg px-2 py-1.5 text-xs ${theme.text} focus:outline-none focus:border-zinc-500 font-mono`}
                   />
-                  <button onClick={() => setNow('deliveryCompleted')} className={`p-1.5 rounded-lg border ${theme.border} ${theme.textMuted} hover:text-indigo-500 transition-colors`}>
+                  <button onClick={() => setNow('deliveryCompleted')} className={`p-1.5 rounded-lg border ${theme.border} ${theme.textMuted} hover:text-zinc-500 transition-colors`}>
                     <Clock size={14} />
                   </button>
                 </div>
