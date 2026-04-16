@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to CDN for reliable production behavior
@@ -1030,6 +1030,57 @@ export default function App() {
     text: string;
   }>({ isOpen: false, x: 0, y: 0, text: "" });
 
+  const handleTripleClickMap = (e: React.MouseEvent, text: string) => {
+    if (e.detail === 3 && extractedData) {
+      const target = e.target as HTMLTextAreaElement | HTMLInputElement;
+      const start = target.selectionStart || 0;
+      const lines = text.split('\n');
+      let currentPos = 0;
+      let clickedLine = "";
+      
+      for (const line of lines) {
+        if (start >= currentPos && start <= currentPos + line.length) {
+          clickedLine = line.trim().toUpperCase();
+          break;
+        }
+        currentPos += line.length + 1;
+      }
+      
+      if (clickedLine) {
+        // Find the FULL address from the original data
+        // We compare the clicked line (potentially simplified) with our extracted data
+        let fullAddress = clickedLine;
+
+        const findFullFromList = (addresses: string[]) => {
+          for (const raw of addresses) {
+            const simplified = formatAddress(raw, true).toUpperCase();
+            const full = formatAddress(raw, false).toUpperCase();
+            if (clickedLine === simplified || clickedLine === full) {
+              return raw;
+            }
+          }
+          return null;
+        };
+
+        const allRawAddresses = extractedData.stops 
+          ? extractedData.stops.map(s => s.address || "") 
+          : [extractedData.originAddress || "", extractedData.destinationAddress || ""];
+        
+        const matched = findFullFromList(allRawAddresses);
+        if (matched) {
+          fullAddress = matched;
+        }
+
+        // Clean up address (remove things like "PU ", "DEL ", etc if they were part of the selection)
+        fullAddress = fullAddress.replace(/^(PU|DEL|PICKUP|DELIVERY|STOP \d+)[:\s]*/i, "").trim();
+
+        if (fullAddress) {
+          window.open(`https://www.google.com/maps/search/${encodeURIComponent(fullAddress)}`, '_blank');
+        }
+      }
+    }
+  };
+
   const handleQuickLook = (e: React.MouseEvent, text: string) => {
     if (!text) return;
     e.preventDefault();
@@ -1652,6 +1703,11 @@ export default function App() {
                     type="text" 
                     value={value}
                     onChange={(e) => handleDataChange(e.target.value)}
+                    onClick={(e) => {
+                      if (step.field === 'address' || step.key.includes('Address') || (typeof value === 'string' && value.length > 5 && value.includes(','))) {
+                        handleTripleClickMap(e, value);
+                      }
+                    }}
                     className={`w-full ${theme.inputBg} border ${theme.border} rounded-xl px-4 py-4 text-xl ${theme.text} font-mono focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all`}
                   />
                   <Edit2 className={`absolute right-4 top-1/2 -translate-y-1/2 ${theme.textMuted} w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity`} />
@@ -1759,6 +1815,7 @@ export default function App() {
             value={routeText}
             onChange={(e) => setRouteText(e.target.value)}
             onContextMenu={(e) => handleQuickLook(e, routeText)}
+            onClick={(e) => handleTripleClickMap(e, routeText)}
             className={`w-full h-40 p-6 bg-transparent ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} font-mono text-sm resize-none focus:outline-none leading-relaxed`}
             spellCheck={false}
           />
@@ -1780,6 +1837,7 @@ export default function App() {
             value={notesText}
             onChange={(e) => setNotesText(e.target.value)}
             onContextMenu={(e) => handleQuickLook(e, notesText)}
+            onClick={(e) => handleTripleClickMap(e, notesText)}
             className={`w-full h-40 p-6 bg-transparent ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} font-mono text-sm resize-none focus:outline-none leading-relaxed`}
             spellCheck={false}
           />
@@ -2319,10 +2377,7 @@ export default function App() {
 
       <DriverNumberModal 
         isOpen={isDriverModalOpen}
-        onClose={() => {
-          setIsDriverModalOpen(false);
-          if (appState === 'verify') finishVerification();
-        }}
+        onClose={() => setIsDriverModalOpen(false)}
         onConfirm={handleDriverNumberConfirm}
         isDarkMode={isDarkMode}
         theme={theme}
