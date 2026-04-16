@@ -37,10 +37,10 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
       initial={{ opacity: 1 }}
       exit={{ opacity: 0, x: -100, filter: 'blur(10px)' }}
       transition={{ duration: 0.8, ease: "easeInOut" }}
-      className="fixed inset-0 z-[200] flex bg-white overflow-hidden"
+      className="fixed inset-0 z-[200] flex bg-background overflow-hidden"
     >
-      {/* 30% Left Sidebar: Interactive Content */}
-      <div className="w-full lg:w-[30%] h-full bg-white flex flex-col p-8 md:p-12 relative z-10 shadow-[20px_0_50px_rgba(0,0,0,0.05)]">
+      {/* 20% Left Sidebar: Interactive Content */}
+      <div className="w-full lg:w-[20%] h-full bg-background flex flex-col p-8 md:p-12 relative z-10 shadow-[20px_0_50px_rgba(0,0,0,0.05)]">
         {/* Header with Logo */}
         <div className="flex items-center gap-4 mb-20">
           <div className="p-2 bg-zinc-50 rounded-xl border border-zinc-100/50">
@@ -116,8 +116,8 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
         </div>
       </div>
 
-      {/* 70% Right: Decorative Background Inspired by MongoDB UI */}
-      <div className="hidden lg:flex flex-1 lg:w-[70%] relative bg-[#0a0a0a] overflow-hidden">
+      {/* 80% Right: Decorative Background Inspired by MongoDB UI */}
+      <div className="hidden lg:flex flex-1 lg:w-[80%] relative bg-[#0a0a0a] overflow-hidden">
         {/* Large Decorative SVG Background (Masked Shapes) */}
         <div className="absolute inset-0 z-0">
           <svg className="w-full h-full opacity-30" viewBox="0 0 1000 1000" preserveAspectRatio="none">
@@ -140,17 +140,17 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
             className="relative w-full h-full max-w-4xl"
           >
             {/* Large Brackets Symbols */}
-            <div className="absolute top-20 right-20 text-[20rem] font-mono font-bold text-white/[0.02] leading-none select-none">
+            <div className="absolute top-20 right-20 text-[20rem] font-mono font-bold text-white/30 leading-none select-none">
               {"{ }"}
             </div>
 
             {/* Asterisk Symbol */}
-            <div className="absolute bottom-10 right-40 text-[15rem] font-bold text-white/[0.02] leading-none select-none rotate-12">
+            <div className="absolute bottom-10 right-40 text-[15rem] font-bold text-white/30 leading-none select-none rotate-12">
               *
             </div>
 
             {/* Slashes */}
-            <div className="absolute top-40 left-20 text-[10rem] font-mono font-light text-white/[0.02] leading-none select-none -rotate-12">
+            <div className="absolute top-40 left-20 text-[10rem] font-mono font-light text-white/30 leading-none select-none -rotate-12">
               / /
             </div>
 
@@ -174,23 +174,6 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
           </motion.div>
         </div>
 
-        {/* Marketing Text Overlay on Right Side */}
-        <div className="absolute top-1/4 left-20 z-10 max-w-md">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.6 }}
-            className="space-y-6"
-          >
-            <h3 className="text-3xl font-display font-medium text-white italic opacity-60">
-              Tactical Logistics.
-            </h3>
-            <p className="text-zinc-400 text-lg font-light leading-relaxed">
-              Experience the next generation of logistics automation. Designed for performance, built for speed.
-            </p>
-            <div className="w-12 h-1 bg-white/10 rounded-full" />
-          </motion.div>
-        </div>
         
         {/* Subtle Grid */}
         <div className="absolute inset-0 opacity-[0.02] pointer-events-none" 

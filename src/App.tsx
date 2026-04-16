@@ -619,7 +619,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
   }, []);
 
   return (
-    <div className={`w-full ${isAutoZoomEnabled ? 'h-full' : 'h-auto'} overflow-hidden rounded-lg shadow-lg border relative ${isDarkMode ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-slate-100'} flex flex-col`}>
+    <div className={`w-full ${isAutoZoomEnabled ? 'h-full' : 'h-auto'} overflow-hidden rounded-lg shadow-lg border relative ${isDarkMode ? 'border-white/10 bg-zinc-950' : 'border-zinc-200 bg-zinc-100'} flex flex-col`}>
       {/* Page Navigation */}
       {totalPages > 1 && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-white text-xs font-medium">
@@ -832,7 +832,7 @@ const ManageView = ({
             <h3 className={`text-lg font-medium ${theme.text} flex items-center gap-2`}>
                 <Truck size={20} className="text-zinc-500" /> Trucks
             </h3>
-            <span className={`text-xs ${theme.textMuted} bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full`}>{savedTrucks.length} saved</span>
+            <span className={`text-xs ${theme.textMuted} bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-full`}>{savedTrucks.length} saved</span>
           </div>
           
           <div className="flex gap-2 mb-6">
@@ -856,11 +856,11 @@ const ManageView = ({
 
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
             {savedTrucks.map(t => (
-              <div key={t} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'} group hover:border-zinc-500/30 transition-colors`}>
+              <div key={t} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-zinc-50'} group hover:border-zinc-500/30 transition-colors`}>
                 <span className={`font-mono font-medium ${theme.text}`}>{t}</span>
                 <button 
                   onClick={(e) => removeTruck(t, e)}
-                  className="text-slate-400 hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 border-none"
+                  className="text-zinc-400 hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 border-none"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -967,7 +967,7 @@ const HistoryView = ({
 
         {history.length === 0 && (
           <div className="text-center py-20 space-y-4">
-            <div className={`w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto ${theme.textMuted}`}>
+            <div className={`w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto ${theme.textMuted}`}>
               <FileText size={32} />
             </div>
             <p className={`${theme.textMuted} italic`}>No history found. Upload a RateCon to get started.</p>
@@ -1292,14 +1292,14 @@ export default function App() {
 
   // --- Styles Helper ---
   const theme = React.useMemo(() => ({
-    bg: isDarkMode ? 'bg-[#0a0a0a]' : 'bg-white',
+    bg: isDarkMode ? 'bg-[#0a0a0a]' : 'bg-background',
     text: isDarkMode ? 'text-white' : 'text-zinc-900',
     textMuted: isDarkMode ? 'text-zinc-400' : 'text-zinc-500',
     border: isDarkMode ? 'border-zinc-800' : 'border-zinc-200',
-    cardBg: isDarkMode ? 'bg-[#121212]' : 'bg-white',
+    cardBg: isDarkMode ? 'bg-[#121212]' : 'bg-background',
     cardHover: isDarkMode ? 'hover:bg-[#1a1a1a]' : 'hover:bg-zinc-50',
     inputBg: isDarkMode ? 'bg-[#1a1a1a]' : 'bg-zinc-100',
-    headerBg: isDarkMode ? 'bg-[#0a0a0a]/80' : 'bg-white/80',
+    headerBg: isDarkMode ? 'bg-[#0a0a0a]/80' : 'bg-background/80',
     accent: isDarkMode ? 'text-white' : 'text-zinc-900',
     accentBg: isDarkMode ? 'bg-zinc-700' : 'bg-zinc-900',
     accentHover: isDarkMode ? 'hover:bg-zinc-600' : 'hover:bg-zinc-800',
@@ -1803,7 +1803,7 @@ export default function App() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Box 1: Route */}
         <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-zinc-500/30 transition-colors group shadow-sm`}>
-          <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
+          <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-zinc-50'}`}>
             <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>ROUTE</span>
             <button 
               onClick={() => copyToClipboard(routeText, setCopiedRoute)}
@@ -1818,14 +1818,14 @@ export default function App() {
             onChange={(e) => setRouteText(e.target.value)}
             onContextMenu={(e) => handleQuickLook(e, routeText)}
             onClick={(e) => handleTripleClickMap(e, routeText)}
-            className={`w-full h-40 p-6 bg-transparent ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} font-mono text-sm resize-none focus:outline-none leading-relaxed`}
+            className={`w-full h-40 p-6 bg-transparent ${isDarkMode ? 'text-zinc-200' : 'text-zinc-700'} font-mono text-sm resize-none focus:outline-none leading-relaxed`}
             spellCheck={false}
           />
         </div>
 
         {/* Box 2: Notes */}
         <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-zinc-500/30 transition-colors group shadow-sm`}>
-          <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
+          <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-zinc-50'}`}>
             <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>NOTES</span>
             <button 
               onClick={() => copyToClipboard(notesText, setCopiedNotes)}
@@ -1840,14 +1840,14 @@ export default function App() {
             onChange={(e) => setNotesText(e.target.value)}
             onContextMenu={(e) => handleQuickLook(e, notesText)}
             onClick={(e) => handleTripleClickMap(e, notesText)}
-            className={`w-full h-40 p-6 bg-transparent ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} font-mono text-sm resize-none focus:outline-none leading-relaxed`}
+            className={`w-full h-40 p-6 bg-transparent ${isDarkMode ? 'text-zinc-200' : 'text-zinc-700'} font-mono text-sm resize-none focus:outline-none leading-relaxed`}
             spellCheck={false}
           />
         </div>
 
         {/* Box 3: Chain (Full Width) */}
         <div className={`md:col-span-2 ${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-zinc-500/30 transition-colors group shadow-sm`}>
-          <div className={`px-6 py-4 border-b ${theme.border} flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
+          <div className={`px-6 py-4 border-b ${theme.border} flex flex-col md:flex-row justify-between items-start md:items-center gap-4 ${isDarkMode ? 'bg-white/[0.02]' : 'bg-zinc-50'}`}>
             <div className="flex items-center gap-4 flex-wrap">
               <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>CHAIN</span>
               
@@ -1893,7 +1893,7 @@ export default function App() {
               value={chainText}
               onChange={(e) => setChainText(e.target.value)}
               onContextMenu={(e) => handleQuickLook(e, chainText)}
-              className={`w-full bg-transparent ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} font-mono text-lg focus:outline-none`}
+              className={`w-full bg-transparent ${isDarkMode ? 'text-zinc-200' : 'text-zinc-700'} font-mono text-lg focus:outline-none`}
               spellCheck={false}
             />
           </div>
@@ -1901,7 +1901,7 @@ export default function App() {
 
         {/* Box 4: Rename (Full Width) */}
         <div className={`md:col-span-2 ${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-zinc-500/30 transition-colors group shadow-sm`}>
-          <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-slate-50'}`}>
+          <div className={`px-6 py-4 border-b ${theme.border} flex justify-between items-center ${isDarkMode ? 'bg-white/[0.02]' : 'bg-zinc-50'}`}>
             <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>RENAME</span>
             <button 
               onClick={() => copyToClipboard(renameText, setCopiedRename)}
@@ -1917,7 +1917,7 @@ export default function App() {
               value={renameText}
               onChange={(e) => setRenameText(e.target.value)}
               onContextMenu={(e) => handleQuickLook(e, renameText)}
-              className={`w-full bg-transparent ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} font-mono text-lg focus:outline-none`}
+              className={`w-full bg-transparent ${isDarkMode ? 'text-zinc-200' : 'text-zinc-700'} font-mono text-lg focus:outline-none`}
               spellCheck={false}
             />
           </div>
@@ -2175,7 +2175,7 @@ export default function App() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className={`fixed right-0 top-0 bottom-0 w-72 ${isDarkMode ? 'bg-[#0F172A]' : 'bg-white'} border-l ${theme.border} z-50 shadow-2xl flex flex-col rounded-none border-y-0 border-r-0 overflow-hidden`}
+              className={`fixed right-0 top-0 bottom-0 w-72 ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-background'} border-l ${theme.border} z-50 shadow-2xl flex flex-col rounded-none border-y-0 border-r-0 overflow-hidden`}
             >
               <div className="p-5 flex justify-between items-center border-b border-white/5">
                 <div className="flex items-center gap-2">
@@ -2193,7 +2193,7 @@ export default function App() {
               <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
                 {/* Navigation Links (Mobile) */}
                 <div className="md:hidden space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 px-1">Navigation</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2 px-1">Navigation</p>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => {
@@ -2230,14 +2230,14 @@ export default function App() {
 
                 {/* Preferences Section */}
                 <div className="space-y-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-1">Preferences</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 px-1">Preferences</p>
                   
                   {/* Team Selector */}
                   <div className="space-y-2 px-1">
-                    <label className="text-xs font-medium text-slate-400">Team Color</label>
+                    <label className="text-xs font-medium text-zinc-400">Team Color</label>
                     <div className="flex items-center gap-2">
                       {[
-                        { id: 'none', label: 'None', color: 'bg-slate-500' },
+                        { id: 'none', label: 'None', color: 'bg-zinc-500' },
                         { id: 'green', label: '🟢', color: 'bg-emerald-500' },
                         { id: 'purple', label: '🟣', color: 'bg-purple-500' },
                         { id: 'red', label: '🔴', color: 'bg-red-500' },
@@ -2250,7 +2250,7 @@ export default function App() {
                           title={t.label}
                         >
                            {t.id === 'none' ? 
-                             <div className="w-5 h-5 rounded-full bg-slate-700 flex items-center justify-center"><X size={10} className="text-white" /></div> : 
+                             <div className="w-5 h-5 rounded-full bg-zinc-700 flex items-center justify-center"><X size={10} className="text-white" /></div> : 
                              <span className="text-lg leading-none">{t.label}</span>
                            }
                         </button>
@@ -2278,20 +2278,20 @@ export default function App() {
                   {/* Theme Toggle */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
-                      <span className="text-xs font-medium text-slate-400">Appearance</span>
+                      <span className="text-xs font-medium text-zinc-400">Appearance</span>
                       <span className="text-[10px] font-mono text-zinc-400 uppercase">{isDarkMode ? 'Dark' : 'Light'}</span>
                     </div>
-                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-slate-100'} border ${theme.border}`}>
+                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-100'} border ${theme.border}`}>
                       <button 
                         onClick={() => setIsDarkMode(false)}
-                        className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-lg transition-all ${!isDarkMode ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-400'}`}
+                        className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-lg transition-all ${!isDarkMode ? 'bg-background shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-400'}`}
                       >
                         <Sun size={14} />
                         Light
                       </button>
                       <button 
                         onClick={() => setIsDarkMode(true)}
-                        className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-lg transition-all ${isDarkMode ? 'bg-slate-800 shadow-sm text-white' : 'text-slate-500 hover:text-slate-400'}`}
+                        className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-lg transition-all ${isDarkMode ? 'bg-zinc-800 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
                       >
                         <Moon size={14} />
                         Dark
@@ -2302,13 +2302,13 @@ export default function App() {
                   {/* Address Format Toggle */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
-                      <span className="text-xs font-medium text-slate-400">Address Format</span>
+                      <span className="text-xs font-medium text-zinc-400">Address Format</span>
                       <span className="text-[10px] font-mono text-zinc-400 uppercase">{isSimplifiedAddress ? 'Simple' : 'Full'}</span>
                     </div>
-                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-slate-100'} border ${theme.border}`}>
+                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-100'} border ${theme.border}`}>
                       <button 
                         onClick={() => setIsSimplifiedAddress(false)}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${!isSimplifiedAddress ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-400'}`}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${!isSimplifiedAddress ? 'bg-background shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-400'}`}
                       >
                         Full
                       </button>
@@ -2324,7 +2324,7 @@ export default function App() {
                   {/* Drag Sensitivity */}
                   <div className="space-y-3 px-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-400">Drag Sensitivity</span>
+                      <span className="text-xs font-medium text-zinc-400">Drag Sensitivity</span>
                       <span className="text-[10px] font-mono text-zinc-400">{dragSensitivity.toFixed(1)}x</span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -2344,11 +2344,11 @@ export default function App() {
                 {/* Info Section */}
                 <div className="space-y-4 pt-4 border-t border-white/5">
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-slate-500">
+                    <div className="flex items-center gap-2 text-zinc-500">
                       <HelpCircle size={14} />
                       <p className="text-[10px] font-bold uppercase tracking-widest">Help</p>
                     </div>
-                    <ul className="text-xs text-slate-500 space-y-2 leading-relaxed px-1">
+                    <ul className="text-xs text-zinc-500 space-y-2 leading-relaxed px-1">
                       <li className="flex gap-2">
                         <span className="text-zinc-500">•</span>
                         <span>Upload PDF via sidebar</span>
@@ -2365,11 +2365,11 @@ export default function App() {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-slate-500">
+                    <div className="flex items-center gap-2 text-zinc-500">
                       <Shield size={14} />
                       <p className="text-[10px] font-bold uppercase tracking-widest">Privacy</p>
                     </div>
-                    <p className="text-xs text-slate-500 leading-relaxed px-1">
+                    <p className="text-xs text-zinc-500 leading-relaxed px-1">
                       Documents are processed locally. No data is uploaded to external servers.
                     </p>
                   </div>
@@ -2378,7 +2378,7 @@ export default function App() {
 
               <div className="p-5 border-t border-white/5 bg-black/5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-slate-600 uppercase tracking-tighter">Dakota Stable 0410</span>
+                  <span className="text-[10px] font-medium text-zinc-600 uppercase tracking-tighter">Dakota Stable 0410</span>
                   <div className="flex gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   </div>

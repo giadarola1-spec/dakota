@@ -189,7 +189,7 @@ Kind regards.`;
               </div>
             </div>
 
-            <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-slate-50'} border ${theme.border} font-mono text-xs whitespace-pre-wrap leading-relaxed ${theme.textMuted}`}>
+            <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-50'} border ${theme.border} font-mono text-xs whitespace-pre-wrap leading-relaxed ${theme.textMuted}`}>
               {pickupTemplate}
             </div>
           </div>
@@ -199,7 +199,7 @@ Kind regards.`;
         <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} p-6 shadow-sm flex flex-col space-y-4`}>
           <div className="flex items-center justify-between">
             <h3 className={`text-lg font-medium ${theme.text} flex items-center gap-2`}>
-              <div className="w-2 h-2 rounded-full bg-blue-500" /> Delivery Template
+              <div className="w-2 h-2 rounded-full bg-zinc-500" /> Delivery Template
             </h3>
             <button 
               onClick={() => handleCopy(deliveryTemplate, 'delivery')}
@@ -258,7 +258,7 @@ Kind regards.`;
               </div>
             </div>
 
-            <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-slate-50'} border ${theme.border} font-mono text-xs whitespace-pre-wrap leading-relaxed ${theme.textMuted}`}>
+            <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-50'} border ${theme.border} font-mono text-xs whitespace-pre-wrap leading-relaxed ${theme.textMuted}`}>
               {deliveryTemplate}
             </div>
           </div>
