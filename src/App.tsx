@@ -11,6 +11,7 @@ import { DottedMapBackground } from './components/DottedMapBackground';
 import { LoadingScreen } from './components/LoadingScreen';
 import { DriverNumberModal } from './components/DriverNumberModal';
 import { TemplatesView } from './components/TemplatesView';
+import { WelcomeView } from './components/WelcomeView';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">
@@ -1001,6 +1002,7 @@ export default function App() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [currentSteps, setCurrentSteps] = useState<VerificationStep[]>([]);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+  const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>("dakota_hasSeenWelcome", false);
   
   // History State
   const [history, setHistory] = useLocalStorage<HistoryItem[]>("dakota_history", []);
@@ -1927,6 +1929,18 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.text} font-sans selection:bg-indigo-500/30 transition-colors duration-300 flex flex-col relative overflow-hidden`}>
+      <AnimatePresence>
+        {!hasSeenWelcome && (
+          <WelcomeView 
+            onGetStarted={() => setHasSeenWelcome(true)} 
+            team={team} 
+            setTeam={setTeam} 
+            isDarkMode={isDarkMode} 
+            theme={theme} 
+          />
+        )}
+      </AnimatePresence>
+
       {isDarkMode && (
         <div className="atmospheric-bg">
           <div className="atmosphere-orb w-[600px] h-[600px] bg-indigo-600/20 -top-[200px] -left-[100px]" />
