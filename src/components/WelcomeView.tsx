@@ -33,11 +33,16 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[200] flex bg-white overflow-hidden">
-      {/* 40% Left Sidebar: Interactive Content */}
-      <div className="w-full lg:w-2/5 h-full bg-white flex flex-col p-8 md:p-20 relative z-10 shadow-[20px_0_50px_rgba(0,0,0,0.05)]">
+    <motion.div 
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0, x: -100, filter: 'blur(10px)' }}
+      transition={{ duration: 0.8, ease: "easeInOut" }}
+      className="fixed inset-0 z-[200] flex bg-white overflow-hidden"
+    >
+      {/* 30% Left Sidebar: Interactive Content */}
+      <div className="w-full lg:w-[30%] h-full bg-white flex flex-col p-8 md:p-12 relative z-10 shadow-[20px_0_50px_rgba(0,0,0,0.05)]">
         {/* Header with Logo */}
-        <div className="flex items-center gap-4 mb-24">
+        <div className="flex items-center gap-4 mb-20">
           <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
             <DakotaLogo className="w-8 h-8" />
           </div>
@@ -48,7 +53,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex flex-col justify-center max-w-sm">
+        <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -58,7 +63,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
               Billing made faster. <br />
               <span className="text-indigo-600">200% faster.</span>
             </h2>
-            <p className="text-base text-slate-500 font-light mb-12">
+            <p className="text-base text-slate-500 font-light mb-12 leading-relaxed">
               Automate your rate confirmation processing with tactical precision.
             </p>
           </motion.div>
@@ -101,15 +106,18 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="mt-auto pt-8 border-t border-slate-100">
+        <div className="mt-auto pt-8 border-t border-slate-100 flex flex-col gap-1">
           <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest">
             Dakota Intelligence Systems © 2026
+          </p>
+          <p className="text-[10px] font-bold text-slate-500/60 uppercase tracking-widest flex items-center gap-1.5">
+            Made in green team <span className="text-emerald-500">💚</span>
           </p>
         </div>
       </div>
 
-      {/* 60% Right: Decorative Background Inspired by MongoDB UI */}
-      <div className="hidden lg:flex flex-1 relative bg-[#020617] overflow-hidden">
+      {/* 70% Right: Decorative Background Inspired by MongoDB UI */}
+      <div className="hidden lg:flex flex-1 lg:w-[70%] relative bg-[#020617] overflow-hidden">
         {/* Large Decorative SVG Background (Masked Shapes) */}
         <div className="absolute inset-0 z-0">
           <svg className="w-full h-full opacity-40" viewBox="0 0 1000 1000" preserveAspectRatio="none">
@@ -189,6 +197,6 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
           style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '60px 60px' }} 
         />
       </div>
-    </div>
+    </motion.div>
   );
 };
