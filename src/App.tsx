@@ -1579,8 +1579,8 @@ export default function App() {
     }
 
     if (format === 'alt3') {
-       // Example: 🟢 TRUCK 1011 LA-MA-04.17.2026 TRAFFIX LOAD# T01480351
-       return `${emoji ? emoji + " " : ""}TRUCK ${tNum} ${lane}-${date} ${brk} LOAD# ${loadNum}`;
+       // Example: 🟢TRUCK 7255 IL-IN 04.16.2026 FITZMARK LOAD# 2302630
+       return `${emoji}TRUCK ${tNum} ${lane} ${date} ${brk} LOAD# ${loadNum}`;
     }
 
     const chain = `${emoji ? emoji + " " : ""}${tNum}-${lane}-${date} ${brk} LOAD ${loadNum}`;
@@ -1617,6 +1617,18 @@ export default function App() {
       setNotesText(prev => {
         let notes = "";
         
+        const formatWeight = (w: string) => {
+          if (!w) return "?";
+          const numericOnly = w.replace(/[^0-9]/g, '');
+          if (!numericOnly) return w;
+          const num = parseInt(numericOnly, 10);
+          if (isNaN(num)) return w;
+          if (num >= 1000) {
+            return `${Math.round(num / 1000)}KLB`;
+          }
+          return `${num}LB`;
+        };
+
         const stops = extractedData.stops && extractedData.stops.length > 0 
           ? extractedData.stops.map(s => {
               const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
@@ -1625,7 +1637,7 @@ export default function App() {
             }).join('\n') + '\n'
           : `PU ${extractedData.pickupTime || "?"}\nDEL ${extractedData.deliveryTime || "?"}\n`;
 
-        const weight = `W ${extractedData.weight || "?"}LB\n`;
+        const weight = `W ${formatWeight(extractedData.weight)}\n`;
         const loadNum = extractedData.loadNumber && broker.toUpperCase() === 'TRAFFIX' && !extractedData.loadNumber.startsWith('T') 
           ? `T${extractedData.loadNumber}` 
           : extractedData.loadNumber;
@@ -1635,7 +1647,7 @@ export default function App() {
           notes = stops + weight + loadNum;
         } else {
           // Standard Style: Weight -> Stops -> Chain
-          notes = `W${extractedData.weight || "?"}\n` + stops + chain;
+          notes = `W${formatWeight(extractedData.weight)}\n` + stops + chain;
         }
         
         return notes;
