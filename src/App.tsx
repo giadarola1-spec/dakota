@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, HelpCircle, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to CDN for reliable production behavior
@@ -1018,7 +1018,7 @@ export default function App() {
   const [truckNumber, setTruckNumber] = useState("TRUCK#");
   const [savedTrucks, setSavedTrucks] = useLocalStorage<string[]>("dakota_savedTrucks", []);
   const [broker, setBroker] = useLocalStorage<string>("dakota_broker", "TRAFFIX");
-  const [chainFormat, setChainFormat] = useLocalStorage<'standard' | 'alternative'>("dakota_chainFormat", "standard");
+  const [chainFormat, setChainFormat] = useLocalStorage<'standard' | 'alternative' | 'alt2'>("dakota_chainFormat", "standard");
   const [chainText, setChainText] = useState("");
   const [copiedChain, setCopiedChain] = useState(false);
   const [renameText, setRenameText] = useState("");
@@ -1293,14 +1293,14 @@ export default function App() {
 
   // --- Styles Helper ---
   const theme = React.useMemo(() => ({
-    bg: isDarkMode ? 'bg-[#0a0a0a]' : 'bg-white',
+    bg: isDarkMode ? 'bg-[#0a0d17]' : 'bg-white',
     text: isDarkMode ? 'text-white' : 'text-zinc-900',
     textMuted: isDarkMode ? 'text-zinc-400' : 'text-zinc-500',
     border: isDarkMode ? 'border-zinc-800' : 'border-zinc-200',
-    cardBg: isDarkMode ? 'bg-[#121212]' : 'bg-white',
-    cardHover: isDarkMode ? 'hover:bg-[#1a1a1a]' : 'hover:bg-zinc-50',
-    inputBg: isDarkMode ? 'bg-[#1a1a1a]' : 'bg-zinc-100',
-    headerBg: isDarkMode ? 'bg-[#0a0a0a]/80' : 'bg-white/80',
+    cardBg: isDarkMode ? 'bg-[#111626]' : 'bg-white',
+    cardHover: isDarkMode ? 'hover:bg-[#1a2035]' : 'hover:bg-zinc-50',
+    inputBg: isDarkMode ? 'bg-[#1a2035]' : 'bg-zinc-100',
+    headerBg: isDarkMode ? 'bg-[#0a0d17]/80' : 'bg-white/80',
     accent: isDarkMode ? 'text-white' : 'text-zinc-900',
     accentBg: isDarkMode ? 'bg-zinc-700' : 'bg-zinc-900',
     accentHover: isDarkMode ? 'hover:bg-zinc-600' : 'hover:bg-zinc-800',
@@ -1536,7 +1536,7 @@ export default function App() {
     setHistory(prev => [historyItem, ...prev].slice(0, 100)); // Keep last 100
   };
 
-  const generateChainString = (data: ParsedRateCon, tNum: string, brk: string, tm: string, format: 'standard' | 'alternative' = 'standard') => {
+  const generateChainString = (data: ParsedRateCon, tNum: string, brk: string, tm: string, format: 'standard' | 'alternative' | 'alt2' = 'standard') => {
     // Logic: [EMOJI] [TRUCK#]-[LANE]-[DATE] [BROKER] [LOAD#]
     
     // Team Emoji
@@ -1570,6 +1570,11 @@ export default function App() {
 
     if (format === 'alternative') {
        return `${emoji ? emoji + " " : ""}TRUCK# ${tNum}-${lane}-${date} ${brk} LOAD# ${loadNum}`;
+    }
+
+    if (format === 'alt2') {
+       // Example: 🟢 TRUCK #1021 OH-IN 04.17.2026 PLS LOAD #32067460
+       return `${emoji ? emoji + " " : ""}TRUCK #${tNum} ${lane} ${date} ${brk} LOAD #${loadNum}`;
     }
 
     const chain = `${emoji ? emoji + " " : ""}${tNum}-${lane}-${date} ${brk} LOAD ${loadNum}`;
@@ -1948,20 +1953,20 @@ export default function App() {
 
       {isDarkMode && (
         <div className="atmospheric-bg">
-          <div className="atmosphere-orb w-[600px] h-[600px] bg-zinc-600/10 -top-[200px] -left-[100px]" />
-          <div className="atmosphere-orb w-[500px] h-[500px] bg-zinc-800/10 bottom-[10%] -right-[100px]" style={{ animationDelay: '-5s' }} />
-          <div className="atmosphere-orb w-[400px] h-[400px] bg-zinc-700/5 top-[40%] left-[20%]" style={{ animationDelay: '-12s' }} />
+          <div className="atmosphere-orb w-[600px] h-[600px] bg-blue-900/10 -top-[200px] -left-[100px]" />
+          <div className="atmosphere-orb w-[500px] h-[500px] bg-slate-800/10 bottom-[10%] -right-[100px]" style={{ animationDelay: '-5s' }} />
+          <div className="atmosphere-orb w-[400px] h-[400px] bg-indigo-950/5 top-[40%] left-[20%]" style={{ animationDelay: '-12s' }} />
         </div>
       )}
       <AnimatePresence>
         {isLoading && <LoadingScreen isDarkMode={isDarkMode} />}
       </AnimatePresence>
-      <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#27272a" : "#d4d4d8"} />
+      <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#1e2235" : "#d4d4d8"} />
       
       {/* Header */}
       <header className={`border-b ${appState === 'verify' ? 'border-zinc-700' : theme.border} sticky top-0 z-20 ${theme.headerBg} backdrop-blur-md transition-all duration-300 flex-none border-x-0 border-t-0 rounded-none relative`}>
         <div className="w-full px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setAppState('upload')}>
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setHasSeenWelcome(false)}>
             <DakotaLogo className="w-7 h-7" />
             <h1 className={`text-2xl font-geologica font-bold tracking-tight ${theme.text} lowercase`}>dakota</h1>
           </div>
@@ -2246,18 +2251,6 @@ export default function App() {
                 <div className="space-y-4">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 px-1">Preferences</p>
                   
-                  {/* Broker Selector */}
-                  <div className="space-y-2 px-1">
-                    <label className="text-xs font-medium text-zinc-400">Broker</label>
-                    <input 
-                      type="text" 
-                      value={broker}
-                      onChange={(e) => setBroker(e.target.value.toUpperCase())}
-                      className={`w-full bg-transparent border-b ${theme.border} text-sm ${theme.text} focus:outline-none focus:border-zinc-500 font-mono py-1`}
-                      placeholder="BROKER NAME"
-                    />
-                  </div>
-
                   {/* Chain Format Toggle */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
@@ -2275,7 +2268,13 @@ export default function App() {
                         onClick={() => setChainFormat('alternative')}
                         className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alternative' ? 'bg-zinc-800 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
                       >
-                        Alt
+                        Alt 1
+                      </button>
+                      <button 
+                        onClick={() => setChainFormat('alt2')}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alt2' ? 'bg-blue-600 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
+                      >
+                        Alt 2
                       </button>
                     </div>
                   </div>
@@ -2391,27 +2390,6 @@ export default function App() {
 
                 {/* Info Section */}
                 <div className="space-y-4 pt-4 border-t border-white/5">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-zinc-500">
-                      <HelpCircle size={14} />
-                      <p className="text-[10px] font-bold uppercase tracking-widest">Help</p>
-                    </div>
-                    <ul className="text-xs text-zinc-500 space-y-2 leading-relaxed px-1">
-                      <li className="flex gap-2">
-                        <span className="text-zinc-500">•</span>
-                        <span>Upload PDF via sidebar</span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-zinc-500">•</span>
-                        <span>Verify data in wizard</span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="text-zinc-500">•</span>
-                        <span>Copy formatted route</span>
-                      </li>
-                    </ul>
-                  </div>
-
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-zinc-500">
                       <Shield size={14} />

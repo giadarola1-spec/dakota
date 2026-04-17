@@ -141,9 +141,9 @@
 }
 
 .dark {
-  --background: oklch(0.08 0 0); /* Very dark grey, not total black */
+  --background: oklch(0.08 0.01 260); /* Very dark blue-ish tint */
   --foreground: oklch(0.98 0 0);
-  --card: oklch(0.12 0 0);
+  --card: oklch(0.12 0.01 260);
   --card-foreground: oklch(0.98 0 0);
   --popover: oklch(0.12 0 0);
   --popover-foreground: oklch(0.98 0 0);
@@ -219,7 +219,7 @@
     inset: 0;
     z-index: -1;
     overflow: hidden;
-    background: #080808;
+    background: #0a0d17;
   }
 
   .custom-scrollbar::-webkit-scrollbar {

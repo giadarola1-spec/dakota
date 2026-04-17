@@ -46,36 +46,35 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
   isDarkMode,
   theme
 }) => {
-  const [showWhatIsThis, setShowWhatIsThis] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
+  const [view, setView] = useState<'home' | 'about' | 'demo'>('home');
 
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.05, filter: 'blur(20px)' }}
-      className="fixed inset-0 z-[200] bg-zinc-950 text-white overflow-y-auto overflow-x-hidden font-sans"
+      className="fixed inset-0 z-[200] bg-[#0a0d17] text-white overflow-y-auto overflow-x-hidden font-sans"
     >
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full bg-zinc-950/80 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto rounded-b-2xl shadow-2xl">
+      <header className="sticky top-0 z-50 w-full bg-[#0a0d17]/80 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto rounded-b-2xl shadow-2xl">
         <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2 cursor-pointer">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => { if (view === 'home') window.location.reload(); else setView('home'); }}>
             <DakotaLogo className="w-7 h-7" />
             <span className="text-xl font-geologica font-bold tracking-tight text-white lowercase">dakota</span>
           </div>
           
           <nav className="hidden md:flex items-center gap-6 ml-4">
             <button 
-              onClick={() => { setShowWhatIsThis(true); setShowTutorial(false); }}
-              className="text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+              onClick={() => setView('about')}
+              className={`text-sm font-medium transition-colors ${view === 'about' ? 'text-white underline underline-offset-8' : 'text-zinc-400 hover:text-white'}`}
             >
               What is this
             </button>
             <button 
-              onClick={() => { setShowTutorial(true); setShowWhatIsThis(false); }}
-              className="text-sm font-medium text-zinc-400 hover:text-white transition-colors"
+              onClick={() => setView('demo')}
+              className={`text-sm font-medium transition-colors ${view === 'demo' ? 'text-white underline underline-offset-8' : 'text-zinc-400 hover:text-white'}`}
             >
-              Tutorial
+              Demo
             </button>
           </nav>
         </div>
@@ -90,120 +89,151 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
         </div>
       </header>
 
-      {/* Hero Section */}
-      <main className="max-w-7xl mx-auto px-6 pt-24 pb-32 text-center relative">
-        {/* Information Modals / Overlays */}
-        <AnimatePresence>
-          {showWhatIsThis && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="absolute inset-x-6 top-24 z-40 max-w-2xl mx-auto bg-zinc-900 border border-white/10 p-8 rounded-[32px] shadow-2xl text-left"
+      {/* Main Content Area */}
+      <main className="max-w-7xl mx-auto px-6 pt-24 pb-32 relative">
+        <AnimatePresence mode="wait">
+          {view === 'home' && (
+            <motion.div
+              key="home"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
             >
-              <div className="flex justify-between items-start mb-6">
-                <h3 className="text-2xl font-bold">What is this?</h3>
-                <button onClick={() => setShowWhatIsThis(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
-                  <X size={20} />
-                </button>
+              <div className="text-center mb-24">
+                <motion.h1 
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                  className="text-6xl md:text-8xl font-bold text-white tracking-[-0.03em] mb-8"
+                >
+                  Bill and dispatch faster.
+                </motion.h1>
+                
+                <div className="flex flex-col items-center gap-12">
+                  <p className="text-xl text-zinc-400 max-w-2xl mx-auto font-light leading-relaxed">
+                    Precision Logistics Automation. <span className="text-white font-medium">Engineered for speed.</span>
+                  </p>
+                </div>
               </div>
-              <p className="text-zinc-400 text-lg leading-relaxed">
-                Dakota is a regex parsing formatter used to bill and dispatch faster the Traffix ratecons, 
-                making the workflow for the tracer quicker, saving you time for other tasks.
-              </p>
+
+              <div className="relative h-[600px] w-full rounded-[48px] border border-white/5 bg-zinc-900/50 overflow-hidden group">
+                <DottedMapBackground className="opacity-20 !scale-125" color="#ffffff" glow={false} />
+              </div>
             </motion.div>
           )}
 
-          {showTutorial && (
+          {view === 'about' && (
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="absolute inset-x-6 top-24 z-40 max-w-2xl mx-auto bg-zinc-900 border border-white/10 p-8 rounded-[32px] shadow-2xl text-left"
+              key="about"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="max-w-4xl mx-auto py-12 text-left space-y-16"
             >
-              <div className="flex justify-between items-start mb-6">
-                <h3 className="text-2xl font-bold">Tutorial</h3>
-                <button onClick={() => setShowTutorial(false)} className="p-2 hover:bg-white/5 rounded-full transition-colors">
-                  <X size={20} />
+              <div className="space-y-6">
+                <button 
+                  onClick={() => setView('home')}
+                  className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-8 group"
+                >
+                  <ArrowRight size={18} className="rotate-180 group-hover:-translate-x-1 transition-transform" />
+                  <span className="text-sm font-bold uppercase tracking-widest leading-none">Back to Home</span>
                 </button>
+                <h2 className="text-5xl font-bold text-white tracking-tight">The Dakota Regex Engine</h2>
+                <p className="text-2xl text-zinc-400 font-light leading-relaxed">
+                  Dakota is a precision-engineered parsing platform built exclusively for Traffix Rate Confirmations. Dakota does not use AI, ensuring 100% accuracy in data extraction through deterministic regex logic.
+                </p>
               </div>
-              <div className="space-y-4 text-zinc-400 text-lg">
-                <p>Learn how to use the app in 3 simple steps:</p>
-                <ul className="list-disc list-inside space-y-2 ml-4">
-                  <li>Upload your Traffix rate confirmation PDF.</li>
-                  <li>Verify the automatically parsed data fields.</li>
-                  <li>Generate your finalized chain or email template instantly.</li>
-                </ul>
-                <p className="mt-6 text-sm italic">Tactical efficiency for modern logistics.</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <div className="p-8 rounded-[32px] bg-white/[0.03] border border-white/5 space-y-4">
+                  <div className="w-12 h-12 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center border border-blue-600/20">
+                    <Zap size={24} />
+                  </div>
+                  <h3 className="text-xl font-bold text-white">No AI Hallucinations</h3>
+                  <p className="text-zinc-500 leading-relaxed">
+                    By avoiding Large Language Models, Dakota eliminates "guessing." The engine follows strict rulesets defined by the Traffix document structure, providing zero-error parsing.
+                  </p>
+                </div>
+
+                <div className="p-8 rounded-[32px] bg-white/[0.03] border border-white/5 space-y-4">
+                  <div className="w-12 h-12 bg-emerald-600/10 text-emerald-500 rounded-2xl flex items-center justify-center border border-emerald-600/20">
+                    <Search size={24} />
+                  </div>
+                  <h3 className="text-xl font-bold text-white">Tracer-Centric Design</h3>
+                  <p className="text-zinc-500 leading-relaxed">
+                    We built Dakota to solve the manual entry bottleneck. By automating the extraction of multi-stop coordinates, tracers can focus on other tasks.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {view === 'demo' && (
+            <motion.div 
+              key="demo"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="max-w-5xl mx-auto py-12 text-left space-y-20"
+            >
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+                <div className="space-y-4">
+                  <button 
+                    onClick={() => setView('home')}
+                    className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-4 group"
+                  >
+                    <ArrowRight size={18} className="rotate-180 group-hover:-translate-x-1 transition-transform" />
+                    <span className="text-sm font-bold uppercase tracking-widest leading-none">Back</span>
+                  </button>
+                  <h2 className="text-6xl font-bold text-white tracking-tighter">Demo & Functionality</h2>
+                  <p className="text-xl text-zinc-500 font-medium">A detailed look at the Dakota Tactical Environment.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-10 rounded-[40px] bg-zinc-900 border border-white/5 space-y-6">
+                  <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center text-white">
+                    <Zap size={28} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">Precise Parsing</h3>
+                  <p className="text-zinc-500 leading-relaxed">
+                    Identifies multi-stop routes, distinguishes between pickup/delivery times, and extracts weight/rates with 100% precision.
+                  </p>
+                </div>
+
+                <div className="p-10 rounded-[40px] bg-zinc-900 border border-white/5 space-y-6">
+                  <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center text-white">
+                    <FileText size={28} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">Alternative Formats</h3>
+                  <p className="text-zinc-500 leading-relaxed">
+                    Toggle between Standard and Alternative chain/notes formatting to match specific broker requirements instantly.
+                  </p>
+                </div>
+
+                <div className="p-10 rounded-[40px] bg-zinc-900 border border-white/5 space-y-6">
+                  <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center text-white">
+                    <Bot size={28} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">Team & Truck Saving</h3>
+                  <p className="text-zinc-500 leading-relaxed">
+                    Quickly select team colors and save frequently used truck numbers to local storage for instant reuse.
+                  </p>
+                </div>
+
+                <div className="p-10 rounded-[40px] bg-zinc-900 border border-white/5 space-y-6">
+                  <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center text-white">
+                    <Search size={28} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">Address Logic</h3>
+                  <p className="text-zinc-500 leading-relaxed">
+                    Toggle between Full Address or City/Zip modes. Dakota automatically cleans suite info and isolates location data.
+                  </p>
+                </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-
-        <div className="mb-24">
-          <motion.h1 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="text-6xl md:text-8xl font-bold text-white tracking-[-0.03em] mb-8"
-          >
-            Bill and dispatch faster.
-          </motion.h1>
-          
-          <div className="flex flex-col items-center gap-12">
-            <p className="text-xl text-zinc-400 max-w-2xl mx-auto font-light leading-relaxed">
-              Experience the next generation of logistics automation. Designed for performance, built for your team.
-            </p>
-            
-            <div className="flex items-center gap-3 p-1.5 bg-white/5 rounded-full border border-white/10 shadow-inner">
-              {[
-                { id: 'none', label: 'None', color: 'bg-zinc-800' },
-                { id: 'green', label: '🟢', color: 'bg-emerald-500' },
-                { id: 'purple', label: '🟣', color: 'bg-purple-500' },
-                { id: 'red', label: '🔴', color: 'bg-red-500' },
-                { id: 'blue', label: '🔵', color: 'bg-blue-500' },
-              ].map((t) => (
-                <button 
-                  key={t.id}
-                  onClick={() => setTeam(t.id as any)}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all bg-zinc-900 border ${team === t.id ? 'border-white ring-2 ring-white/20' : 'border-transparent opacity-60 hover:opacity-100'}`}
-                  title={t.label}
-                >
-                   {t.id === 'none' ? <X size={14} className="text-zinc-500" /> : <span className="text-lg">{t.label}</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Tactical Map Display (Replaced Cards) */}
-        <div className="relative h-[600px] w-full rounded-[48px] border border-white/5 bg-zinc-900/50 overflow-hidden group">
-          <DottedMapBackground className="opacity-20 !scale-125" color="#ffffff" glow={false} />
-          
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.5 }}
-              className="space-y-6 max-w-xl"
-            >
-              <div className="w-16 h-16 bg-blue-600/10 text-blue-500 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-blue-600/20">
-                <Zap size={32} />
-              </div>
-              <h4 className="text-3xl font-bold text-white mb-4">Tactical Data Environment</h4>
-              <p className="text-zinc-500 text-lg leading-relaxed">
-                Your Traffix rate confirmations are processed through a specialized regex parsing engine, 
-                eliminating manual entry and streamlining the billing workflow for the tracer.
-              </p>
-            </motion.div>
-          </div>
-          
-          {/* Decorative Corner Accents */}
-          <div className="absolute top-8 left-8 text-[10px] font-mono text-white/20 uppercase tracking-[0.3em]">System.Active.0410</div>
-          <div className="absolute bottom-8 right-8 text-[10px] font-mono text-white/20 uppercase tracking-[0.3em] flex items-center gap-2">
-            Status: Nominal <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          </div>
-        </div>
       </main>
 
       {/* Footer Area */}
@@ -215,32 +245,8 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
               <span className="text-xl font-geologica font-bold tracking-tight text-white lowercase">dakota</span>
             </div>
             <p className="text-zinc-500 text-sm leading-relaxed max-w-xs mb-8">
-              The world's first tactical logistics billing agent. Built for scale, designed for speed.
+              Designed for billing large scale traffix rate confirmations. Built for speed.
             </p>
-          </div>
-          <div className="space-y-4">
-            <h6 className="font-bold text-xs uppercase tracking-widest text-zinc-600">Infrastructure</h6>
-            <ul className="space-y-2 text-sm text-zinc-500">
-              <li className="hover:text-white cursor-pointer transition-colors">Regex Engine</li>
-              <li className="hover:text-white cursor-pointer transition-colors">Parsing Layer</li>
-              <li className="hover:text-white cursor-pointer transition-colors">Tracer Sync</li>
-            </ul>
-          </div>
-          <div className="space-y-4">
-            <h6 className="font-bold text-xs uppercase tracking-widest text-zinc-600">Organization</h6>
-            <ul className="space-y-2 text-sm text-zinc-500">
-              <li className="hover:text-white cursor-pointer transition-colors">Intelligence</li>
-              <li className="hover:text-white cursor-pointer transition-colors">Operations</li>
-              <li className="hover:text-white cursor-pointer transition-colors">Privacy</li>
-            </ul>
-          </div>
-          <div className="space-y-4">
-            <h6 className="font-bold text-xs uppercase tracking-widest text-zinc-600">Tactical Teams</h6>
-            <ul className="space-y-2 text-sm text-zinc-500">
-              <li className="flex items-center gap-2 hover:text-emerald-500 cursor-pointer">🟢 Green Team</li>
-              <li className="flex items-center gap-2 hover:text-purple-500 cursor-pointer">🟣 Purple Team</li>
-              <li className="flex items-center gap-2 hover:text-red-500 cursor-pointer">🔴 Red Team</li>
-            </ul>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-white/5 flex justify-between items-center text-zinc-600">
