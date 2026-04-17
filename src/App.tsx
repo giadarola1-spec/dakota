@@ -1018,7 +1018,8 @@ export default function App() {
   const [truckNumber, setTruckNumber] = useState("TRUCK#");
   const [savedTrucks, setSavedTrucks] = useLocalStorage<string[]>("dakota_savedTrucks", []);
   const [broker, setBroker] = useLocalStorage<string>("dakota_broker", "TRAFFIX");
-  const [chainFormat, setChainFormat] = useLocalStorage<'standard' | 'alternative' | 'alt2'>("dakota_chainFormat", "standard");
+  const [chainFormat, setChainFormat] = useLocalStorage<'standard' | 'alternative' | 'alt2' | 'alt3'>("dakota_chainFormat", "standard");
+  const [notesFormat, setNotesFormat] = useLocalStorage<'standard' | 'alternative'>("dakota_notesFormat", "standard");
   const [chainText, setChainText] = useState("");
   const [copiedChain, setCopiedChain] = useState(false);
   const [renameText, setRenameText] = useState("");
@@ -1536,7 +1537,7 @@ export default function App() {
     setHistory(prev => [historyItem, ...prev].slice(0, 100)); // Keep last 100
   };
 
-  const generateChainString = (data: ParsedRateCon, tNum: string, brk: string, tm: string, format: 'standard' | 'alternative' | 'alt2' = 'standard') => {
+  const generateChainString = (data: ParsedRateCon, tNum: string, brk: string, tm: string, format: 'standard' | 'alternative' | 'alt2' | 'alt3' = 'standard') => {
     // Logic: [EMOJI] [TRUCK#]-[LANE]-[DATE] [BROKER] [LOAD#]
     
     // Team Emoji
@@ -1577,6 +1578,11 @@ export default function App() {
        return `${emoji ? emoji + " " : ""}TRUCK #${tNum} ${lane} ${date} ${brk} LOAD #${loadNum}`;
     }
 
+    if (format === 'alt3') {
+       // Example: 🟢 TRUCK 1011 LA-MA-04.17.2026 TRAFFIX LOAD# T01480351
+       return `${emoji ? emoji + " " : ""}TRUCK ${tNum} ${lane}-${date} ${brk} LOAD# ${loadNum}`;
+    }
+
     const chain = `${emoji ? emoji + " " : ""}${tNum}-${lane}-${date} ${brk} LOAD ${loadNum}`;
     return chain;
   };
@@ -1609,21 +1615,33 @@ export default function App() {
       
       // Update notes with new chain (replace last line)
       setNotesText(prev => {
-        let notes = `W${extractedData.weight || "?"}\n`;
-        if (extractedData.stops && extractedData.stops.length > 0) {
-          extractedData.stops.forEach(s => {
-            const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
-            const label = s.label.match(/\d+/)?.[0] || "";
-            notes += `${prefix}${label ? ' ' + label : ''} ${s.time || "?"}\n`;
-          });
+        let notes = "";
+        
+        const stops = extractedData.stops && extractedData.stops.length > 0 
+          ? extractedData.stops.map(s => {
+              const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
+              const label = s.label.match(/\d+/)?.[0] || "";
+              return `${prefix}${label ? ' ' + label : ''} ${s.time || "?"}`;
+            }).join('\n') + '\n'
+          : `PU ${extractedData.pickupTime || "?"}\nDEL ${extractedData.deliveryTime || "?"}\n`;
+
+        const weight = `W ${extractedData.weight || "?"}LB\n`;
+        const loadNum = extractedData.loadNumber && broker.toUpperCase() === 'TRAFFIX' && !extractedData.loadNumber.startsWith('T') 
+          ? `T${extractedData.loadNumber}` 
+          : extractedData.loadNumber;
+
+        if (notesFormat === 'alternative') {
+          // Alternative Style: Stops -> Weight -> Load#
+          notes = stops + weight + loadNum;
         } else {
-          notes += `PU ${extractedData.pickupTime || "?"}\nDEL ${extractedData.deliveryTime || "?"}\n`;
+          // Standard Style: Weight -> Stops -> Chain
+          notes = `W${extractedData.weight || "?"}\n` + stops + chain;
         }
-        notes += chain;
+        
         return notes;
       });
     }
-  }, [truckNumber, broker, extractedData, team, isViewingHistory, appState, chainFormat]);
+  }, [truckNumber, broker, extractedData, team, isViewingHistory, appState, chainFormat, notesFormat]);
 
   useEffect(() => {
     if (appState === 'results' && extractedData && !isViewingHistory) {
@@ -2275,6 +2293,34 @@ export default function App() {
                         className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alt2' ? 'bg-blue-600 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
                       >
                         Alt 2
+                      </button>
+                      <button 
+                        onClick={() => setChainFormat('alt3')}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alt3' ? 'bg-indigo-600 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
+                      >
+                        Alt 3
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Notes Format Toggle */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-xs font-medium text-zinc-400">Notes Style</span>
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase">{notesFormat}</span>
+                    </div>
+                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-100'} border ${theme.border}`}>
+                      <button 
+                        onClick={() => setNotesFormat('standard')}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${notesFormat === 'standard' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-400'}`}
+                      >
+                        Std
+                      </button>
+                      <button 
+                        onClick={() => setNotesFormat('alternative')}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${notesFormat === 'alternative' ? 'bg-zinc-800 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
+                      >
+                        Alt
                       </button>
                     </div>
                   </div>
