@@ -4,9 +4,10 @@ import DottedMap from 'dotted-map';
 interface DottedMapBackgroundProps {
   className?: string;
   color?: string;
+  glow?: boolean;
 }
 
-export function DottedMapBackground({ className, color = "currentColor" }: DottedMapBackgroundProps) {
+export function DottedMapBackground({ className, color = "currentColor", glow = true }: DottedMapBackgroundProps) {
   const svgMap = useMemo(() => {
     try {
       const map = new DottedMap({ height: 60, grid: "diagonal" });
@@ -29,31 +30,33 @@ export function DottedMapBackground({ className, color = "currentColor" }: Dotte
     <div 
       className={`absolute inset-0 z-0 overflow-hidden pointer-events-none ${className}`}
     >
-      {/* Base Map (Dim) */}
+      {/* Base Map */}
       <div 
-        className="absolute inset-0 opacity-10 transition-opacity duration-500"
+        className={`absolute inset-0 ${glow ? 'opacity-10' : 'opacity-100'} transition-opacity duration-500`}
         style={{
           backgroundImage: svgMap,
           backgroundRepeat: svgMap.startsWith('url') ? 'no-repeat' : 'repeat',
           backgroundPosition: 'center',
           backgroundSize: svgMap.startsWith('url') ? 'contain' : '20px 20px',
-          maskImage: 'radial-gradient(circle at center, black 40%, transparent 100%)',
-          WebkitMaskImage: 'radial-gradient(circle at center, black 40%, transparent 100%)'
+          maskImage: glow ? 'radial-gradient(circle at center, black 40%, transparent 100%)' : 'none',
+          WebkitMaskImage: glow ? 'radial-gradient(circle at center, black 40%, transparent 100%)' : 'none'
         }}
       />
 
       {/* Illuminated Layer (Follows Mouse) */}
-      <div 
-        className="absolute inset-0 opacity-80 transition-opacity duration-300"
-        style={{
-          backgroundImage: svgMap,
-          backgroundRepeat: svgMap.startsWith('url') ? 'no-repeat' : 'repeat',
-          backgroundPosition: 'center',
-          backgroundSize: svgMap.startsWith('url') ? 'contain' : '20px 20px',
-          maskImage: `radial-gradient(circle 200px at var(--mouse-x) var(--mouse-y), black 0%, transparent 80%)`,
-          WebkitMaskImage: `radial-gradient(circle 200px at var(--mouse-x) var(--mouse-y), black 0%, transparent 80%)`
-        }}
-      />
+      {glow && (
+        <div 
+          className="absolute inset-0 opacity-80 transition-opacity duration-300"
+          style={{
+            backgroundImage: svgMap,
+            backgroundRepeat: svgMap.startsWith('url') ? 'no-repeat' : 'repeat',
+            backgroundPosition: 'center',
+            backgroundSize: svgMap.startsWith('url') ? 'contain' : '20px 20px',
+            maskImage: `radial-gradient(circle 200px at var(--mouse-x) var(--mouse-y), black 0%, transparent 80%)`,
+            WebkitMaskImage: `radial-gradient(circle 200px at var(--mouse-x) var(--mouse-y), black 0%, transparent 80%)`
+          }}
+        />
+      )}
     </div>
   );
 }

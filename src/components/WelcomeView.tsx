@@ -1,6 +1,20 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { ChevronRight, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  ChevronRight, 
+  X, 
+  Search, 
+  MessageSquare, 
+  Zap, 
+  Bot, 
+  ArrowRight,
+  Play,
+  FileText,
+  Clock,
+  ShieldCheck,
+  ChevronDown
+} from 'lucide-react';
+import { DottedMapBackground } from './DottedMapBackground';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">
@@ -18,6 +32,13 @@ interface WelcomeViewProps {
   theme: any;
 }
 
+const NavLink = ({ children, active = false }: { children: React.ReactNode, active?: boolean }) => (
+  <button className={`flex items-center gap-1 text-sm font-medium ${active ? 'text-zinc-900' : 'text-zinc-500'} hover:text-zinc-900 transition-colors px-3 py-1.5 rounded-lg hover:bg-zinc-50`}>
+    {children}
+    <ChevronDown size={14} className="opacity-40" />
+  </button>
+);
+
 export const WelcomeView: React.FC<WelcomeViewProps> = ({
   onGetStarted,
   team,
@@ -25,53 +46,92 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
   isDarkMode,
   theme
 }) => {
-  React.useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, []);
+  const [activeFeature, setActiveFeature] = useState(0);
+
+  const features = [
+    {
+      title: "Automate repetitive work",
+      description: "Let Dakota handle the data entry from your rate confirmations.",
+      icon: <Zap className="w-5 h-5" />,
+      tag: "New",
+      details: [
+        { name: "Emily", text: "How do I process this load?", reply: "Just drag the PDF into Dakota." },
+        { name: "Catherine", text: "Is the rate captured correctly?", reply: "100% accuracy on standard fields." },
+        { name: "Stephanie", text: "Can we link the ELD?", reply: "Yes, fully integrated." }
+      ]
+    },
+    {
+      title: "Q&A agents",
+      description: "Ask questions instantly using knowledge you already have.",
+      icon: <Search className="w-5 h-5" />,
+    },
+    {
+      title: "Task routing",
+      description: "Assign loads and tasks with tactical precision.",
+      icon: <Bot className="w-5 h-5" />,
+    },
+    {
+      title: "Reporting",
+      description: "Full visibility into your team's tactical performance.",
+      icon: <FileText className="w-5 h-5" />,
+    }
+  ];
 
   return (
     <motion.div 
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0, x: -100, filter: 'blur(10px)' }}
-      transition={{ duration: 0.8, ease: "easeInOut" }}
-      className="fixed inset-0 z-[200] flex bg-background overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 1.05, filter: 'blur(20px)' }}
+      className="fixed inset-0 z-[200] bg-white overflow-y-auto overflow-x-hidden font-sans"
     >
-      {/* 20% Left Sidebar: Interactive Content */}
-      <div className="w-full lg:w-[20%] h-full bg-background flex flex-col p-8 md:p-12 relative z-10 shadow-[20px_0_50px_rgba(0,0,0,0.05)]">
-        {/* Header with Logo */}
-        <div className="flex items-center gap-4 mb-20">
-          <div className="p-2 bg-zinc-50 rounded-xl border border-zinc-100/50">
-            <DakotaLogo className="w-8 h-8" />
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-zinc-100 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto rounded-b-2xl shadow-sm">
+        <div className="flex items-center gap-8">
+          <div className="flex items-center gap-2 cursor-pointer">
+            <DakotaLogo className="w-7 h-7" />
+            <span className="text-xl font-geologica font-bold tracking-tight text-zinc-900 lowercase">dakota</span>
           </div>
-          <div>
-            <h1 className="text-2xl font-geologica font-bold tracking-tight text-zinc-900 lowercase">dakota</h1>
-            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-400" style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}>STABLE 0410</p>
-          </div>
+          
+          <nav className="hidden md:flex items-center gap-2">
+            <NavLink>What is this</NavLink>
+            <button onClick={onGetStarted} className="flex items-center gap-1 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors px-3 py-1.5 rounded-lg hover:bg-zinc-50">
+              Start Billing
+              <ChevronDown size={14} className="opacity-40" />
+            </button>
+            <NavLink>Tutorial</NavLink>
+          </nav>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+        <div className="flex items-center gap-4">
+          <button className="text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors px-4 py-2">Log in</button>
+          <button 
+            onClick={onGetStarted}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm shadow-sm transition-all"
           >
-            <h2 className="text-4xl font-display font-medium text-zinc-900 mb-6 leading-tight">
-              Billing made faster. <br />
-              <span className="text-zinc-500">200% faster.</span>
-            </h2>
-            <p className="text-base text-zinc-500 font-light mb-12 leading-relaxed">
-              Automate your rate confirmation processing with tactical precision.
-            </p>
-          </motion.div>
+            Start Billing
+          </button>
+        </div>
+      </header>
 
-          {/* Team Selector */}
-          <div className="space-y-4 mb-12">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 px-1">Tactical Unit</p>
-            <div className="flex items-center gap-3">
+      {/* Hero Section */}
+      <main className="max-w-7xl mx-auto px-6 pt-24 pb-32">
+        <div className="text-center mb-24">
+          <motion.h1 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="text-6xl md:text-8xl font-bold text-zinc-900 tracking-[-0.03em] mb-8"
+          >
+            Bill and dispatch faster.
+          </motion.h1>
+          
+          {/* Team Selector Sub-Hero */}
+          <div className="flex flex-col items-center gap-6">
+            <p className="text-xl text-zinc-500 max-w-2xl mx-auto font-light leading-relaxed">
+              Experience the next generation of logistics automation. Designed for performance, built for your team.
+            </p>
+            
+            <div className="flex items-center gap-3 p-1.5 bg-zinc-100 rounded-full border border-zinc-200 shadow-inner">
               {[
                 { id: 'none', label: 'None', color: 'bg-zinc-200' },
                 { id: 'green', label: '🟢', color: 'bg-emerald-500' },
@@ -82,104 +142,186 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
                 <button 
                   key={t.id}
                   onClick={() => setTeam(t.id as any)}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border-2 ${team === t.id ? 'border-zinc-900 scale-110 shadow-lg shadow-zinc-900/10' : 'border-zinc-100 opacity-60 hover:opacity-100 hover:border-zinc-200'}`}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all bg-white shadow-sm border ${team === t.id ? 'border-zinc-900 ring-2 ring-zinc-500/20' : 'border-transparent opacity-60 hover:opacity-100'}`}
                   title={t.label}
                 >
-                   {t.id === 'none' ? 
-                     <div className="w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center"><X size={12} className="text-zinc-400" /></div> : 
-                     <span className="text-xl leading-none">{t.id === 'none' ? '' : t.label}</span>
-                   }
+                   {t.id === 'none' ? <X size={14} className="text-zinc-400" /> : <span className="text-lg">{t.label}</span>}
                 </button>
               ))}
             </div>
           </div>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onGetStarted}
-            className="w-full py-5 bg-zinc-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-zinc-900/10 hover:shadow-zinc-900/20 transition-all flex items-center justify-center gap-2 group"
-          >
-            Get Started
-            <ChevronRight className="group-hover:translate-x-1 transition-transform" />
-          </motion.button>
         </div>
 
-        {/* Footer */}
-        <div className="mt-auto pt-8 border-t border-zinc-100 flex flex-col gap-1">
-          <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
-            Dakota Intelligence Systems © 2026
-          </p>
-          <p className="text-[10px] font-bold text-zinc-500/60 uppercase tracking-widest flex items-center gap-1.5">
-            Made in green team <span className="text-emerald-500">💚</span>
-          </p>
-        </div>
-      </div>
+        {/* Feature Showcase Box (The "Notion" Block) */}
+        <div className="bg-[#fff9f4] rounded-[32px] border border-zinc-100 shadow-xl overflow-hidden flex flex-col lg:flex-row relative">
+          {/* Left Feature Sidebar */}
+          <div className="w-full lg:w-[400px] p-8 bg-white border-r border-zinc-50 space-y-2">
+            {features.map((f, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveFeature(i)}
+                className={`w-full text-left p-6 rounded-2xl transition-all group relative ${activeFeature === i ? 'bg-[#f6f6f6]' : 'hover:bg-zinc-50'}`}
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`p-2 rounded-lg ${activeFeature === i ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-500 group-hover:bg-zinc-200 transition-colors'}`}>
+                    {f.icon}
+                  </div>
+                  {f.tag && <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-full uppercase tracking-wider">{f.tag}</span>}
+                  <span className={`font-bold text-lg ${activeFeature === i ? 'text-zinc-900' : 'text-zinc-500'}`}>{f.title}</span>
+                </div>
+                {activeFeature === i && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-4"
+                  >
+                    <p className="text-zinc-500 text-sm leading-relaxed">{f.description}</p>
+                    <ArrowRight className="w-5 h-5 text-zinc-900" />
+                  </motion.div>
+                )}
+              </button>
+            ))}
+          </div>
 
-      {/* 80% Right: Decorative Background Inspired by MongoDB UI */}
-      <div className="hidden lg:flex flex-1 lg:w-[80%] relative bg-[#0a0a0a] overflow-hidden">
-        {/* Large Decorative SVG Background (Masked Shapes) */}
-        <div className="absolute inset-0 z-0">
-          <svg className="w-full h-full opacity-30" viewBox="0 0 1000 1000" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style={{ stopColor: '#1a1a1a', stopOpacity: 0.8 }} />
-                <stop offset="100%" style={{ stopColor: '#2a2a2a', stopOpacity: 0.4 }} />
-              </linearGradient>
-            </defs>
-            <path d="M 0,0 L 1000,0 L 1000,1000 L 0,1000 Z" fill="url(#grad1)" />
-          </svg>
+          {/* Right Showcase area */}
+          <div className="flex-1 min-h-[500px] relative p-12 flex items-center justify-center overflow-hidden bg-[#fff9f4]">
+            <DottedMapBackground className="opacity-[0.05] !scale-150 rotate-12" color="#000000" glow={false} />
+            
+            <AnimatePresence mode="wait">
+              <motion.div 
+                key={activeFeature}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="relative z-10 w-full max-w-lg space-y-4"
+              >
+                {activeFeature === 0 ? (
+                  <>
+                    {features[0].details?.map((d, i) => (
+                      <motion.div 
+                        key={i}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="bg-white p-5 rounded-2xl shadow-lg border border-zinc-100 flex items-start gap-4"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center flex-none">
+                          <span className="text-zinc-400 font-bold text-xs">{d.name[0]}</span>
+                        </div>
+                        <div className="space-y-1 flex-1">
+                          <p className="text-sm font-bold text-zinc-900">{d.name}</p>
+                          <p className="text-sm text-zinc-500">{d.text}</p>
+                          <div className="flex items-center gap-1.5 mt-2 bg-blue-50 text-blue-600 w-fit px-2 py-1 rounded-lg">
+                            <MessageSquare className="w-3 h-3" />
+                            <span className="text-[10px] font-bold">1 reply</span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </>
+                ) : (
+                  <div className="bg-white aspect-video rounded-3xl shadow-2xl border border-zinc-100 flex items-center justify-center group cursor-pointer overflow-hidden relative">
+                    <div className="absolute inset-0 bg-zinc-900/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
+                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-xl">
+                        <Play className="fill-blue-600 text-blue-600 translate-x-0.5" />
+                      </div>
+                    </div>
+                    <div className="p-8 text-center space-y-4">
+                      <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        {features[activeFeature].icon}
+                      </div>
+                      <h4 className="text-xl font-bold text-zinc-900">{features[activeFeature].title}</h4>
+                      <p className="text-zinc-500 text-sm">Watch a quick demonstration of how this tactical unit operates.</p>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
 
-        {/* Abstract Floating Symbols (Bracket, Asterisk) */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1 }}
-            className="relative w-full h-full max-w-4xl"
-          >
-            {/* Large Brackets Symbols */}
-            <div className="absolute top-20 right-20 text-[20rem] font-mono font-bold text-white/30 leading-none select-none">
-              {"{ }"}
+        {/* Bottom Benefits Bar */}
+        <div className="mt-24 grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[
+            { 
+              title: "Tactical Precision", 
+              desc: "100% data capturing from complex rate confirmations.", 
+              icon: <ShieldCheck className="text-emerald-500" /> 
+            },
+            { 
+              title: "Zero Delay", 
+              desc: "Millisecond processing times for large document batches.", 
+              icon: <Zap className="text-amber-500" /> 
+            },
+            { 
+              title: "Active Deployment", 
+              desc: "Integrated with your existing dispatch workflows.", 
+              icon: <ArrowRight className="text-blue-500" /> 
+            }
+          ].map((benefit, i) => (
+            <motion.div
+              key={i}
+              whileHover={{ y: -5 }}
+              className="p-8 bg-zinc-50 rounded-2xl border border-zinc-100 flex flex-col gap-4 group cursor-pointer"
+            >
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
+                {benefit.icon}
+              </div>
+              <h5 className="font-bold text-lg text-zinc-900">{benefit.title}</h5>
+              <p className="text-zinc-500 text-sm leading-relaxed">{benefit.desc}</p>
+            </motion.div>
+          ))}
+        </div>
+      </main>
+
+      {/* Full Footer Area */}
+      <footer className="bg-zinc-50 border-t border-zinc-100 py-16">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12">
+          <div className="col-span-2">
+            <div className="flex items-center gap-2 mb-6">
+              <DakotaLogo className="w-6 h-6" />
+              <span className="text-xl font-geologica font-bold tracking-tight text-zinc-900 lowercase">dakota</span>
             </div>
-
-            {/* Asterisk Symbol */}
-            <div className="absolute bottom-10 right-40 text-[15rem] font-bold text-white/30 leading-none select-none rotate-12">
-              *
-            </div>
-
-            {/* Slashes */}
-            <div className="absolute top-40 left-20 text-[10rem] font-mono font-light text-white/30 leading-none select-none -rotate-12">
-              / /
-            </div>
-
-            {/* Geometric Orbs */}
-            <motion.div 
-              animate={{ 
-                y: [0, -30, 0],
-                rotate: [0, 5, 0] 
-              }}
-              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute top-1/2 left-1/4 w-96 h-96 bg-zinc-500/10 rounded-full blur-[100px]" 
-            />
-            <motion.div 
-              animate={{ 
-                x: [0, 20, 0],
-                y: [0, 20, 0] 
-              }}
-              transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute bottom-1/4 left-1/2 w-64 h-64 bg-zinc-300/5 rounded-full blur-[80px]" 
-            />
-          </motion.div>
+            <p className="text-zinc-500 text-sm leading-relaxed max-w-xs mb-8">
+              The world's first tactical logistics billing agent. Built for scale, designed for speed.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <h6 className="font-bold text-xs uppercase tracking-widest text-zinc-400">Product</h6>
+            <ul className="space-y-2 text-sm text-zinc-500 font-medium">
+              <li className="hover:text-zinc-900 cursor-pointer">What is this?</li>
+              <li className="hover:text-zinc-900 cursor-pointer">Rate Indexing</li>
+              <li className="hover:text-zinc-900 cursor-pointer">Team Sync</li>
+            </ul>
+          </div>
+          <div className="space-y-4">
+            <h6 className="font-bold text-xs uppercase tracking-widest text-zinc-400">Company</h6>
+            <ul className="space-y-2 text-sm text-zinc-500 font-medium">
+              <li className="hover:text-zinc-900 cursor-pointer">About</li>
+              <li className="hover:text-zinc-900 cursor-pointer">Contact</li>
+              <li className="hover:text-zinc-900 cursor-pointer">Privacy</li>
+            </ul>
+          </div>
+          <div className="space-y-4">
+            <h6 className="font-bold text-xs uppercase tracking-widest text-zinc-400">Tactical</h6>
+            <ul className="space-y-2 text-sm text-zinc-500 font-medium">
+              <li className="flex items-center gap-2 hover:text-emerald-600 cursor-pointer">
+                Green Team 🟢
+              </li>
+              <li className="flex items-center gap-2 hover:text-purple-600 cursor-pointer">
+                Purple Team 🟣
+              </li>
+              <li className="flex items-center gap-2 hover:text-red-600 cursor-pointer">
+                Red Team 🔴
+              </li>
+            </ul>
+          </div>
         </div>
-
-        
-        {/* Subtle Grid */}
-        <div className="absolute inset-0 opacity-[0.02] pointer-events-none" 
-          style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '60px 60px' }} 
-        />
-      </div>
+        <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-zinc-200">
+          <p className="text-xs text-zinc-400 font-medium uppercase tracking-tighter">Dakota Intelligence Systems © 2026</p>
+        </div>
+      </footer>
     </motion.div>
   );
 };
+

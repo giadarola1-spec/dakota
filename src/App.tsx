@@ -1017,7 +1017,8 @@ export default function App() {
   // Chain State
   const [truckNumber, setTruckNumber] = useState("TRUCK#");
   const [savedTrucks, setSavedTrucks] = useLocalStorage<string[]>("dakota_savedTrucks", []);
-  const broker = "TRAFFIX";
+  const [broker, setBroker] = useLocalStorage<string>("dakota_broker", "TRAFFIX");
+  const [chainFormat, setChainFormat] = useLocalStorage<'standard' | 'alternative'>("dakota_chainFormat", "standard");
   const [chainText, setChainText] = useState("");
   const [copiedChain, setCopiedChain] = useState(false);
   const [renameText, setRenameText] = useState("");
@@ -1287,19 +1288,19 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useLocalStorage("dakota_isDarkMode", true);
   const [isAutoZoomEnabled, setIsAutoZoomEnabled] = useLocalStorage("dakota_isAutoZoomEnabled", true);
-  const [isSimplifiedAddress, setIsSimplifiedAddress] = useLocalStorage("dakota_isSimplifiedAddress", false);
+  const [isSimplifiedAddress, setIsSimplifiedAddress] = useLocalStorage("dakota_isSimplifiedAddress", true);
   const [dragSensitivity, setDragSensitivity] = useLocalStorage("dakota_dragSensitivity", 1.5);
 
   // --- Styles Helper ---
   const theme = React.useMemo(() => ({
-    bg: isDarkMode ? 'bg-[#0a0a0a]' : 'bg-background',
+    bg: isDarkMode ? 'bg-[#0a0a0a]' : 'bg-white',
     text: isDarkMode ? 'text-white' : 'text-zinc-900',
     textMuted: isDarkMode ? 'text-zinc-400' : 'text-zinc-500',
     border: isDarkMode ? 'border-zinc-800' : 'border-zinc-200',
-    cardBg: isDarkMode ? 'bg-[#121212]' : 'bg-background',
+    cardBg: isDarkMode ? 'bg-[#121212]' : 'bg-white',
     cardHover: isDarkMode ? 'hover:bg-[#1a1a1a]' : 'hover:bg-zinc-50',
     inputBg: isDarkMode ? 'bg-[#1a1a1a]' : 'bg-zinc-100',
-    headerBg: isDarkMode ? 'bg-[#0a0a0a]/80' : 'bg-background/80',
+    headerBg: isDarkMode ? 'bg-[#0a0a0a]/80' : 'bg-white/80',
     accent: isDarkMode ? 'text-white' : 'text-zinc-900',
     accentBg: isDarkMode ? 'bg-zinc-700' : 'bg-zinc-900',
     accentHover: isDarkMode ? 'hover:bg-zinc-600' : 'hover:bg-zinc-800',
@@ -1495,7 +1496,7 @@ export default function App() {
     }
     setRouteText(route);
 
-    const chain = generateChainString(data, tNum, broker, team);
+    const chain = generateChainString(data, tNum, broker, team, chainFormat);
     setChainText(chain);
 
     const rename = generateRenameString(data, tNum);
@@ -1535,7 +1536,7 @@ export default function App() {
     setHistory(prev => [historyItem, ...prev].slice(0, 100)); // Keep last 100
   };
 
-  const generateChainString = (data: ParsedRateCon, tNum: string, brk: string, tm: string) => {
+  const generateChainString = (data: ParsedRateCon, tNum: string, brk: string, tm: string, format: 'standard' | 'alternative' = 'standard') => {
     // Logic: [EMOJI] [TRUCK#]-[LANE]-[DATE] [BROKER] [LOAD#]
     
     // Team Emoji
@@ -1567,6 +1568,10 @@ export default function App() {
       loadNum = `T${loadNum}`;
     }
 
+    if (format === 'alternative') {
+       return `${emoji ? emoji + " " : ""}TRUCK# ${tNum}-${lane}-${date} ${brk} LOAD# ${loadNum}`;
+    }
+
     const chain = `${emoji ? emoji + " " : ""}${tNum}-${lane}-${date} ${brk} LOAD ${loadNum}`;
     return chain;
   };
@@ -1591,7 +1596,7 @@ export default function App() {
   // Update chain and notes when dependencies change (if in results view and NOT viewing history)
   useEffect(() => {
     if (appState === 'results' && extractedData && !isViewingHistory) {
-      const chain = generateChainString(extractedData, truckNumber, broker, team);
+      const chain = generateChainString(extractedData, truckNumber, broker, team, chainFormat);
       setChainText(chain);
       
       const rename = generateRenameString(extractedData, truckNumber);
@@ -1613,7 +1618,7 @@ export default function App() {
         return notes;
       });
     }
-  }, [truckNumber, broker, extractedData, team, isViewingHistory, appState]);
+  }, [truckNumber, broker, extractedData, team, isViewingHistory, appState, chainFormat]);
 
   useEffect(() => {
     if (appState === 'results' && extractedData && !isViewingHistory) {
@@ -1871,10 +1876,10 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Broker Info (Fixed to TRAFFIX) */}
+              {/* Broker Info */}
               <div className="flex items-center gap-2 ml-4">
-                <span className={`px-2 py-1 text-xs rounded border bg-zinc-500/10 text-zinc-500 border-zinc-500/30 font-bold`}>
-                  TRAFFIX
+                <span className={`px-2 py-1 text-xs rounded border bg-zinc-500/10 text-zinc-500 border-zinc-500/30 font-bold uppercase`}>
+                  {broker}
                 </span>
               </div>
             </div>
@@ -1954,7 +1959,7 @@ export default function App() {
       <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#27272a" : "#d4d4d8"} />
       
       {/* Header */}
-      <header className={`border-b ${appState === 'verify' ? 'border-zinc-700' : theme.border} sticky top-0 z-20 ${theme.headerBg} transition-all duration-300 flex-none border-x-0 border-t-0 rounded-none relative`}>
+      <header className={`border-b ${appState === 'verify' ? 'border-zinc-700' : theme.border} sticky top-0 z-20 ${theme.headerBg} backdrop-blur-md transition-all duration-300 flex-none border-x-0 border-t-0 rounded-none relative`}>
         <div className="w-full px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setAppState('upload')}>
             <DakotaLogo className="w-7 h-7" />
@@ -2023,14 +2028,23 @@ export default function App() {
       </div>
 
       {/* Progress Bar Line */}
-      {appState === 'verify' && (
-        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/10 dark:bg-zinc-800 overflow-hidden">
+      {(appState === 'verify' || appState === 'results') && (
+        <div key={`progress-${pdfLoadNumber || 'nav'}`} className="absolute bottom-0 left-0 right-0 h-[2px] bg-zinc-400/20 dark:bg-zinc-800/50 overflow-hidden">
           <motion.div 
             initial={{ width: 0 }}
-            animate={{ width: `${((currentStepIndex + 1) / currentSteps.length) * 100}%` }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className="h-full bg-zinc-900 dark:bg-white shadow-[0_0_10px_rgba(255,255,255,0.3)]"
-          />
+            animate={{ 
+              width: appState === 'results' 
+                ? '100%' 
+                : (currentSteps.length > 0) 
+                  ? `${(currentStepIndex / currentSteps.length) * 100}%` 
+                  : '0%' 
+            }}
+            transition={{ type: "spring", stiffness: 50, damping: 15 }}
+            className={`h-full ${isDarkMode ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-zinc-900'} relative z-10`}
+          >
+            {/* Glossy lead effect */}
+            {isDarkMode && <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-r from-transparent to-white/30" />}
+          </motion.div>
         </div>
       )}
     </header>
@@ -2175,7 +2189,7 @@ export default function App() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className={`fixed right-0 top-0 bottom-0 w-72 ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-background'} border-l ${theme.border} z-50 shadow-2xl flex flex-col rounded-none border-y-0 border-r-0 overflow-hidden`}
+              className={`fixed right-0 top-0 bottom-0 w-72 ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-white'} border-l ${theme.border} z-50 shadow-2xl flex flex-col rounded-none border-y-0 border-r-0 overflow-hidden`}
             >
               <div className="p-5 flex justify-between items-center border-b border-white/5">
                 <div className="flex items-center gap-2">
@@ -2232,6 +2246,40 @@ export default function App() {
                 <div className="space-y-4">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 px-1">Preferences</p>
                   
+                  {/* Broker Selector */}
+                  <div className="space-y-2 px-1">
+                    <label className="text-xs font-medium text-zinc-400">Broker</label>
+                    <input 
+                      type="text" 
+                      value={broker}
+                      onChange={(e) => setBroker(e.target.value.toUpperCase())}
+                      className={`w-full bg-transparent border-b ${theme.border} text-sm ${theme.text} focus:outline-none focus:border-zinc-500 font-mono py-1`}
+                      placeholder="BROKER NAME"
+                    />
+                  </div>
+
+                  {/* Chain Format Toggle */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-xs font-medium text-zinc-400">Chain Format</span>
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase">{chainFormat}</span>
+                    </div>
+                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-100'} border ${theme.border}`}>
+                      <button 
+                        onClick={() => setChainFormat('standard')}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'standard' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-400'}`}
+                      >
+                        Std
+                      </button>
+                      <button 
+                        onClick={() => setChainFormat('alternative')}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alternative' ? 'bg-zinc-800 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
+                      >
+                        Alt
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Team Selector */}
                   <div className="space-y-2 px-1">
                     <label className="text-xs font-medium text-zinc-400">Team Color</label>
@@ -2284,7 +2332,7 @@ export default function App() {
                     <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-100'} border ${theme.border}`}>
                       <button 
                         onClick={() => setIsDarkMode(false)}
-                        className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-lg transition-all ${!isDarkMode ? 'bg-background shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-400'}`}
+                        className={`flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-lg transition-all ${!isDarkMode ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-400'}`}
                       >
                         <Sun size={14} />
                         Light
@@ -2308,7 +2356,7 @@ export default function App() {
                     <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-100'} border ${theme.border}`}>
                       <button 
                         onClick={() => setIsSimplifiedAddress(false)}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${!isSimplifiedAddress ? 'bg-background shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-400'}`}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${!isSimplifiedAddress ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-400'}`}
                       >
                         Full
                       </button>
