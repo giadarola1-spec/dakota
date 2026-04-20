@@ -2063,16 +2063,14 @@ export default function App() {
       </div>
 
       {/* Progress Bar Line */}
-      {(appState === 'verify' || appState === 'results') && (
+      {appState === 'verify' && (
         <div key={`progress-${pdfLoadNumber || 'nav'}`} className="absolute bottom-0 left-0 right-0 h-[2px] bg-zinc-400/20 dark:bg-zinc-800/50 overflow-hidden">
           <motion.div 
             initial={{ width: 0 }}
             animate={{ 
-              width: appState === 'results' 
-                ? '100%' 
-                : (currentSteps.length > 0) 
-                  ? `${(currentStepIndex / currentSteps.length) * 100}%` 
-                  : '0%' 
+              width: (currentSteps.length > 0) 
+                ? `${(currentStepIndex / currentSteps.length) * 100}%` 
+                : '0%' 
             }}
             transition={{ type: "spring", stiffness: 50, damping: 15 }}
             className={`h-full ${isDarkMode ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-zinc-900'} relative z-10`}
