@@ -46,7 +46,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
   isDarkMode,
   theme
 }) => {
-  const [view, setView] = useState<'home' | 'about' | 'demo'>('home');
+  const [view, setView] = useState<'home' | 'about'>('home');
 
   return (
     <motion.div 
@@ -69,12 +69,6 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
               className={`text-sm font-medium transition-colors ${view === 'about' ? 'text-white underline underline-offset-8' : 'text-zinc-400 hover:text-white'}`}
             >
               What is this
-            </button>
-            <button 
-              onClick={() => setView('demo')}
-              className={`text-sm font-medium transition-colors ${view === 'demo' ? 'text-white underline underline-offset-8' : 'text-zinc-400 hover:text-white'}`}
-            >
-              Demo
             </button>
           </nav>
         </div>
@@ -168,71 +162,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
             </motion.div>
           )}
 
-          {view === 'demo' && (
-            <motion.div 
-              key="demo"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="max-w-5xl mx-auto py-12 text-left space-y-20"
-            >
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-                <div className="space-y-4">
-                  <button 
-                    onClick={() => setView('home')}
-                    className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-4 group"
-                  >
-                    <ArrowRight size={18} className="rotate-180 group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-sm font-bold uppercase tracking-widest leading-none">Back</span>
-                  </button>
-                  <h2 className="text-6xl font-bold text-white tracking-tighter">Demo & Functionality</h2>
-                  <p className="text-xl text-zinc-500 font-medium">A detailed look at the Dakota Tactical Environment.</p>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-10 rounded-[40px] bg-zinc-900 border border-white/5 space-y-6">
-                  <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center text-white">
-                    <Zap size={28} />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Precise Parsing</h3>
-                  <p className="text-zinc-500 leading-relaxed">
-                    Identifies multi-stop routes, distinguishes between pickup/delivery times, and extracts weight/rates with 100% precision.
-                  </p>
-                </div>
-
-                <div className="p-10 rounded-[40px] bg-zinc-900 border border-white/5 space-y-6">
-                  <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center text-white">
-                    <FileText size={28} />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Alternative Formats</h3>
-                  <p className="text-zinc-500 leading-relaxed">
-                    Toggle between Standard and Alternative chain/notes formatting to match specific broker requirements instantly.
-                  </p>
-                </div>
-
-                <div className="p-10 rounded-[40px] bg-zinc-900 border border-white/5 space-y-6">
-                  <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center text-white">
-                    <Bot size={28} />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Team & Truck Saving</h3>
-                  <p className="text-zinc-500 leading-relaxed">
-                    Quickly select team colors and save frequently used truck numbers to local storage for instant reuse.
-                  </p>
-                </div>
-
-                <div className="p-10 rounded-[40px] bg-zinc-900 border border-white/5 space-y-6">
-                  <div className="w-14 h-14 bg-zinc-800 rounded-2xl flex items-center justify-center text-white">
-                    <Search size={28} />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Address Logic</h3>
-                  <p className="text-zinc-500 leading-relaxed">
-                    Toggle between Full Address or City/Zip modes. Dakota automatically cleans suite info and isolates location data.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          )}
         </AnimatePresence>
       </main>
 
