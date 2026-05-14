@@ -12,6 +12,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { DriverNumberModal } from './components/DriverNumberModal';
 import { TemplatesView } from './components/TemplatesView';
 import { WelcomeView } from './components/WelcomeView';
+import { UpdateModal } from './components/UpdateModal';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">
@@ -1102,6 +1103,7 @@ export default function App() {
   const [currentSteps, setCurrentSteps] = useState<VerificationStep[]>([]);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>("dakota_hasSeenWelcome", false);
+  const [hasSeenRobinsonUpdate, setHasSeenRobinsonUpdate] = useLocalStorage<boolean>("dakota_hasSeenRobinsonUpdate_v1", false);
   
   // History State
   const [history, setHistory] = useLocalStorage<HistoryItem[]>("dakota_history", []);
@@ -1389,6 +1391,7 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useLocalStorage("dakota_isDarkMode", true);
   const [isAutoZoomEnabled, setIsAutoZoomEnabled] = useLocalStorage("dakota_isAutoZoomEnabled", true);
   const [isSimplifiedAddress, setIsSimplifiedAddress] = useLocalStorage("dakota_isSimplifiedAddress", true);
+  const [robinsonDisplayMode, setRobinsonDisplayMode] = useLocalStorage<'with-space' | 'no-space'>("dakota_robinson_display_mode", 'with-space');
   const [dragSensitivity, setDragSensitivity] = useLocalStorage("dakota_dragSensitivity", 1.5);
 
   // --- Styles Helper ---
@@ -1703,30 +1706,35 @@ export default function App() {
     // Date: MM.DD.YYYY
     const date = data.pickupDate ? data.pickupDate.replace(/[\/-]/g, '.') : "MM.DD.YYYY";
 
+    let displayBroker = brk;
+    if (brk.toUpperCase().includes('ROBINSON')) {
+      displayBroker = robinsonDisplayMode === 'no-space' ? 'CHROBINSON' : 'CH ROBINSON';
+    }
+
     // Load Number
     let loadNum = data.loadNumber;
-    if (brk.toUpperCase().includes('TRAFFIX') && !loadNum.startsWith('T')) {
+    if (displayBroker.toUpperCase().includes('TRAFFIX') && !loadNum.startsWith('T')) {
       loadNum = `T${loadNum}`;
     }
-    if (brk.toUpperCase().includes('ROBINSON')) {
+    if (displayBroker.toUpperCase().includes('ROBINSON')) {
       loadNum = loadNum.replace(/^T/i, '');
     }
 
     if (format === 'alternative') {
-       return `${emoji ? emoji + " " : ""}TRUCK# ${tNum}-${lane}-${date} ${brk} LOAD# ${loadNum}`;
+       return `${emoji ? emoji + " " : ""}TRUCK# ${tNum}-${lane}-${date} ${displayBroker} LOAD# ${loadNum}`;
     }
 
     if (format === 'alt2') {
        // Example: 🟢 TRUCK #1021 OH-IN 04.17.2026 PLS LOAD #32067460
-       return `${emoji ? emoji + " " : ""}TRUCK #${tNum} ${lane} ${date} ${brk} LOAD #${loadNum}`;
+       return `${emoji ? emoji + " " : ""}TRUCK #${tNum} ${lane} ${date} ${displayBroker} LOAD #${loadNum}`;
     }
 
     if (format === 'alt3') {
        // Example: 🟢TRUCK 7255 IL-IN 04.16.2026 FITZMARK LOAD# 2302630
-       return `${emoji}TRUCK ${tNum} ${lane} ${date} ${brk} LOAD# ${loadNum}`;
+       return `${emoji}TRUCK ${tNum} ${lane} ${date} ${displayBroker} LOAD# ${loadNum}`;
     }
 
-    const chain = `${emoji ? emoji + " " : ""}${tNum}-${lane}-${date} ${brk} LOAD ${loadNum}`;
+    const chain = `${emoji ? emoji + " " : ""}${tNum}-${lane}-${date} ${displayBroker} LOAD ${loadNum}`;
     return chain;
   };
 
@@ -2105,7 +2113,7 @@ export default function App() {
                   className={`px-2 py-1 text-xs rounded border bg-zinc-500/10 text-zinc-500 border-zinc-500/30 font-bold uppercase hover:bg-zinc-500/20 transition-colors`}
                   title="Click to toggle broker"
                 >
-                  {broker}
+                  {broker.includes('ROBINSON') ? (robinsonDisplayMode === 'no-space' ? 'CHROBINSON' : 'CH ROBINSON') : broker}
                 </button>
               </div>
             </div>
@@ -2171,6 +2179,12 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      <UpdateModal 
+        isOpen={hasSeenWelcome && !hasSeenRobinsonUpdate} 
+        onClose={() => setHasSeenRobinsonUpdate(true)}
+        isDarkMode={isDarkMode}
+      />
 
       {isDarkMode && (
         <div className="atmospheric-bg">
@@ -2611,6 +2625,28 @@ export default function App() {
                         className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${isSimplifiedAddress ? 'bg-zinc-800 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
                       >
                         City/Zip
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Robinson Name Toggle */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-xs font-medium text-zinc-400">Robinson Name</span>
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase">{robinsonDisplayMode === 'no-space' ? 'No Space' : 'With Space'}</span>
+                    </div>
+                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-100'} border ${theme.border}`}>
+                      <button 
+                        onClick={() => setRobinsonDisplayMode('with-space')}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${robinsonDisplayMode === 'with-space' ? (isDarkMode ? 'bg-zinc-800 text-white' : 'bg-white text-zinc-900 shadow-sm') : 'text-zinc-500 hover:text-zinc-400'}`}
+                      >
+                        With Space
+                      </button>
+                      <button 
+                        onClick={() => setRobinsonDisplayMode('no-space')}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${robinsonDisplayMode === 'no-space' ? (isDarkMode ? 'bg-zinc-800 text-white' : 'bg-white text-zinc-900 shadow-sm') : 'text-zinc-500 hover:text-zinc-400'}`}
+                      >
+                        No Space
                       </button>
                     </div>
                   </div>

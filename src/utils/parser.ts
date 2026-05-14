@@ -120,26 +120,29 @@ function parseChRobinson(text: string): ParsedRateCon {
   // Weight
   // Robinson commodity tables: [Commodity Name] [Weight] [Units] [Count] [Pallets]
   // Capture the weight (usually has commas or is large) before the units label.
-  const weightTableMatch = text.match(/Commodity\s*Est\s*Wgt\s*Units\s*Count\s*Pallets[\s\S]*?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
-                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[\s\n]*Units\s*Stack\s*Frt\s*Class\s*Temp\s*L\/W\/H\s*[\d\/]+\s*(\d{1,3}(?:,\d{3})*)/i) ||
-                           text.match(/Est\s*Wgt\s*Units\s*Count\s*Pallets\s*Temp\s*Ref\s*#\s*\n\s*[^\n]*?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
-                           text.match(/(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)\s+(?:\d+)/i) ||
-                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[^\n]*\n[^\n]*\s*[\d\/]+\s+(?:Piece|Pieces|Units|Pallets)\s+(\d{1,3}(?:,\d{3})*(?:\.\d+)?)/i);
+  const weightTableMatch = text.match(/Commodity\s*Est\s*Wgt\s*Units\s*Count\s*Pallets[\s\S]*?(\d+(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
+                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[\s\n]*Units\s*Stack\s*Frt\s*Class\s*Temp\s*L\/W\/H\s*[\d\/]+\s*(\d+(?:,\d{3})*)/i) ||
+                           text.match(/Est\s*Wgt\s*Units\s*Count\s*Pallets\s*Temp\s*Ref\s*#\s*\n\s*[^\n]*?\s*(\d+(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
+                           text.match(/(\d+(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)\s+(?:\d+)/i) ||
+                           text.match(/(\d+)\s+(\d+)\s+(\d+(?:,\d{3})*(?:\.\d+)?)\s+Total/i) ||
+                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[^\n]*\n[^\n]*\s*[\d\/]+\s+(?:Piece|Pieces|Units|Pallets)\s+(\d+(?:,\d{3})*(?:\.\d+)?)/i);
   
   if (weightTableMatch) {
-    result.weight = weightTableMatch[1].replace(/,/g, '') + " LBS";
+    // If it was the "Total" match, the weight is the 3rd group
+    const weightVal = weightTableMatch[3] || weightTableMatch[1];
+    result.weight = weightVal.replace(/,/g, '') + " LBS";
   } else {
     // If table match fails, try near "Est Wgt" label specifically
     const estWgtIdx = text.indexOf("Est Wgt");
     if (estWgtIdx !== -1) {
       const sub = text.substring(estWgtIdx, estWgtIdx + 300);
-      const m = sub.match(/(\d{1,3}(?:,\d{3})+)/) || sub.match(/(\d{5,})/);
+      const m = sub.match(/(\d+(?:,\d{3})+)/) || sub.match(/(\d{4,})/);
       if (m) result.weight = m[1].replace(/,/g, '') + " LBS";
     }
     
     if (!result.weight) {
       // Prefer numbers with at least 2 digits for weight to avoid picking up single digits like "4" from "Page 1" etc.
-      const weightMatch = text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,3}(?:,\d{3})*)/i) || 
+      const weightMatch = text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,}(?:,\d{3})*)/i) || 
                           text.match(/L\/W\/H\s+(\d+)\s+(\d{2,})/i) ||
                           text.match(/Est\s*Wgt\s*(\d{2,})/i) ||
                           text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,})/i);
