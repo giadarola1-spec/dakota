@@ -67,10 +67,10 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                  <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-1 text-blue-200">
                       <Sparkles size={14} className="animate-pulse" />
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Nueva Actualización</span>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em]">New Update</span>
                     </div>
-                    <h2 className="text-xl font-bold tracking-tight leading-tight">Dakota se ha actualizado</h2>
-                    <p className="text-blue-100/70 text-xs mt-1">Echa un vistazo a las siguientes mejoras.</p>
+                    <h2 className="text-xl font-bold tracking-tight leading-tight">Dakota has been updated</h2>
+                    <p className="text-blue-100/70 text-xs mt-1">Check out the following improvements.</p>
                  </div>
                  
                  {/* Abstract background shapes */}
@@ -87,7 +87,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                   <div className="flex flex-col justify-center">
                     <h4 className={`font-bold ${isDarkMode ? 'text-white' : 'text-zinc-900'} text-sm`}>CH Robinson (Beta)</h4>
                     <p className={`text-[11px] ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'} leading-relaxed mt-0.5`}>
-                      Soporte experimental para Rate Confirmations de C.H. Robinson.
+                      Experimental support for C.H. Robinson Rate Confirmations.
                     </p>
                   </div>
                 </div>
@@ -98,9 +98,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     <Clock size={20} className="text-emerald-500" />
                   </div>
                   <div className="flex flex-col justify-center">
-                    <h4 className={`font-bold ${isDarkMode ? 'text-white' : 'text-zinc-900'} text-sm`}>Soporte de Time Zones</h4>
+                    <h4 className={`font-bold ${isDarkMode ? 'text-white' : 'text-zinc-900'} text-sm`}>Time Zone Support</h4>
                     <p className={`text-[11px] ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'} leading-relaxed mt-0.5`}>
-                      Detección automática de zonas horarias para citas de carga y descarga.
+                      Automatic time zone detection for pick-up and delivery appointments.
                     </p>
                   </div>
                 </div>
@@ -111,9 +111,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     <FileText size={20} className="text-orange-500" />
                   </div>
                   <div className="flex flex-col justify-center">
-                    <h4 className={`font-bold ${isDarkMode ? 'text-white' : 'text-zinc-900'} text-sm`}>Notas Inteligentes</h4>
+                    <h4 className={`font-bold ${isDarkMode ? 'text-white' : 'text-zinc-900'} text-sm`}>Smart Notes</h4>
                     <p className={`text-[11px] ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'} leading-relaxed mt-0.5`}>
-                      Separación inteligente de notas para entregas el día siguiente o fechas posteriores.
+                      Smart separation of notes for next-day or later deliveries.
                     </p>
                   </div>
                 </div>
@@ -124,7 +124,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                   onClick={onClose}
                   className="w-full py-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-3xl font-bold text-sm shadow-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 group active:scale-[0.98]"
                 >
-                  Continuar
+                  Continue
                   <Zap size={16} className="fill-current group-hover:scale-110 transition-transform" />
                 </button>
               </div>
