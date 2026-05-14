@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink, Clock } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to CDN for reliable production behavior
@@ -34,6 +34,8 @@ type HistoryItem = {
   notes: string;
   chain: string;
   rename: string;
+  isOvernight?: boolean;
+  overnightMessage?: string;
 };
 
 type VerificationStep = {
@@ -50,6 +52,82 @@ const isMultiStop = (data: ParsedRateCon | null) => {
   const deliveries = data.stops.filter(s => s.type === 'delivery');
   // Multi-stop means more than one pickup OR more than one delivery
   return pickups.length > 1 || deliveries.length > 1;
+};
+
+const isOvernight = (data: ParsedRateCon | null) => {
+  if (!data || !data.stops || data.stops.length < 2) return false;
+  const pickups = data.stops.filter(s => s.type === 'pickup');
+  const deliveries = data.stops.filter(s => s.type === 'delivery');
+  if (pickups.length === 0 || deliveries.length === 0) return false;
+  
+  const firstPu = pickups[0];
+  const lastDel = deliveries[deliveries.length - 1];
+  
+  // Normalize dates for comparison (e.g. 05.14.2024)
+  const d1 = firstPu.date?.replace(/[/.-]/g, '.');
+  const d2 = lastDel.date?.replace(/[/.-]/g, '.');
+  
+  return d1 && d2 && d1 !== d2;
+};
+
+const getOvernightMessage = (data: ParsedRateCon | null) => {
+  if (!data || !data.stops || data.stops.length < 2) return "";
+  const pickups = data.stops.filter(s => s.type === 'pickup');
+  const deliveries = data.stops.filter(s => s.type === 'delivery');
+  if (pickups.length === 0 || deliveries.length === 0) return "";
+  
+  const firstPu = pickups[0];
+  const lastDel = deliveries[deliveries.length - 1];
+  
+  if (!firstPu.date || !lastDel.date) return "";
+
+  const d1Str = firstPu.date.replace(/[/.-]/g, '.');
+  const d2Str = lastDel.date.replace(/[/.-]/g, '.');
+
+  if (d1Str === d2Str) return "";
+
+  const parts1 = d1Str.split('.').map(Number);
+  const parts2 = d2Str.split('.').map(Number);
+
+  if (parts1.length === 3 && parts2.length === 3) {
+    let year1 = parts1[2]; if (year1 < 100) year1 += 2000;
+    let year2 = parts2[2]; if (year2 < 100) year2 += 2000;
+    const date1 = new Date(year1, parts1[0] - 1, parts1[1]);
+    const date2 = new Date(year2, parts2[0] - 1, parts2[1]);
+    
+    if (!isNaN(date1.getTime()) && !isNaN(date2.getTime())) {
+      const diffTime = date2.getTime() - date1.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays === 1) return "This load delivers next day";
+    }
+  }
+
+  return `This load delivers on ${lastDel.date}`;
+};
+
+const getTimezoneByAddress = (address: string | undefined): string => {
+  if (!address) return "";
+  // Search for State code before ZIP (e.g. "IN 46802")
+  const match = address.match(/([A-Z]{2})\s\d{5}/);
+  const state = match ? match[1] : "";
+
+  const tzMap: Record<string, string> = {
+    // Eastern
+    'ME': 'EDT', 'NH': 'EDT', 'VT': 'EDT', 'MA': 'EDT', 'RI': 'EDT', 'CT': 'EDT', 
+    'NY': 'EDT', 'NJ': 'EDT', 'PA': 'EDT', 'DE': 'EDT', 'MD': 'EDT', 'DC': 'EDT', 
+    'VA': 'EDT', 'WV': 'EDT', 'NC': 'EDT', 'SC': 'EDT', 'GA': 'EDT', 'FL': 'EDT', 
+    'OH': 'EDT', 'MI': 'EDT', 'IN': 'EDT', 'KY': 'EDT',
+    // Central
+    'WI': 'CDT', 'IL': 'CDT', 'MN': 'CDT', 'IA': 'CDT', 'MO': 'CDT', 'AR': 'CDT', 
+    'LA': 'CDT', 'ND': 'CDT', 'SD': 'CDT', 'NE': 'CDT', 'KS': 'CDT', 'OK': 'CDT', 
+    'TX': 'CDT', 'MS': 'CDT', 'AL': 'CDT', 'TN': 'CDT',
+    // Mountain
+    'MT': 'MDT', 'WY': 'MDT', 'CO': 'MDT', 'NM': 'MDT', 'ID': 'MDT', 'UT': 'MDT', 'AZ': 'MDT',
+    // Pacific
+    'WA': 'PDT', 'OR': 'PDT', 'CA': 'PDT', 'NV': 'PDT'
+  };
+
+  return tzMap[state] ? ` ${tzMap[state]}` : "";
 };
 
 const getBaseSteps = (data: ParsedRateCon | null): VerificationStep[] => {
@@ -1488,12 +1566,18 @@ export default function App() {
     
     const tNum = truckNumberOverride || truckNumber;
 
+    const overnight = isOvernight(data);
+
     // Format Outputs
     let route = "";
     if (data.stops && data.stops.length > 0) {
-      route = data.stops.map(s => formatAddress(s.address || "Address Not Found", isSimplifiedAddress)).join("\n").toUpperCase();
+      const separator = overnight ? "\n\n" : "\n";
+      route = data.stops.map(s => {
+        return formatAddress(s.address || "Address Not Found", isSimplifiedAddress).toUpperCase();
+      }).join(separator);
     } else {
-      route = `${formatAddress(data.originAddress || "Origin Not Found", isSimplifiedAddress)}\n${formatAddress(data.destinationAddress || "Dest Not Found", isSimplifiedAddress)}`.toUpperCase();
+      const separator = overnight ? "\n\n" : "\n";
+      route = `${formatAddress(data.originAddress || "Origin Not Found", isSimplifiedAddress)}${separator}${formatAddress(data.destinationAddress || "Dest Not Found", isSimplifiedAddress)}`.toUpperCase();
     }
     setRouteText(route);
 
@@ -1503,17 +1587,44 @@ export default function App() {
     const rename = generateRenameString(data, tNum);
     setRenameText(rename);
 
-    let notes = `W${data.weight || "?"}\n`;
-    if (data.stops && data.stops.length > 0) {
-      data.stops.forEach(s => {
-        const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
+    const weightLine = `W${data.weight || "?"}\n`;
+    let notes = "";
+
+    if (overnight && data.stops && data.stops.length > 0) {
+      // Overnight mode: Two separate notes
+      const pickups = data.stops.filter(s => s.type === 'pickup');
+      const deliveries = data.stops.filter(s => s.type === 'delivery');
+
+      const puNotes = weightLine + pickups.map(s => {
         const label = s.label.match(/\d+/)?.[0] || "";
-        notes += `${prefix}${label ? ' ' + label : ''} ${s.time || "?"}\n`;
-      });
+        const tz = getTimezoneByAddress(s.address);
+        return `PU${label ? ' ' + label : ''} ${s.time || "?"}${tz}`;
+      }).join('\n') + '\n' + chain;
+
+      const delNotes = weightLine + deliveries.map(s => {
+        const label = s.label.match(/\d+/)?.[0] || "";
+        const tz = getTimezoneByAddress(s.address);
+        return `DEL${label ? ' ' + label : ''} ${s.time || "?"}${tz}`;
+      }).join('\n') + '\n' + chain;
+
+      notes = puNotes + "\n\n" + delNotes;
     } else {
-      notes += `PU ${data.pickupTime || "?"}\nDEL ${data.deliveryTime || "?"}\n`;
+      // Standard mode
+      notes = weightLine;
+      if (data.stops && data.stops.length > 0) {
+        data.stops.forEach((s, idx) => {
+          const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
+          const label = s.label.match(/\d+/)?.[0] || "";
+          const tz = getTimezoneByAddress(s.address);
+          notes += `${prefix}${label ? ' ' + label : ''} ${s.time || "?"}${tz}\n`;
+        });
+      } else {
+        const puTz = getTimezoneByAddress(data.originAddress);
+        const delTz = getTimezoneByAddress(data.destinationAddress);
+        notes += `PU ${data.pickupTime || "?"}${puTz}\nDEL ${data.deliveryTime || "?"}${delTz}\n`;
+      }
+      notes += chain;
     }
-    notes += chain;
     setNotesText(notes);
 
     setIsViewingHistory(false);
@@ -1532,7 +1643,9 @@ export default function App() {
       route: route,
       notes: notes,
       chain: chain,
-      rename: rename
+      rename: rename,
+      isOvernight: overnight,
+      overnightMessage: getOvernightMessage(data)
     };
     setHistory(prev => [historyItem, ...prev].slice(0, 100)); // Keep last 100
   };
@@ -1615,8 +1728,6 @@ export default function App() {
       
       // Update notes with new chain (replace last line)
       setNotesText(prev => {
-        let notes = "";
-        
         const formatWeight = (w: string) => {
           if (!w) return "?";
           const numericOnly = w.replace(/[^0-9]/g, '');
@@ -1629,25 +1740,56 @@ export default function App() {
           return `${num}LB`;
         };
 
-        const stops = extractedData.stops && extractedData.stops.length > 0 
-          ? extractedData.stops.map(s => {
-              const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
-              const label = s.label.match(/\d+/)?.[0] || "";
-              return `${prefix}${label ? ' ' + label : ''} ${s.time || "?"}`;
-            }).join('\n') + '\n'
-          : `PU ${extractedData.pickupTime || "?"}\nDEL ${extractedData.deliveryTime || "?"}\n`;
-
-        const weight = `W ${formatWeight(extractedData.weight)}\n`;
+        const overnight = isOvernight(extractedData);
+        const weightFormatted = formatWeight(extractedData.weight);
+        const weightLine = `W${weightFormatted}\n`;
         const loadNum = extractedData.loadNumber && broker.toUpperCase() === 'TRAFFIX' && !extractedData.loadNumber.startsWith('T') 
           ? `T${extractedData.loadNumber}` 
           : extractedData.loadNumber;
 
-        if (notesFormat === 'alternative') {
-          // Alternative Style: Stops -> Weight -> Load#
-          notes = stops + weight + loadNum;
+        let notes = "";
+
+        if (overnight && extractedData.stops && extractedData.stops.length > 0) {
+          const pickups = extractedData.stops.filter(s => s.type === 'pickup');
+          const deliveries = extractedData.stops.filter(s => s.type === 'delivery');
+
+          const puSection = pickups.map(s => {
+            const label = s.label.match(/\d+/)?.[0] || "";
+            const tz = getTimezoneByAddress(s.address);
+            return `PU${label ? ' ' + label : ''} ${s.time || "?"}${tz}`;
+          }).join('\n') + '\n';
+
+          const delSection = deliveries.map(s => {
+            const label = s.label.match(/\d+/)?.[0] || "";
+            const tz = getTimezoneByAddress(s.address);
+            return `DEL${label ? ' ' + label : ''} ${s.time || "?"}${tz}`;
+          }).join('\n') + '\n';
+
+          if (notesFormat === 'alternative') {
+            notes = puSection + weightLine + loadNum + "\n\n" + delSection + weightLine + loadNum;
+          } else {
+            notes = weightLine + puSection + chain + "\n\n" + weightLine + delSection + chain;
+          }
         } else {
-          // Standard Style: Weight -> Stops -> Chain
-          notes = `W${formatWeight(extractedData.weight)}\n` + stops + chain;
+          // Standard logic
+          const stops = extractedData.stops && extractedData.stops.length > 0 
+            ? extractedData.stops.map((s, idx) => {
+                const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
+                const label = s.label.match(/\d+/)?.[0] || "";
+                const tz = getTimezoneByAddress(s.address);
+                return `${prefix}${label ? ' ' + label : ''} ${s.time || "?"}${tz}`;
+              }).join('\n') + '\n'
+            : (() => {
+                const puTz = getTimezoneByAddress(extractedData.originAddress);
+                const delTz = getTimezoneByAddress(extractedData.destinationAddress);
+                return `PU ${extractedData.pickupTime || "?"}${puTz}\nDEL ${extractedData.deliveryTime || "?"}${delTz}\n`;
+              })();
+
+          if (notesFormat === 'alternative') {
+            notes = stops + weightLine + loadNum;
+          } else {
+            notes = weightLine + stops + chain;
+          }
         }
         
         return notes;
@@ -1658,10 +1800,16 @@ export default function App() {
   useEffect(() => {
     if (appState === 'results' && extractedData && !isViewingHistory) {
       let route = "";
+      const overnight = isOvernight(extractedData);
+      
       if (extractedData.stops && extractedData.stops.length > 0) {
-        route = extractedData.stops.map(s => formatAddress(s.address || "Address Not Found", isSimplifiedAddress)).join("\n").toUpperCase();
+        const separator = overnight ? "\n\n" : "\n";
+        route = extractedData.stops.map(s => {
+          return formatAddress(s.address || "Address Not Found", isSimplifiedAddress).toUpperCase();
+        }).join(separator);
       } else {
-        route = `${formatAddress(extractedData.originAddress || "Origin Not Found", isSimplifiedAddress)}\n${formatAddress(extractedData.destinationAddress || "Dest Not Found", isSimplifiedAddress)}`.toUpperCase();
+        const separator = overnight ? "\n\n" : "\n";
+        route = `${formatAddress(extractedData.originAddress || "Origin Not Found", isSimplifiedAddress)}${separator}${formatAddress(extractedData.destinationAddress || "Dest Not Found", isSimplifiedAddress)}`.toUpperCase();
       }
       setRouteText(route);
     }
@@ -1798,6 +1946,15 @@ export default function App() {
           <h2 className={`text-2xl font-display font-medium ${theme.text}`}>
             {isViewingHistory ? currentHistoryItem?.loadNumber : (extractedData?.loadNumber || "Generated Output")}
           </h2>
+          {(isViewingHistory ? currentHistoryItem?.isOvernight : isOvernight(extractedData)) && (
+            <span 
+              className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-500 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter border border-amber-500/20 shadow-sm animate-pulse-slow cursor-help"
+              title={isViewingHistory ? currentHistoryItem?.overnightMessage : getOvernightMessage(extractedData)}
+            >
+              <Clock size={10} />
+              Overnight
+            </span>
+          )}
           {(isViewingHistory ? currentHistoryItem?.rate : extractedData?.rate) && (
             <span className={`text-lg ${theme.textMuted} opacity-60 font-normal`}>
               ${isViewingHistory ? currentHistoryItem?.rate : extractedData?.rate}
