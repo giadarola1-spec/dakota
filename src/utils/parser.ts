@@ -52,6 +52,7 @@ export interface ParsedRateCon {
   originAddress: string;
   destinationAddress: string;
   brokerEmail?: string;
+  brokerName?: string;
   rawTextPreview: string;
 }
 
@@ -91,11 +92,235 @@ function extractInWindow(text: string, anchors: (string | RegExp)[], patterns: R
   return "";
 }
 
-export function parseRateConfirmation(text: string): ParsedRateCon {
-  // Normalize line endings and whitespace
+function parseChRobinson(text: string): ParsedRateCon {
+  // Normalize line endings
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
 
-  // Fix "spaced out" text (common in some PDF exports where characters are separated by spaces)
+  const result: ParsedRateCon = {
+    loadNumber: "",
+    weight: "",
+    rate: "",
+    stops: [],
+    pickupTime: "",
+    pickupDate: "",
+    deliveryTime: "",
+    originAddress: "",
+    destinationAddress: "",
+    brokerName: "CH ROBINSON",
+    rawTextPreview: text.substring(0, 200) + "..."
+  };
+
+  // Load Number
+  const loadMatch = text.match(/(?:Confirmation\s*-\s*#|Load\s*Number\s*[:]?|Load\s*#)\s*([A-Z]*\d+)/i);
+  if (loadMatch) {
+    // Per user request: if CH Robinson, remove leading T
+    result.loadNumber = loadMatch[1].replace(/^T/i, '');
+  }
+
+  // Weight
+  // Robinson commodity tables: [Commodity Name] [Weight] [Units] [Count] [Pallets]
+  // Capture the weight (usually has commas or is large) before the units label.
+  const weightTableMatch = text.match(/Commodity\s*Est\s*Wgt\s*Units\s*Count\s*Pallets[\s\S]*?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
+                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[\s\n]*Units\s*Stack\s*Frt\s*Class\s*Temp\s*L\/W\/H\s*[\d\/]+\s*(\d{1,3}(?:,\d{3})*)/i) ||
+                           text.match(/Est\s*Wgt\s*Units\s*Count\s*Pallets\s*Temp\s*Ref\s*#\s*\n\s*[^\n]*?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
+                           text.match(/(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)\s+(?:\d+)/i) ||
+                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[^\n]*\n[^\n]*\s*[\d\/]+\s+(?:Piece|Pieces|Units|Pallets)\s+(\d{1,3}(?:,\d{3})*(?:\.\d+)?)/i);
+  
+  if (weightTableMatch) {
+    result.weight = weightTableMatch[1].replace(/,/g, '') + " LBS";
+  } else {
+    // If table match fails, try near "Est Wgt" label specifically
+    const estWgtIdx = text.indexOf("Est Wgt");
+    if (estWgtIdx !== -1) {
+      const sub = text.substring(estWgtIdx, estWgtIdx + 300);
+      const m = sub.match(/(\d{1,3}(?:,\d{3})+)/) || sub.match(/(\d{5,})/);
+      if (m) result.weight = m[1].replace(/,/g, '') + " LBS";
+    }
+    
+    if (!result.weight) {
+      // Prefer numbers with at least 2 digits for weight to avoid picking up single digits like "4" from "Page 1" etc.
+      const weightMatch = text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,3}(?:,\d{3})*)/i) || 
+                          text.match(/L\/W\/H\s+(\d+)\s+(\d{2,})/i) ||
+                          text.match(/Est\s*Wgt\s*(\d{2,})/i) ||
+                          text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,})/i);
+      if (weightMatch) {
+        const weightVal = weightMatch[2] || weightMatch[1];
+        result.weight = weightVal.replace(/,/g, '') + " LBS";
+      }
+    }
+  }
+
+  // Rate
+  const rateMatch = text.match(/Total\s*[:]?\s*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/Line\s*Haul\s*[-–]\s*Flat\s*Rate\s*\d+\s*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/Total\s*:\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i);
+  if (rateMatch) result.rate = rateMatch[1].replace(/,/g, '');
+
+  // Stops (Shipper / Receiver blocks)
+  // Split by SHIPPER# or RECEIVER# (allowing spaces)
+  const stopsRaw = text.split(/(?=SHIPPER\s*#|RECEIVER\s*#)/i);
+  
+  stopsRaw.forEach(section => {
+    const isPickup = /SHIPPER\s*#/i.test(section);
+    const isDelivery = /RECEIVER\s*#/i.test(section);
+    
+    if (isPickup || isDelivery) {
+      const type = isPickup ? 'pickup' : 'delivery';
+      const labelMatch = section.match(/(?:SHIPPER|RECEIVER)\s*#\d+/i);
+      const label = labelMatch ? labelMatch[0] : (isPickup ? 'Pickup' : 'Delivery');
+
+      // Date extraction: Scheduled Pick Up* 5/13/2026 or Pick Up Date: 5/12/2026
+      const dateMatch = section.match(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/) || 
+                        section.match(/(?:Pick\s*Up\s*Date|Delivery\s*Date)\s*[:]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i);
+      let date = dateMatch ? dateMatch[1].replace(/[\/.-]/g, '.') : "";
+
+      // Time extraction: Pick Up Open 5/13/2026 5:10 AM or Pick Up Time: 22:00 Appt.
+      // Handlers ranges like 07:00-14:30 or 13:00 Appt or 0700-1400
+      // CRITICAL: Avoid zip codes like 46123-1772
+      const timeRegex = /\b(?:[01]?\d|2[0-3])[:][0-5]\d\b/;
+      const rangeMatch = section.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?\s*[-–]\s*\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+      
+      // Only capture 4-digit ranges if they look like military time and aren't zip codes
+      // We check if it follows a time label or doesn't have 5 digits before the dash
+      const militaryRangeStr = section.match(/(?:Time|Open|Close|At)\b[:]?\s*(\d{4}\s*[-–]\s*\d{4})/i)?.[1];
+      
+      const apptMatch = section.match(/(\b\d{1,2}:\d{2}(?:\s*AM|PM)?\s*Appt)/i) ||
+                        section.match(/(\b\d{4}\b\s*Appt)/i);
+      
+      const labeledTimeMatch = section.match(/(?:Pick\s*Up\s*Open|Pick\s*Up\s*Time|Pick\s*Up\s*Close|Delivery\s*Open|Delivery\s*Time|Delivery\s*Close)\s*(?:\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})?\s*(\d{1,2}[:]\d{2}(?:\s*AM|PM)?)/i);
+      
+      const fallbackTimeMatch = section.match(/(\b\d{1,2}:\d{2}(?:\s*AM|PM)?)/i);
+      
+      let time = "";
+      if (rangeMatch) time = rangeMatch[1];
+      else if (militaryRangeStr) time = militaryRangeStr;
+      else if (apptMatch) time = apptMatch[1];
+      else if (labeledTimeMatch) time = labeledTimeMatch[1];
+      else if (fallbackTimeMatch) time = fallbackTimeMatch[1];
+      
+      if (time) {
+         time = time.trim();
+         // If it's a simple HH:MM AM/PM or HH:MM Appt, normalize it. If range, keep it.
+         if (time.includes(':') && !time.includes('-') && !time.includes('–')) {
+           const t = time.replace(/Appt/i, '').trim();
+           let [h, m] = t.split(':');
+           let hours = parseInt(h, 10);
+           const mins = m.match(/\d{2}/)?.[0] || "00";
+           const isPM = /PM/i.test(time);
+           const isAM = /AM/i.test(time);
+           if (isPM && hours < 12) hours += 12;
+           if (isAM && hours === 12) hours = 0;
+           time = `${hours.toString().padStart(2, '0')}:${mins}`;
+         } else if (/^\d{4}$/.test(time)) {
+           // HHMM format
+           time = time.substring(0, 2) + ":" + time.substring(2, 4);
+         }
+      }
+
+      // Address extraction
+      // Look for Address: ... until next key field or Zip:
+      const addrMatch = section.match(/Address\s*[:]?\s*([^\n\*]+)/i);
+      let cityStateMatch = section.match(/([A-Z][A-Za-z\s]+,\s*[A-Z]{2})/) || section.match(/([A-Z\s]{2,},\s*[A-Z]{2})/); // Knoxville, TN or FRANKFORT, IN
+      const zipMatch = section.match(/Zip\s*[:]?\s*(\d{5})/i) || section.match(/,\s*[A-Z]{2}\s*(\d{5})/);
+      
+      const cleanRobinsonText = (t: string): string => {
+        if (!t) return "";
+        // Use word boundaries \b to avoid catching parts of words (e.g., "County" -> "ty" because of "count")
+        let cleaned = t.replace(/\b(?:scheduled|pick up|delivery|arrival|appointment|appt|phone|address|zip|date|time|pickup|ref|receiver|shipper|units|count|pallets|commodity|est wgt)\b\s*(?:date|time|open|close|#|#\d+|[:*])?/gi, "");
+        cleaned = cleaned.replace(/\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}.*$/gi, ""); 
+        cleaned = cleaned.replace(/\d{1,2}:\d{2}.*$/gi, ""); 
+        cleaned = cleaned.replace(/\(?\d{3}\)?\s*[\-\.]?\s*\d{3}\s*[\-\.]?\s*\d{4}.*$/g, ""); 
+        cleaned = cleaned.replace(/\s+/g, " ");
+        
+        // Remove leading/trailing non-alphanumeric noise
+        cleaned = cleaned.trim().replace(/^[^a-z0-9#]+/i, "").replace(/[^a-z0-9#]+$/i, "");
+        cleaned = cleaned.replace(/^[\.,\*]\s*/, "").replace(/\s*[\.,\*]$/, "");
+        
+        return cleaned.trim();
+      };
+      
+      let street = addrMatch ? cleanRobinsonText(addrMatch[1]) : "";
+      
+      // If we didn't find street via "Address:", it might be on a line after "RECEIVER #1"
+      if (!street) {
+        const lines = section.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (/(?:SHIPPER|RECEIVER)\s*#\d+/i.test(lines[i])) {
+            let found = false;
+            for (let j = 1; j <= 2; j++) {
+              let nextLine = lines[i+j] ? lines[i+j].trim() : "";
+              if (nextLine && nextLine.length > 5 && !/Scheduled|Pick\s*Up|Delivery|Address|Phone|Date:|Time:/i.test(nextLine)) {
+                street = cleanRobinsonText(nextLine);
+                found = true;
+                break;
+              }
+            }
+            if (found) break;
+          }
+        }
+      }
+
+      let cityState = cityStateMatch ? cleanRobinsonText(cityStateMatch[1]) : "";
+      let zip = zipMatch ? zipMatch[1] : "";
+      
+      if (!cityState) {
+        const fallbackCityState = section.match(/\b([A-Za-z\s]{2,30}),\s*(AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\b/i);
+        if (fallbackCityState) cityState = `${fallbackCityState[1]}, ${fallbackCityState[2].toUpperCase()}`;
+      }
+
+      // Per user request: "solo quiero la ciudad, la abreviacion y el zip" for CH Robinson
+      let address = [cityState, zip].filter(Boolean).join(" ");
+      
+      // If NOT CH Robinson, we can keep the street if found
+      if (street && !text.toLowerCase().includes('robinson')) {
+        address = [street, cityState, zip].filter(Boolean).join(", ");
+      }
+
+      if (address && (date || time)) {
+        result.stops.push({
+          type,
+          address,
+          date,
+          time,
+          label
+        });
+      }
+    }
+  });
+
+  if (result.stops.length > 0) {
+    const pickups = result.stops.filter(s => s.type === 'pickup');
+    const deliveries = result.stops.filter(s => s.type === 'delivery');
+    
+    if (pickups.length > 0) {
+      result.pickupTime = pickups[0].time;
+      result.pickupDate = pickups[0].date;
+      result.originAddress = pickups[0].address;
+    }
+    if (deliveries.length > 0) {
+      const lastDel = deliveries[deliveries.length - 1];
+      result.deliveryTime = lastDel.time;
+      result.destinationAddress = lastDel.address;
+    }
+  }
+
+  return result;
+}
+
+export function parseRateConfirmation(text: string): ParsedRateCon {
+  const lowerText = text.toLowerCase();
+  
+  // High-confidence Robinson detection: Check for typical headers
+  const isRobinson = (lowerText.includes('c.h. robinson') || lowerText.includes('ch robinson')) && 
+                     !lowerText.includes('traffix');
+
+  if (isRobinson) {
+    return parseChRobinson(text);
+  }
+
+  const isTraffix = lowerText.includes('traffix');
+
+  // --- TRAFFIX / GENERIC LOGIC ---
   // Example: "2 5 8 1 0 S R I D G E L A N D" -> "25810 SRIDGELAND"
   // We look for sequences of single characters separated by single spaces
   text = text.replace(/(?:^|(?<=\s))([A-Z0-9])\s(?=([A-Z0-9])(?:\s|$))/gi, '$1');
@@ -147,6 +372,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     deliveryTime: "",
     originAddress: "",
     destinationAddress: "",
+    brokerName: isTraffix ? "TRAFFIX" : "",
     rawTextPreview: text.substring(0, 200) + "..."
   };
 

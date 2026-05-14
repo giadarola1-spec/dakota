@@ -107,8 +107,8 @@ const getOvernightMessage = (data: ParsedRateCon | null) => {
 
 const getTimezoneByAddress = (address: string | undefined): string => {
   if (!address) return "";
-  // Search for State code before ZIP (e.g. "IN 46802")
-  const match = address.match(/([A-Z]{2})\s\d{5}/);
+  // Search for State code before ZIP (e.g. "IN 46802" or "IN, 46802")
+  const match = address.match(/([A-Z]{2})[,\s]*\d{5}/);
   const state = match ? match[1] : "";
 
   const tzMap: Record<string, string> = {
@@ -390,12 +390,25 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
           if (Math.abs(yDiff) > 5) return yDiff;
           return a.transform[4] - b.transform[4];
         });
-        const fullText = normalize(items.map(it => it.str).join(""));
-        return fullText.includes(cleanSearch);
+        
+        let combined = "";
+        items.forEach(it => { combined += it.str.toLowerCase() + " "; });
+        
+        // Exact match first (normalized)
+        if (combined.replace(/[^a-z0-9]/g, '').includes(cleanSearch)) return true;
+        
+        // Word based fallback for searches with spaces
+        const searchWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length >= 5);
+        if (searchWords.length > 0) {
+          const matchedWords = searchWords.filter(w => combined.includes(w));
+          if (matchedWords.length === searchWords.length) return true;
+        }
+
+        return false;
       };
 
       // Check current page first
-      if (pageData) {
+      if (pageData && pageData.page.pageNumber === currentPage) {
         if (await isMatchOnPage(pageData.page)) return;
       }
 
@@ -416,7 +429,10 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
   // 3. Render Highlights & Auto Zoom
   useEffect(() => {
     const drawHighlights = async () => {
-      if (!pageData) return;
+      if (!pageData || pageData.page.pageNumber !== currentPage) {
+        setHighlights([]);
+        return;
+      }
       
       const { page, viewport } = pageData;
       const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -483,6 +499,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
         }
 
         if (match && match.index !== undefined) {
+          // ... existing logic ...
           const startIndex = match.index;
           const endIndex = startIndex + match[0].length;
           
@@ -540,21 +557,25 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
             setPosition({ x: translateX, y: translateY });
           }
         } else {
-          // Fallback to word-based matching if sequence fails (for very fragmented PDFs)
-          const highlightWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
-          const newHighlights: any[] = [];
-          let firstMatchRect: number[] | null = null;
+        // Fallback to word-based matching IF sequence fails
+        // But be more restrictive to avoid highlighting generic titles
+        const highlightWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length >= 5);
+        const newHighlights: any[] = [];
+        let firstMatchRect: number[] | null = null;
+
+        const genericWords = ['address', 'origin', 'destination', 'pickup', 'delivery', 'weight', 'load', 'conf', 'rate', 'con', 'scheduled', 'arrival', 'time', 'date'];
 
           items.forEach(item => {
             const cleanItem = normalize(item.str);
-            if (cleanItem.length < 2) return;
+            if (cleanItem.length < 3) return;
 
             const isWordMatch = highlightWords.some(w => {
               const cw = normalize(w);
-              return cw.length >= 3 && (cleanItem.includes(cw) || cw.includes(cleanItem));
+              if (cw.length < 4 || genericWords.includes(cw)) return false;
+              return cleanItem.includes(cw) || cw.includes(cleanItem);
             });
 
-            if (isWordMatch && !cleanItem.includes('address') && !cleanItem.includes('origin') && !cleanItem.includes('destination')) {
+            if (isWordMatch) {
               const pdfX = item.transform[4];
               const pdfY = item.transform[5];
               const pdfHeight = Math.sqrt(item.transform[2] * item.transform[2] + item.transform[3] * item.transform[3]);
@@ -1408,6 +1429,12 @@ export default function App() {
     }
 
     const data = parseRateConfirmation(fullText);
+    
+    // Auto-detect broker if returned by parser
+    if (data.brokerName) {
+      setBroker(data.brokerName);
+    }
+
     setExtractedData(data);
     extractedDataRef.current = data; // Sync ref immediately
     setPdfLoadNumber(data.loadNumber);
@@ -1678,8 +1705,11 @@ export default function App() {
 
     // Load Number
     let loadNum = data.loadNumber;
-    if (brk.toUpperCase() === 'TRAFFIX' && !loadNum.startsWith('T')) {
+    if (brk.toUpperCase().includes('TRAFFIX') && !loadNum.startsWith('T')) {
       loadNum = `T${loadNum}`;
+    }
+    if (brk.toUpperCase().includes('ROBINSON')) {
+      loadNum = loadNum.replace(/^T/i, '');
     }
 
     if (format === 'alternative') {
@@ -2070,9 +2100,13 @@ export default function App() {
 
               {/* Broker Info */}
               <div className="flex items-center gap-2 ml-4">
-                <span className={`px-2 py-1 text-xs rounded border bg-zinc-500/10 text-zinc-500 border-zinc-500/30 font-bold uppercase`}>
+                <button 
+                  onClick={() => setBroker(prev => prev === "TRAFFIX" ? "CH ROBINSON" : "TRAFFIX")}
+                  className={`px-2 py-1 text-xs rounded border bg-zinc-500/10 text-zinc-500 border-zinc-500/30 font-bold uppercase hover:bg-zinc-500/20 transition-colors`}
+                  title="Click to toggle broker"
+                >
                   {broker}
-                </span>
+                </button>
               </div>
             </div>
 
