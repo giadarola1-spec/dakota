@@ -79,6 +79,19 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
               </div>
 
               <div className="space-y-5">
+                {/* Feature 0 - Landstar */}
+                <div className="flex gap-4 group">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center flex-none border border-purple-100 dark:border-purple-800/50 group-hover:scale-110 transition-transform">
+                    <Zap size={20} className="text-purple-500" />
+                  </div>
+                  <div className="flex flex-col justify-center">
+                    <h4 className={`font-bold ${isDarkMode ? 'text-white' : 'text-zinc-900'} text-sm`}>Landstar (Beta)</h4>
+                    <p className={`text-[11px] ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'} leading-relaxed mt-0.5`}>
+                      Experimental support for Landstar Rate Confirmations.
+                    </p>
+                  </div>
+                </div>
+
                 {/* Feature 1 */}
                 <div className="flex gap-4 group">
                   <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-none border border-blue-100 dark:border-blue-800/50 group-hover:scale-110 transition-transform">

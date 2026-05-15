@@ -117,39 +117,42 @@ function parseChRobinson(text: string): ParsedRateCon {
     result.loadNumber = loadMatch[1].replace(/^T/i, '');
   }
 
-  // Weight
-  // Robinson commodity tables: [Commodity Name] [Weight] [Units] [Count] [Pallets]
-  // Capture the weight (usually has commas, spaces or is large) before the units label.
-  const weightTableMatch = text.match(/Commodity\s*Est\s*Wgt\s*Units\s*Count\s*Pallets[\s\S]*?(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
-                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[\s\n]*Units\s*Stack\s*Frt\s*Class\s*Temp\s*L\/W\/H\s*[\d\/]+\s*(\d+(?:[,\s]\d{3})*)/i) ||
-                           text.match(/Est\s*Wgt\s*Units\s*Count\s*Pallets\s*Temp\s*Ref\s*#\s*\n\s*[^\n]*?\s*(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
-                           text.match(/(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)\s+(?:\d+)/i) ||
-                           text.match(/(\d+)\s+(\d+)\s+(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+Total/i) ||
-                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[^\n]*\n[^\n]*\s*[\d\/]+\s+(?:Piece|Pieces|Units|Pallets)\s+(\d+(?:[,\s]\d{3})*(?:\.\d+)?)/i);
+  // Weight extraction (Enhanced for Robinson to handle multiple rows)
+  const weightMatches: number[] = [];
   
-  if (weightTableMatch) {
-    // If it was the "Total" match, the weight is the 3rd group
-    const weightVal = weightTableMatch[3] || weightTableMatch[1];
-    result.weight = weightVal.replace(/[,\s]/g, '') + " LBS";
+  // 1. Look for weights in the commodity table: [Number] [Units]
+  // In Robinson, weight usually precedes the units (Carton(s), Pieces, Units, etc.)
+  const tableWeightRegex = /(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Carton\(s\)|Pieces|Units|Piece|Pallets|LBS|LB|KGS|KG)/gi;
+  let weightMatch;
+  while ((weightMatch = tableWeightRegex.exec(text)) !== null) {
+    const val = parseFloat(weightMatch[1].replace(/[,\s]/g, ''));
+    if (!isNaN(val) && val > 10) weightMatches.push(val);
+  }
+
+  // 2. Look for explicit total line
+  const totalMatch = text.match(/[\s\S]*?(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+Total\b/i) ||
+                     text.match(/(\d+)\s+(\d+)\s+(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+Total/i);
+  if (totalMatch) {
+    const totalVal = parseFloat((totalMatch[3] || totalMatch[1]).replace(/[,\s]/g, ''));
+    if (!isNaN(totalVal)) weightMatches.push(totalVal);
+  }
+
+  // 3. Fallback to common labels near "Est Wgt"
+  const labelWeightRegex = /(?:Est\s*Wgt|Total\s*Weight|Weight|Wt)\s*[:]?\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/gi;
+  while ((weightMatch = labelWeightRegex.exec(text)) !== null) {
+    const val = parseFloat(weightMatch[1].replace(/[,\s]/g, ''));
+    if (!isNaN(val) && val > 10) weightMatches.push(val);
+  }
+
+  if (weightMatches.length > 0) {
+    // Per user request, pick the largest weight found
+    const maxW = Math.max(...weightMatches);
+    result.weight = maxW.toLocaleString() + " LBS";
   } else {
-    // If table match fails, try near "Est Wgt" label specifically
-    const estWgtIdx = text.indexOf("Est Wgt");
-    if (estWgtIdx !== -1) {
-      const sub = text.substring(estWgtIdx, estWgtIdx + 300);
-      const m = sub.match(/(\d+(?:[,\s]\d{3})+)/) || sub.match(/(\d{4,})/);
-      if (m) result.weight = m[1].replace(/[,\s]/g, '') + " LBS";
-    }
-    
-    if (!result.weight) {
-      // Prefer numbers with at least 2 digits for weight to avoid picking up single digits like "4" from "Page 1" etc.
-      const weightMatch = text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,}(?:[,\s]\d{3})*)/i) || 
-                          text.match(/L\/W\/H\s+(\d+)\s+(\d{2,})/i) ||
-                          text.match(/Est\s*Wgt\s*(\d{2,})/i) ||
-                          text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,})/i);
-      if (weightMatch) {
-        const weightVal = weightMatch[2] || weightMatch[1];
-        result.weight = weightVal.replace(/[,\s]/g, '') + " LBS";
-      }
+    // Final fallback
+    const genericMatch = text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,}(?:[,\s]\d{3})*)/i);
+    if (genericMatch) {
+       result.weight = genericMatch[1].replace(/[,\s]/g, '') + " LBS";
     }
   }
 
@@ -310,15 +313,173 @@ function parseChRobinson(text: string): ParsedRateCon {
   return result;
 }
 
+function parseLandstar(text: string): ParsedRateCon {
+  // Normalize line endings and spaces
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
+  
+  // Common OCR fixes
+  text = text.replace(/\bKOKORO\b/ig, 'KOKOMO');
+
+  const result: ParsedRateCon = {
+    loadNumber: "",
+    weight: "",
+    rate: "",
+    stops: [],
+    pickupTime: "",
+    pickupDate: "",
+    deliveryTime: "",
+    originAddress: "",
+    destinationAddress: "",
+    brokerName: "LANDSTAR",
+    rawTextPreview: text.substring(0, 200) + "..."
+  };
+
+  // Load Number
+  // Freight Bill # 3101610 or EL # EL10420551
+  const loadMatch = text.match(/Freight\s*Bill\s*#\s*(\d+)/i) || 
+                    text.match(/EL\s*#\s*(EL\d+)/i) ||
+                    text.match(/EL\s*#\s*(\d+)/i);
+  if (loadMatch) result.loadNumber = loadMatch[1];
+
+  // Weight extraction (Collect all and pick max, consistent with Robinson preference)
+  const weightMatches: number[] = [];
+  const landstarWeightRegex = /(?:Wgt|Weight)\s*[:]?\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/gi;
+  let wMatch;
+  while ((wMatch = landstarWeightRegex.exec(text)) !== null) {
+    const val = parseFloat(wMatch[1].replace(/[,\s]/g, ''));
+    if (!isNaN(val) && val > 10) weightMatches.push(val);
+  }
+  if (weightMatches.length > 0) {
+    result.weight = Math.max(...weightMatches).toLocaleString() + " LBS";
+  }
+
+  // Rate
+  const rateMatch = text.match(/Total\s*[:]?\s*\$?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/Charge\s*\$?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/Agreed\s*Rate[\s\S]*?Charge[\s\S]*?\$?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i);
+  if (rateMatch) result.rate = rateMatch[1].replace(/[,\s]/g, '');
+
+  // Stops
+  // Stop #1 Pickup - 
+  const stopsRaw = text.split(/(?=Stop\s*#\d+\s*(?:Pickup|Drop|Delivery|Drop-off))/i);
+  stopsRaw.forEach(section => {
+    const isPickup = /Stop\s*#\d+\s*Pickup/i.test(section);
+    const isDelivery = /Stop\s*#\d+\s*(?:Drop|Delivery|Drop-off)/i.test(section);
+    
+    if (isPickup || isDelivery) {
+      const type = isPickup ? 'pickup' : 'delivery';
+      const labelMatch = section.match(/Stop\s*#\d+\s*(?:Pickup|Drop|Delivery|Drop-off)/i);
+      const label = labelMatch ? labelMatch[0].trim() : (isPickup ? 'Pickup' : 'Delivery');
+
+      // Date & Time from "Target Window"
+      // Target Window 05/06/2026 06:00 - 05/06/2026 06:00
+      const windowMatch = section.match(/Target\s*Window\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})(?:\s*(\d{1,2}:\d{2}))?\s*[-–]\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})?(?:\s*(\d{1,2}:\d{2}))?/i);
+      let date = "";
+      let time = "";
+      if (windowMatch) {
+         date = windowMatch[1].replace(/[\/.-]/g, '.');
+         const startTime = windowMatch[2];
+         const endTime = windowMatch[4];
+         if (startTime && endTime && startTime !== endTime) {
+           time = `${startTime} - ${endTime}`;
+         } else if (startTime) {
+           time = startTime;
+         }
+      }
+
+      // Address extraction
+      let addressParts: string[] = [];
+      
+      // Split the section by known labels to isolate address components
+      const blocks = section.split(/\b(?:Stop\s*#\d+|Target\s*Window|Location|Address|Contact|Phone|Notes|Item|Qty|Wgt|Appoint)\b/i);
+      blocks.forEach(b => {
+        let clean = b.trim();
+        if (clean.length > 2) {
+          // Remove trailing/leading punctuation specifically for Landstar headers
+          clean = clean.replace(/^[:\-\s,]+|[:\-\s,]+$/g, "");
+          if (clean && !addressParts.includes(clean)) {
+            addressParts.push(clean);
+          }
+        }
+      });
+
+      // Per user request: Favor the part that contains "City, ST Zip"
+      // We use case-insensitive matching for the city name to avoid missing parts due to OCR case errors
+      let cityStateZip = "";
+      for (const part of addressParts) {
+        // High confidence match: "City, ST 12345" or "City, ST" 
+        // We look for at least 3 letters for city name, a comma, and a 2-letter state code
+        if (part.match(/\b[A-Za-z\s\.]{3,},\s*[A-Z]{2}\b/i)) {
+          cityStateZip = part;
+          break;
+        }
+      }
+
+      let address = cityStateZip || addressParts.filter(p => p.length > 5 && !p.match(/^\d+$/)).join(", ");
+
+      // Fallback address logic if labels are messy
+      if (!address) {
+        const lines = section.split('\n');
+        const startIdx = lines.findIndex(l => /Stop\s*#\d+/i.test(l));
+        if (startIdx !== -1) {
+          for (let i = 1; i < 8; i++) {
+            const line = lines[startIdx + i]?.trim();
+            if (line && line.length > 5 && !/Stop|Window|Date|Time|Appoint|Contact|Phone|Notes|Item|Qty|Wgt/i.test(line)) {
+              if (line.match(/\b[A-Za-z\s]+,\s*[A-Z]{2}\b/i) || line.match(/\b[A-Z]{2}\s+\d{4,5}/)) {
+                address = line;
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      if (address) {
+        result.stops.push({
+          type,
+          address,
+          date,
+          time,
+          label
+        });
+      }
+    }
+  });
+
+  if (result.stops.length > 0) {
+    const pickups = result.stops.filter(s => s.type === 'pickup');
+    const deliveries = result.stops.filter(s => s.type === 'delivery');
+    
+    if (pickups.length > 0) {
+      result.pickupTime = pickups[0].time;
+      result.pickupDate = pickups[0].date;
+      result.originAddress = pickups[0].address;
+    }
+    if (deliveries.length > 0) {
+      const lastDel = deliveries[deliveries.length - 1];
+      result.deliveryTime = lastDel.time;
+      result.destinationAddress = lastDel.address;
+    }
+  }
+
+  return result;
+}
+
 export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
   
-  // High-confidence Robinson detection: Check for typical headers
+  // High-confidence Robinson detection
   const isRobinson = (lowerText.includes('c.h. robinson') || lowerText.includes('ch robinson')) && 
                      !lowerText.includes('traffix');
 
   if (isRobinson) {
     return parseChRobinson(text);
+  }
+
+  // Landstar detection
+  const isLandstar = lowerText.includes('landstar') || lowerText.includes('freight bill #');
+  if (isLandstar) {
+    return parseLandstar(text);
   }
 
   const isTraffix = lowerText.includes('traffix');

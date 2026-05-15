@@ -179,6 +179,26 @@ const getBaseSteps = (data: ParsedRateCon | null): VerificationStep[] => {
 
 // --- Helper Functions ---
 
+const formatWeight = (w: string) => {
+  if (!w) return "?";
+  // Remove "LBS" but keep commas if present
+  const clean = w.replace(/\s*lbs?\s*/gi, '').trim();
+  
+  const numericOnly = clean.replace(/[^0-9]/g, '');
+  if (!numericOnly) return clean;
+  const num = parseInt(numericOnly, 10);
+  if (isNaN(num)) return clean;
+
+  // Use KLB for large rounded numbers, but preserve decimals for precision
+  if (num >= 1000) {
+    const klb = num / 1000;
+    if (klb % 1 === 0) return `${klb}KLB`;
+    // If it has decimals, keep up to 2 but remove trailing zeros (e.g. 6.5)
+    return `${parseFloat(klb.toFixed(2))}KLB`;
+  }
+  return `${num}LB`;
+};
+
 const formatAddress = (fullAddress: string, simplified: boolean) => {
   if (!simplified || !fullAddress) return fullAddress;
 
@@ -224,7 +244,13 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
       }
     }
     
-    // Fallback: Just take the last word if it looks like a city
+    // Fallback: If no clear suffix marker and the string doesn't start with digits (suggesting no street number),
+    // assume the whole part is the city name.
+    if (!/^\d+/.test(cleanedPart)) {
+      return `${cleanedPart.toUpperCase()}, ${state.toUpperCase()} ${zip}`.trim();
+    }
+
+    // Fallback for strings starting with digits: Just take the last word if it looks like a city
     const words = cleanedPart.split(/\s+/);
     if (words.length >= 1) {
       const lastWord = words[words.length - 1];
@@ -1111,7 +1137,7 @@ export default function App() {
   const [currentSteps, setCurrentSteps] = useState<VerificationStep[]>([]);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>("dakota_hasSeenWelcome", false);
-  const [hasSeenRobinsonUpdate, setHasSeenRobinsonUpdate] = useLocalStorage<boolean>("dakota_hasSeenRobinsonUpdate_v1", false);
+  const [hasSeenLandstarUpdate, setHasSeenLandstarUpdate] = useLocalStorage<boolean>("dakota_hasSeenLandstarUpdate_v1", false);
   
   // History State
   const [history, setHistory] = useLocalStorage<HistoryItem[]>("dakota_history", []);
@@ -1625,7 +1651,7 @@ export default function App() {
     const rename = generateRenameString(data, tNum);
     setRenameText(rename);
 
-    const weightLine = `W${data.weight || "?"}\n`;
+    const weightLine = `W${formatWeight(data.weight)}\n`;
     let notes = "";
 
     if (overnight && data.stops && data.stops.length > 0) {
@@ -1774,18 +1800,6 @@ export default function App() {
       
       // Update notes with new chain (replace last line)
       setNotesText(prev => {
-        const formatWeight = (w: string) => {
-          if (!w) return "?";
-          const numericOnly = w.replace(/[^0-9]/g, '');
-          if (!numericOnly) return w;
-          const num = parseInt(numericOnly, 10);
-          if (isNaN(num)) return w;
-          if (num >= 1000) {
-            return `${Math.round(num / 1000)}KLB`;
-          }
-          return `${num}LB`;
-        };
-
         const overnight = isOvernight(extractedData);
         const weightFormatted = formatWeight(extractedData.weight);
         const weightLine = `W${weightFormatted}\n`;
@@ -2189,8 +2203,8 @@ export default function App() {
       </AnimatePresence>
 
       <UpdateModal 
-        isOpen={hasSeenWelcome && !hasSeenRobinsonUpdate} 
-        onClose={() => setHasSeenRobinsonUpdate(true)}
+        isOpen={hasSeenWelcome && !hasSeenLandstarUpdate} 
+        onClose={() => setHasSeenLandstarUpdate(true)}
         isDarkMode={isDarkMode}
       />
 
