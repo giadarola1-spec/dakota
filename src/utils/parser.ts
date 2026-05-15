@@ -465,6 +465,137 @@ function parseLandstar(text: string): ParsedRateCon {
   return result;
 }
 
+function parseTQL(text: string): ParsedRateCon {
+  // Normalize
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
+
+  const result: ParsedRateCon = {
+    loadNumber: "",
+    weight: "",
+    rate: "",
+    stops: [],
+    pickupTime: "",
+    pickupDate: "",
+    deliveryTime: "",
+    originAddress: "",
+    destinationAddress: "",
+    brokerName: "TQL",
+    rawTextPreview: text.substring(0, 200) + "..."
+  };
+
+  // Load Number: TQL PO# 36493960
+  const poMatch = text.match(/TQL\s*PO#\s*(\d+)/i) || text.match(/PO#\s*(\d{8})/);
+  if (poMatch) result.loadNumber = poMatch[1];
+
+  // Weight: Estimated Weight 42000
+  const weightMatch = text.match(/Estimated\s*Weight\s*(\d+)/i) || 
+                      text.match(/Weight\s*[:]?\s*(\d{1,3}(?:[,\s]\d{3})*)/i);
+  if (weightMatch) result.weight = weightMatch[1].replace(/[,\s]/g, '') + " LBS";
+
+  // Rate: TQL often hides rate on info sheets, but look for it.
+  const rateMatch = text.match(/(?:Total\s*Charge|Carrier\s*Pay|Rate)\s*[:]?\s*\$?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i);
+  if (rateMatch) result.rate = rateMatch[1].replace(/[,\s]/g, '');
+
+  // Stops Detection
+  // TQL uses PICKUPS and DROPS headers
+  const pickupPart = text.split(/\bPICKUPS\b/i)[1] || "";
+  const pickupSection = pickupPart.split(/\bDROPS\b/i)[0] || "";
+  const dropSection = text.split(/\bDROPS\b/i)[1] || "";
+
+  const extractTQLStops = (section: string, type: 'pickup' | 'delivery') => {
+    // TQL tables: [Name/Shed] [City] [State] [Zip] [Ref#] [Date] [Time]
+    // We look for patterns like "Pittsburgh PA 15225"
+    const stopRegex = /\b([A-Z][A-Za-z\s\.\,\/\(\)\-]{2,40})\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b/g;
+    let match;
+    const addedZips = new Set<string>();
+
+    while ((match = stopRegex.exec(section)) !== null) {
+      let rawCity = match[1].trim();
+      const st = match[2].toUpperCase();
+      const zip = match[3];
+
+      // 1. Remove parenthetical text: "(NEVILLE ISLAND,PA)"
+      let city = rawCity.replace(/\([^\)]*\)/g, "").trim();
+      
+      // 2. Split by common delimiters
+      const parts = city.split(/[\/\n,]/);
+      city = parts[parts.length - 1].trim();
+      
+      // 3. Filter common facility keywords
+      const facilityKeywords = ["RECYCLING", "WASTE", "MANAGEMENT", "GREENSTAR", "PLANT", "WAREHOUSE", "LOGISTICS", "INDUSTRIES", "CORP", "INC", "LLC", "Shed"];
+      let words = city.split(/\s+/).filter(w => w.length > 0);
+      words = words.filter(w => !facilityKeywords.includes(w.toUpperCase()));
+      
+      // 4. Refine to last 1-2 words (most cities are 1-2 words)
+      if (words.length > 2) {
+        words = words.slice(-2);
+      }
+      
+      // 5. De-duplicate consecutive identical words (e.g. HENDERSON HENDERSON)
+      if (words.length === 2 && words[0].toLowerCase() === words[1].toLowerCase()) {
+        city = words[1];
+      } else {
+        city = words.join(" ");
+      }
+      
+      // Clean up punctuation
+      city = city.replace(/^[\s,.-]+|[\s,.-]+$/g, "").trim();
+      
+      const cleanAddress = `${city}, ${st} ${zip}`;
+      
+      // De-duplicate: If we already have this zip in this section, skip it
+      // This handles the case where the city is mentioned multiple times or in slightly different ways
+      if (addedZips.has(zip)) continue;
+      
+      // Look forward for date and time
+      const forwardWindow = section.substring(match.index, Math.min(match.index + 300, section.length));
+      const dateMatch = forwardWindow.match(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/);
+      
+      // TQL Time formats: "FCFS 06:00 to 16:00", "Appt 09:10", "Window 08:00 - 12:00"
+      const timeMatch = forwardWindow.match(/(?:FCFS|Appt|Window|Target)?\s*(\d{1,2}:\d{2}\s*(?:to|[-–]|through)\s*\d{1,2}:\d{2}|\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i) ||
+                        forwardWindow.match(/(\d{1,2}:\d{2}\s*(?:to|[-–]|through)\s*\d{1,2}:\d{2})/);
+      
+      const date = dateMatch ? dateMatch[1].replace(/[\/.-]/g, '.') : "";
+      let time = timeMatch ? timeMatch[0].trim() : "";
+      
+      // Clean up "FCFS", "Appt" from the start of time
+      time = time.replace(/^(?:FCFS|Appt|Window|Target)\s+/i, "");
+
+      if (city) {
+        result.stops.push({
+          type,
+          address: cleanAddress,
+          date,
+          time,
+          label: type === 'pickup' ? 'Pickup' : 'Delivery'
+        });
+        addedZips.add(zip);
+      }
+    }
+  };
+
+  extractTQLStops(pickupSection, 'pickup');
+  extractTQLStops(dropSection, 'delivery');
+
+  // Final verification for required fields
+  if (result.stops.length > 0) {
+    const p = result.stops.filter(s => s.type === 'pickup');
+    const d = result.stops.filter(s => s.type === 'delivery');
+    if (p.length > 0) {
+      result.pickupDate = p[0].date;
+      result.pickupTime = p[0].time;
+      result.originAddress = p[0].address;
+    }
+    if (d.length > 0) {
+      const last = d[d.length - 1];
+      result.deliveryTime = last.time;
+      result.destinationAddress = last.address;
+    }
+  }
+
+  return result;
+}
+
 export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
   
@@ -480,6 +611,12 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const isLandstar = lowerText.includes('landstar') || lowerText.includes('freight bill #');
   if (isLandstar) {
     return parseLandstar(text);
+  }
+
+  // TQL detection
+  const isTQL = lowerText.includes('tql') && (lowerText.includes('po#') || lowerText.includes('p.o.#'));
+  if (isTQL) {
+    return parseTQL(text);
   }
 
   const isTraffix = lowerText.includes('traffix');

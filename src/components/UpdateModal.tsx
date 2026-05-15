@@ -85,9 +85,9 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
                     <Zap size={20} className="text-purple-500" />
                   </div>
                   <div className="flex flex-col justify-center">
-                    <h4 className={`font-bold ${isDarkMode ? 'text-white' : 'text-zinc-900'} text-sm`}>Landstar (Beta)</h4>
+                    <h4 className={`font-bold ${isDarkMode ? 'text-white' : 'text-zinc-900'} text-sm`}>Landstar & TQL (Beta)</h4>
                     <p className={`text-[11px] ${isDarkMode ? 'text-zinc-400' : 'text-zinc-500'} leading-relaxed mt-0.5`}>
-                      Experimental support for Landstar Rate Confirmations.
+                      Experimental support for Landstar and TQL Rate Confirmations.
                     </p>
                   </div>
                 </div>

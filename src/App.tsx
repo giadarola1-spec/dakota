@@ -1137,7 +1137,7 @@ export default function App() {
   const [currentSteps, setCurrentSteps] = useState<VerificationStep[]>([]);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>("dakota_hasSeenWelcome", false);
-  const [hasSeenLandstarUpdate, setHasSeenLandstarUpdate] = useLocalStorage<boolean>("dakota_hasSeenLandstarUpdate_v1", false);
+  const [hasSeenTQLUpdate, setHasSeenTQLUpdate] = useLocalStorage<boolean>("dakota_hasSeenTQLUpdate_v1", false);
   
   // History State
   const [history, setHistory] = useLocalStorage<HistoryItem[]>("dakota_history", []);
@@ -2057,6 +2057,24 @@ export default function App() {
         </motion.div>
       )}
 
+      {(isViewingHistory ? currentHistoryItem?.broker === "TQL" : extractedData?.brokerName === "TQL") && (
+        <motion.div 
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-5 flex items-start gap-4"
+        >
+          <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center flex-none">
+            <Info size={20} className="text-blue-500" />
+          </div>
+          <div className="flex flex-col">
+            <h4 className="text-blue-500 font-bold text-sm tracking-tight">AVISO DE TQL</h4>
+            <p className={`${theme.textMuted} text-xs mt-1 font-medium leading-relaxed uppercase tracking-tighter`}>
+              El rate se consigue en el otro documento del rate confirmation (Load Tender).
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Box 1: Route */}
         <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} overflow-hidden flex flex-col hover:border-zinc-500/30 transition-colors group shadow-sm`}>
@@ -2203,8 +2221,8 @@ export default function App() {
       </AnimatePresence>
 
       <UpdateModal 
-        isOpen={hasSeenWelcome && !hasSeenLandstarUpdate} 
-        onClose={() => setHasSeenLandstarUpdate(true)}
+        isOpen={hasSeenWelcome && !hasSeenTQLUpdate} 
+        onClose={() => setHasSeenTQLUpdate(true)}
         isDarkMode={isDarkMode}
       />
 
