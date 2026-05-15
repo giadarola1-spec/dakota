@@ -108,8 +108,16 @@ const getOvernightMessage = (data: ParsedRateCon | null) => {
 
 const getTimezoneByAddress = (address: string | undefined): string => {
   if (!address) return "";
-  // Search for State code before ZIP (e.g. "IN 46802" or "IN, 46802")
-  const match = address.match(/([A-Z]{2})[,\s]*\d{5}/);
+  
+  const upperAddr = address.toUpperCase();
+
+  // Specific city overrides
+  if (upperAddr.includes("KNOXVILLE") && upperAddr.includes("TN")) {
+    return " EDT";
+  }
+
+  // Search for State code before ZIP (e.g. "IN 46802" or "IN, 46802" or "MA 1152")
+  const match = address.match(/([A-Z]{2})\s*[\s,]\s*(\d{4,5})/);
   const state = match ? match[1] : "";
 
   const tzMap: Record<string, string> = {
@@ -128,7 +136,7 @@ const getTimezoneByAddress = (address: string | undefined): string => {
     'WA': 'PDT', 'OR': 'PDT', 'CA': 'PDT', 'NV': 'PDT'
   };
 
-  return tzMap[state] ? ` ${tzMap[state]}` : "";
+  return tzMap[state] ? ` ${tzMap[state]}` : (upperAddr.includes("MA") ? " EDT" : "");
 };
 
 const getBaseSteps = (data: ParsedRateCon | null): VerificationStep[] => {
@@ -231,9 +239,9 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
   const trimmedAddr = fullAddress.trim();
 
   // 1. Find State and Zip at the end (Zip is optional but preferred)
-  const stateZipMatch = trimmedAddr.match(/,\s*([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?\s*$/i);
+  const stateZipMatch = trimmedAddr.match(/,\s*([A-Z]{2})(?:\s+(\d{4,5}(?:-\d{4})?))?\s*$/i);
   if (!stateZipMatch) {
-     const stateZipMatchNoComma = trimmedAddr.match(/\s+([A-Z]{2})(?:\s+(\d{5}(?:-\d{4})?))?\s*$/i);
+     const stateZipMatchNoComma = trimmedAddr.match(/\s+([A-Z]{2})(?:\s+(\d{4,5}(?:-\d{4})?))?\s*$/i);
      if (!stateZipMatchNoComma) return fullAddress;
      
      const [_, state, zip] = stateZipMatchNoComma;

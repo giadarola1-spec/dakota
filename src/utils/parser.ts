@@ -11,8 +11,8 @@ const PATTERNS = {
     /\b(\d{7,})\b/
   ],
   weight: [
-    /(?:Weight|Wt|Gross\s*Wt|Estimated\s*Weight|Total\s*Weight|Net\s*Wt|Actual\s*Wt|Wgt|Scale\s*Weight|Est\s*Wgt|Est\s*wgt|Exp\s*wt|Net\s*Weight|Kilograms)\s*[:.]?\s*(\d+(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs|kg|kilograms)?/i,
-    /(\d+(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs|kg|kilograms)/i
+    /(?:Weight|Wt|Gross\s*Wt|Estimated\s*Weight|Total\s*Weight|Net\s*Wt|Actual\s*Wt|Wgt|Scale\s*Weight|Est\s*Wgt|Est\s*wgt|Exp\s*wt|Net\s*Weight|Kilograms)\s*[:.]?\s*(\d+(?:[,\s]\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs|kg|kilograms)?/i,
+    /(\d+(?:[,\s]\d{3})*|\d+)\s*(?:lbs|LBS|pounds|kgs|kg|kilograms)/i
   ],
   rate: [
     /(?:Rate|Total|Amount|Pay|Flat\s*Rate|Total\s*Pay|Total\s*Amount|Carrier\s*Pay|Linehaul|All-in|Grand\s*Total|Total\s*Carrier\s*Pay|Agreed\s*Amount|Total\s*Charges|Fuel\s*Surcharge|FSC|Accessorials|Lumper|Detention|Payout|Pay\s*Summary|Total\s*Rate|Carrier\s*Pay|Amount\s*to\s*invoice)\s*(?:USD|CAD|GBP)?\s*[:.]?\s*\$?\s*(\d+(?:,\d{3})(?:\.\d{2})?)/i,
@@ -25,11 +25,11 @@ const PATTERNS = {
   timezone: /\b(EST|CST|MST|PST|EDT|CDT|MDT|PDT|AST|HST|AKST|AKDT|UTC|GMT)\b/i,
   address: [
     /(1671\s+GREENBOURNE\s+DR.*GREENSBORO\s*,\s*NC\s*[\s\n]*27409)/i,
-    /(?:Address|Location|Pickup|Delivery)\s*[:\-]?\s*((?:\d+\s+)?[A-Za-z0-9\s\n\.,#:\/-]{5,150}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{5}(?:-\d{4})?)/i,
-    /(\d{2,}\s+[A-Za-z0-9\s\n\.,#:\/-]{2,120}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{5}(?:-\d{4})?)/i,
-    /\b([A-Za-z0-9\s\n\.,#:\/-]{5,120}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{5}(?:-\d{4})?)/i,
-    /\b([A-Z][A-Za-z \t\n\.,\/]{2,30}(?:,|\s+|\n)\s*(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{5}(?:-\d{4})?)/i,
-    /\b([A-Za-z0-9\s\n\.,#:\/-]{2,100}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\b(?:\s*(\d{5}(?:-\d{4})?))?)/i
+    /(?:Address|Location|Pickup|Delivery)\s*[:\-]?\s*((?:\d+\s+)?[A-Za-z0-9\s\n\.,#:\/-]{5,150}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{4,5}(?:-\d{4})?)/i,
+    /(\d{2,}\s+[A-Za-z0-9\s\n\.,#:\/-]{2,120}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{4,5}(?:-\d{4})?)/i,
+    /\b([A-Za-z0-9\s\n\.,#:\/-]{5,120}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{4,5}(?:-\d{4})?)/i,
+    /\b([A-Z][A-Za-z \t\n\.,\/]{2,30}(?:,|\s+|\n)\s*(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\s*[\s\n]*\d{4,5}(?:-\d{4})?)/i,
+    /\b([A-Za-z0-9\s\n\.,#:\/-]{2,100}?\s+(?:AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\b(?:\s*(\d{4,5}(?:-\d{4})?))?)/i
   ]
 };
 
@@ -119,36 +119,36 @@ function parseChRobinson(text: string): ParsedRateCon {
 
   // Weight
   // Robinson commodity tables: [Commodity Name] [Weight] [Units] [Count] [Pallets]
-  // Capture the weight (usually has commas or is large) before the units label.
-  const weightTableMatch = text.match(/Commodity\s*Est\s*Wgt\s*Units\s*Count\s*Pallets[\s\S]*?(\d+(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
-                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[\s\n]*Units\s*Stack\s*Frt\s*Class\s*Temp\s*L\/W\/H\s*[\d\/]+\s*(\d+(?:,\d{3})*)/i) ||
-                           text.match(/Est\s*Wgt\s*Units\s*Count\s*Pallets\s*Temp\s*Ref\s*#\s*\n\s*[^\n]*?\s*(\d+(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
-                           text.match(/(\d+(?:,\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)\s+(?:\d+)/i) ||
-                           text.match(/(\d+)\s+(\d+)\s+(\d+(?:,\d{3})*(?:\.\d+)?)\s+Total/i) ||
-                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[^\n]*\n[^\n]*\s*[\d\/]+\s+(?:Piece|Pieces|Units|Pallets)\s+(\d+(?:,\d{3})*(?:\.\d+)?)/i);
+  // Capture the weight (usually has commas, spaces or is large) before the units label.
+  const weightTableMatch = text.match(/Commodity\s*Est\s*Wgt\s*Units\s*Count\s*Pallets[\s\S]*?(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
+                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[\s\n]*Units\s*Stack\s*Frt\s*Class\s*Temp\s*L\/W\/H\s*[\d\/]+\s*(\d+(?:[,\s]\d{3})*)/i) ||
+                           text.match(/Est\s*Wgt\s*Units\s*Count\s*Pallets\s*Temp\s*Ref\s*#\s*\n\s*[^\n]*?\s*(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)/i) ||
+                           text.match(/(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Pieces|Units|Piece|Pallets)\s+(?:\d+)/i) ||
+                           text.match(/(\d+)\s+(\d+)\s+(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+Total/i) ||
+                           text.match(/Est\s*Wgt\s*Volume\s*Commodity\s*[^\n]*\n[^\n]*\s*[\d\/]+\s+(?:Piece|Pieces|Units|Pallets)\s+(\d+(?:[,\s]\d{3})*(?:\.\d+)?)/i);
   
   if (weightTableMatch) {
     // If it was the "Total" match, the weight is the 3rd group
     const weightVal = weightTableMatch[3] || weightTableMatch[1];
-    result.weight = weightVal.replace(/,/g, '') + " LBS";
+    result.weight = weightVal.replace(/[,\s]/g, '') + " LBS";
   } else {
     // If table match fails, try near "Est Wgt" label specifically
     const estWgtIdx = text.indexOf("Est Wgt");
     if (estWgtIdx !== -1) {
       const sub = text.substring(estWgtIdx, estWgtIdx + 300);
-      const m = sub.match(/(\d+(?:,\d{3})+)/) || sub.match(/(\d{4,})/);
-      if (m) result.weight = m[1].replace(/,/g, '') + " LBS";
+      const m = sub.match(/(\d+(?:[,\s]\d{3})+)/) || sub.match(/(\d{4,})/);
+      if (m) result.weight = m[1].replace(/[,\s]/g, '') + " LBS";
     }
     
     if (!result.weight) {
       // Prefer numbers with at least 2 digits for weight to avoid picking up single digits like "4" from "Page 1" etc.
-      const weightMatch = text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,}(?:,\d{3})*)/i) || 
+      const weightMatch = text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,}(?:[,\s]\d{3})*)/i) || 
                           text.match(/L\/W\/H\s+(\d+)\s+(\d{2,})/i) ||
                           text.match(/Est\s*Wgt\s*(\d{2,})/i) ||
                           text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,})/i);
       if (weightMatch) {
         const weightVal = weightMatch[2] || weightMatch[1];
-        result.weight = weightVal.replace(/,/g, '') + " LBS";
+        result.weight = weightVal.replace(/[,\s]/g, '') + " LBS";
       }
     }
   }
@@ -224,7 +224,7 @@ function parseChRobinson(text: string): ParsedRateCon {
       // Look for Address: ... until next key field or Zip:
       const addrMatch = section.match(/Address\s*[:]?\s*([^\n\*]+)/i);
       let cityStateMatch = section.match(/([A-Z][A-Za-z\s]+,\s*[A-Z]{2})/) || section.match(/([A-Z\s]{2,},\s*[A-Z]{2})/); // Knoxville, TN or FRANKFORT, IN
-      const zipMatch = section.match(/Zip\s*[:]?\s*(\d{5})/i) || section.match(/,\s*[A-Z]{2}\s*(\d{5})/);
+      const zipMatch = section.match(/Zip\s*[:]?\s*(\d{4,5})/i) || section.match(/,\s*[A-Z]{2}\s*(\d{4,5})/);
       
       const cleanRobinsonText = (t: string): string => {
         if (!t) return "";
@@ -336,18 +336,32 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     // Replace newlines with spaces and normalize whitespace
     let cleaned = addr.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
     
+    // Specifically handle common OCR artifacts where multiple labels are joined
+    // Remove specific labels from anywhere in the string
+    const noisyLabels = [/REFERENCE\s*NUMBERS/i, /CONSIGNEE\s*[:]?/i, /SHIPPER\s*[:]?/i, /FACILITY\s*NAME\s*[:]?/i, /SPRINGFIELD\s*NDC\s*01Z/i];
+    for (const label of noisyLabels) {
+      cleaned = cleaned.replace(label, "");
+    }
+
+    // If "Address:" or "Location:" is in the middle of the string, it often indicates facility name noise before it
+    const addrLabelMatch = cleaned.match(/(?:ADDRESS|LOCATION)\s*[:]?\s*/i);
+    if (addrLabelMatch && addrLabelMatch.index && addrLabelMatch.index > 5) {
+      cleaned = cleaned.substring(addrLabelMatch.index + addrLabelMatch[0].length).trim();
+    }
+
     // Remove leading noise (labels at the start)
-    // We also handle cases where a number from a previous field is caught (e.g., "480 Reference Numbers Address:")
     const prefixPattern = /^(?:\s*(?:\d+\s+)?(?:LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DO|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF|PICK-UP\s*LOCATION|DELIVERY\s*LOCATION|DATE\s*TIME|NOTES|SPECIAL\s*INSTRUCTIONS|UP|PICK|INFO|CONTACT|NAME|PHONE|EMAIL|FAX|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|UNLOADING|RECEIPT|EXCHANGE|NOTE|CARRIER|COMMODITY|HANDLING|UNITS|STACKABLE|PIECES|DIMS|TEMP|TEMPERATURE|CONFIRM|RECEIPT|OF|REFERENCE\s*NUMBERS|REF\s*#|REFERENCE)\s*[:\/\-]?\s*)+/i;
     cleaned = cleaned.replace(prefixPattern, "").trim();
     
     // Handle cases like "480 Address: 711..." where a number from a previous field is caught
-    // We remove any leading numbers if they are immediately followed by an address label or section header
     cleaned = cleaned.replace(/^\d+\s+(?:ADDRESS|LOCATION|SHIPPER|CONSIGNEE|PICKUP|DELIVERY|REFERENCE\s*NUMBERS)[:\-]?\s*/i, "").trim();
 
-    // Remove trailing noise (labels that might be caught from adjacent columns)
+    // Remove trailing noise
     const suffixPattern = /(?:\s*(?:REFERENCE\s*NUMBERS|REF\s*#|BOL\s*#|PICKUP\s*#|PU\s*#|DO\s*#|STOP\s*#|NOTES|SPECIAL\s*INSTRUCTIONS|CONTACT|PHONE|EMAIL|FAX|DATE|TIME|APPOINTMENT|APPT|WINDOW|ETA|SCHEDULED|ARRIVAL|CHECK-IN|FCFS|ASAP|DELIVERY|PICKUP|SHIPPER|CONSIGNEE|ORIGIN|DESTINATION|LOCATION|ADDRESS|FROM|TO|RECEIVER|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY|SHIPPING|RECEIVING|DROP|UP|PICK|INFO|NAME|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|RECEIPT|EXCHANGE|NOTE|CARRIER|COMMODITY|HANDLING|UNITS|STACKABLE|PIECES|DIMS|TEMP|CONFIRM|OF)\s*[:\/\-]?\s*)+$/i;
     cleaned = cleaned.replace(suffixPattern, "").trim();
+    
+    // Per user feedback, if the address contains "City, ST Zip" twice or is redundant, try to shorten it
+    // Or if it clearly has a street followed by city state zip, just keep that.
     
     const blacklist = [
       "1701 Edison Drive", "PO Box 9049", "Louisville, KY 40209", "Milford, OH 45150",
