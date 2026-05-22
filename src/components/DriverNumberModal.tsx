@@ -25,6 +25,11 @@ export const DriverNumberModal: React.FC<DriverNumberModalProps> = ({
       return;
     }
 
+    // Blur any focused background elements to prevent double triggers on Enter
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key >= '0' && e.key <= '9') {
         setDigits(prev => [...prev, e.key]);
@@ -32,9 +37,13 @@ export const DriverNumberModal: React.FC<DriverNumberModalProps> = ({
         setDigits(prev => prev.slice(0, -1));
       } else if (e.key === 'Enter') {
         if (digits.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
           onConfirm(digits.join(''));
         }
       } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
         onClose();
       }
     };

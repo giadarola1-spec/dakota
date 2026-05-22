@@ -1498,9 +1498,10 @@ export default function App() {
       setShowPdfInResults(false);
       await processPdfData(pdf);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("PDF Error:", error);
-      alert("Error reading PDF. Please try another file.");
+      // Use standard alert but preserve the rejection message if it comes from the parser
+      alert(error.message || "Error reading PDF. Please try another file.");
     } finally {
       setIsProcessing(false);
     }
@@ -1603,7 +1604,7 @@ export default function App() {
   // Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (appState !== 'verify') return;
+      if (appState !== 'verify' || isDriverModalOpen) return;
       
       // Don't navigate if user is typing in an input, unless it's Enter
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -1622,7 +1623,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [appState, currentStepIndex, extractedData]);
+  }, [appState, currentStepIndex, extractedData, isDriverModalOpen]);
 
   const finishVerification = (dataOverride: ParsedRateCon | null = null, truckNumberOverride: string | null = null) => {
     const data = dataOverride || extractedDataRef.current;

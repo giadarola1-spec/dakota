@@ -469,6 +469,12 @@ function parseTQL(text: string): ParsedRateCon {
   // Normalize
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
 
+  // Check if it's the "Rate Confirmation" instead of the "Information Sheet"
+  const isRateConfirmation = text.toUpperCase().includes('RATE CONFIRMATION');
+  if (isRateConfirmation) {
+    throw new Error("Este documento no tiene todos los detalles. Por favor, sube el otro documento del rate confirmation (Information Sheet / Load Tender).");
+  }
+
   const result: ParsedRateCon = {
     loadNumber: "",
     weight: "",
