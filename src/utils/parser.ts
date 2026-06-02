@@ -56,6 +56,28 @@ export interface ParsedRateCon {
   rawTextPreview: string;
 }
 
+export const normalizeDateHelper = (d: string): string => {
+  if (!d) return "";
+  const parts = d.split(/[\/\.\-]/);
+  if (parts.length === 3) {
+    let m = parts[0].trim();
+    let r = parts[1].trim(); // day
+    let y = parts[2].trim(); // year
+    
+    // Pad months and days to 2 digits
+    if (m.length === 1) m = "0" + m;
+    if (r.length === 1) r = "0" + r;
+    
+    // Convert 2-digit years to 4-digit years
+    if (y.length === 2) {
+      y = "20" + y;
+    }
+    
+    return `${m}.${r}.${y}`;
+  }
+  return d.replace(/[\/\.\-]/g, '.');
+};
+
 /**
  * Windowed Regex Strategy:
  * Searches for a value within a specific character window after an anchor keyword.
@@ -178,7 +200,7 @@ function parseChRobinson(text: string): ParsedRateCon {
       // Date extraction: Scheduled Pick Up* 5/13/2026 or Pick Up Date: 5/12/2026
       const dateMatch = section.match(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/) || 
                         section.match(/(?:Pick\s*Up\s*Date|Delivery\s*Date)\s*[:]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i);
-      let date = dateMatch ? dateMatch[1].replace(/[\/.-]/g, '.') : "";
+      let date = dateMatch ? normalizeDateHelper(dateMatch[1]) : "";
 
       // Time extraction: Pick Up Open 5/13/2026 5:10 AM or Pick Up Time: 22:00 Appt.
       // Handlers ranges like 07:00-14:30 or 13:00 Appt or 0700-1400
@@ -377,7 +399,7 @@ function parseLandstar(text: string): ParsedRateCon {
       let date = "";
       let time = "";
       if (windowMatch) {
-         date = windowMatch[1].replace(/[\/.-]/g, '.');
+         date = normalizeDateHelper(windowMatch[1]);
          const startTime = windowMatch[2];
          const endTime = windowMatch[4];
          if (startTime && endTime && startTime !== endTime) {
@@ -555,7 +577,7 @@ function parseTQL(text: string): ParsedRateCon {
       const timeMatch = forwardWindow.match(/(?:FCFS|Appt|Window|Target)?\s*(\d{1,2}:\d{2}\s*(?:to|[-–]|through)\s*\d{1,2}:\d{2}|\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i) ||
                         forwardWindow.match(/(\d{1,2}:\d{2}\s*(?:to|[-–]|through)\s*\d{1,2}:\d{2})/);
       
-      const date = dateMatch ? dateMatch[1].replace(/[\/.-]/g, '.') : "";
+      const date = dateMatch ? normalizeDateHelper(dateMatch[1]) : "";
       let time = timeMatch ? timeMatch[0].trim() : "";
       
       // Clean up "FCFS", "Appt" from the start of time
@@ -628,7 +650,7 @@ function parseTQL(text: string): ParsedRateCon {
       const timeMatch = forwardWindow.match(/(?:FCFS|Appt|Window|Target)?\s*(\d{1,2}:\d{2}\s*(?:to|[-–]|through)\s*\d{1,2}:\d{2}|\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i) ||
                         forwardWindow.match(/(\d{1,2}:\d{2}\s*(?:to|[-–]|through)\s*\d{1,2}:\d{2})/);
       
-      const date = dateMatch ? dateMatch[1].replace(/[\/.-]/g, '.') : "";
+      const date = dateMatch ? normalizeDateHelper(dateMatch[1]) : "";
       let time = timeMatch ? timeMatch[0].trim() : "";
       time = time.replace(/^(?:FCFS|Appt|Window|Target)\s+/i, "");
 
@@ -789,8 +811,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   };
 
   const normalizeDate = (d: string): string => {
-    if (!d) return "";
-    return d.replace(/[/.-]/g, '.');
+    return normalizeDateHelper(d);
   };
 
   const normalizeTime = (t: string): string => {

@@ -6,7 +6,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Set worker source to CDN for reliable production behavior
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs';
 
-import { parseRateConfirmation, ParsedRateCon } from './utils/parser';
+import { parseRateConfirmation, ParsedRateCon, normalizeDateHelper } from './utils/parser';
 import { DottedMapBackground } from './components/DottedMapBackground';
 import { LoadingScreen } from './components/LoadingScreen';
 import { DriverNumberModal } from './components/DriverNumberModal';
@@ -1739,7 +1739,7 @@ export default function App() {
     const lane = `${originState}-${destState}`;
 
     // Date: MM.DD.YYYY
-    const date = data.pickupDate ? data.pickupDate.replace(/[\/-]/g, '.') : "MM.DD.YYYY";
+    const date = data.pickupDate ? normalizeDateHelper(data.pickupDate) : "MM.DD.YYYY";
 
     let displayBroker = brk;
     if (brk.toUpperCase().includes('ROBINSON')) {
@@ -1785,7 +1785,7 @@ export default function App() {
     const destState = getRegion(data.destinationAddress);
     
     // Date: MM.DD.YYYY
-    const date = data.pickupDate ? data.pickupDate.replace(/[\/-]/g, '.') : "MM.DD.YYYY";
+    const date = data.pickupDate ? normalizeDateHelper(data.pickupDate) : "MM.DD.YYYY";
 
     return `${tNum}-${originState}-${destState}-${date}-C`;
   };
