@@ -469,12 +469,6 @@ function parseTQL(text: string): ParsedRateCon {
   // Normalize
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
 
-  // Check if it's the "Rate Confirmation" instead of the "Information Sheet"
-  const isRateConfirmation = text.toUpperCase().includes('RATE CONFIRMATION');
-  if (isRateConfirmation) {
-    throw new Error("Este documento no tiene todos los detalles. Por favor, sube el otro documento del rate confirmation (Information Sheet / Load Tender).");
-  }
-
   const result: ParsedRateCon = {
     loadNumber: "",
     weight: "",
@@ -582,6 +576,97 @@ function parseTQL(text: string): ParsedRateCon {
 
   extractTQLStops(pickupSection, 'pickup');
   extractTQLStops(dropSection, 'delivery');
+
+  // Fallback: search the entire text for city, state, zip patterns if no stops were found
+  if (result.stops.length === 0) {
+    const stopRegex = /\b([A-Z][A-Za-z\s\.\,\/\(\)\-]{2,40})\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b/g;
+    let match;
+    const foundStops: { type: 'pickup' | 'delivery'; address: string; date: string; time: string; index: number }[] = [];
+    const addedZips = new Set<string>();
+
+    while ((match = stopRegex.exec(text)) !== null) {
+      const rawCity = match[1].trim();
+      const st = match[2].toUpperCase();
+      const zip = match[3];
+
+      // Remove parenthetical noise & facility keywords
+      let city = rawCity.replace(/\([^\)]*\)/g, "").trim();
+      const parts = city.split(/[\/\n,]/);
+      city = parts[parts.length - 1].trim();
+      
+      const facilityKeywords = ["RECYCLING", "WASTE", "MANAGEMENT", "GREENSTAR", "PLANT", "WAREHOUSE", "LOGISTICS", "INDUSTRIES", "CORP", "INC", "LLC", "Shed", "TQL"];
+      let words = city.split(/\s+/).filter(w => w.length > 0);
+      words = words.filter(w => !facilityKeywords.includes(w.toUpperCase()));
+      
+      if (words.length > 2) words = words.slice(-2);
+      if (words.length === 2 && words[0].toLowerCase() === words[1].toLowerCase()) {
+        city = words[1];
+      } else {
+        city = words.join(" ");
+      }
+      city = city.replace(/^[\s,.-]+|[\s,.-]+$/g, "").trim();
+      
+      if (!city || city.length < 3) continue;
+      if (addedZips.has(zip)) continue;
+
+      const cleanAddress = `${city}, ${st} ${zip}`;
+
+      // Search 150 chars before the match for type cues
+      const startIdx = Math.max(0, match.index - 150);
+      const beforeText = text.substring(startIdx, match.index).toLowerCase();
+      
+      let type: 'pickup' | 'delivery' = 'pickup';
+      if (beforeText.includes('delivery') || beforeText.includes('drop') || beforeText.includes('consignee') || beforeText.includes('receiver') || beforeText.includes('del:')) {
+        type = 'delivery';
+      } else if (beforeText.includes('pickup') || beforeText.includes('pick up') || beforeText.includes('p/u') || beforeText.includes('shipper')) {
+        type = 'pickup';
+      }
+
+      // Extract date/time from a forward window
+      const forwardWindow = text.substring(match.index, Math.min(match.index + 200, text.length));
+      const dateMatch = forwardWindow.match(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/);
+      const timeMatch = forwardWindow.match(/(?:FCFS|Appt|Window|Target)?\s*(\d{1,2}:\d{2}\s*(?:to|[-–]|through)\s*\d{1,2}:\d{2}|\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i) ||
+                        forwardWindow.match(/(\d{1,2}:\d{2}\s*(?:to|[-–]|through)\s*\d{1,2}:\d{2})/);
+      
+      const date = dateMatch ? dateMatch[1].replace(/[\/.-]/g, '.') : "";
+      let time = timeMatch ? timeMatch[0].trim() : "";
+      time = time.replace(/^(?:FCFS|Appt|Window|Target)\s+/i, "");
+
+      foundStops.push({
+        type,
+        address: cleanAddress,
+        date,
+        time,
+        index: match.index
+      });
+      addedZips.add(zip);
+    }
+
+    // Adjust types if needed
+    if (foundStops.length === 2 && foundStops[0].type === foundStops[1].type) {
+      foundStops[0].type = 'pickup';
+      foundStops[1].type = 'delivery';
+    } else if (foundStops.length > 2) {
+      const hasPickup = foundStops.some(s => s.type === 'pickup');
+      const hasDelivery = foundStops.some(s => s.type === 'delivery');
+      if (hasPickup && !hasDelivery) {
+        foundStops[foundStops.length - 1].type = 'delivery';
+      } else if (!hasPickup && hasDelivery) {
+        foundStops[0].type = 'pickup';
+      }
+    }
+
+    // Map to result.stops
+    foundStops.forEach(s => {
+      result.stops.push({
+        type: s.type,
+        address: s.address,
+        date: s.date,
+        time: s.time,
+        label: s.type === 'pickup' ? 'Pickup' : 'Delivery'
+      });
+    });
+  }
 
   // Final verification for required fields
   if (result.stops.length > 0) {

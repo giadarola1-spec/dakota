@@ -2728,7 +2728,7 @@ export default function App() {
 
               <div className="p-5 border-t border-white/5 bg-black/5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-zinc-600 uppercase tracking-tighter">Dakota Stable 0410</span>
+                  <span className="text-[10px] font-medium text-zinc-600 uppercase tracking-tighter">Dakota 0626</span>
                   <div className="flex gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   </div>
