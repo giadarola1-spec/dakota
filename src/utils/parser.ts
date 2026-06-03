@@ -776,7 +776,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     
     const blacklist = [
       "1701 Edison Drive", "PO Box 9049", "Louisville, KY 40209", "Milford, OH 45150",
-      "FLEET ONE FACTORING", "WEX", "PO BOX 94565", "CLEVELAND, OH 44101",
+      "FLEET ONE FACTORING", "WEX", "PO BOX 94565",
       "pickup / delivery", "pickup/delivery", "pickup / delivery OR BOTH",
       "delivery OR BOTH", "pickup / delivery OR", "Pallet Yes", "Piece 20000",
       "Pallet", "Piece", "Commodity", "Handling Units"
@@ -978,7 +978,15 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   for (let i = 0; i < foundMarkers.length; i++) {
     const start = foundMarkers[i].index;
     const end = (i < foundMarkers.length - 1) ? foundMarkers[i + 1].index : text.length;
-    const section = text.substring(start, end);
+    let section = text.substring(start, end);
+    
+    // Truncate Terms & Conditions or boilerplates from the stop section to prevent false address matches
+    if (i === foundMarkers.length - 1) {
+      const termsIndex = section.search(/\b(?:Terms\s*(?:and|&)\s*Conditions|FAILURE\s*TO\s*COMPLY|Special\s*Instructions:|Trailer\s*Maintenance|Accept\/Decline\/View\s*Tender)\b/i);
+      if (termsIndex !== -1) {
+        section = section.substring(0, termsIndex);
+      }
+    }
     
     // Windowed extraction within the stop section
     const timeMatch = section.match(PATTERNS.time);
