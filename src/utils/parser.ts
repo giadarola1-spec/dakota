@@ -543,14 +543,40 @@ function parseTQL(text: string): ParsedRateCon {
 
   // Stops Detection
   // TQL uses PICKUPS and DROPS headers
-  const pickupPart = text.split(/\bPICKUPS\b/i)[1] || "";
-  const pickupSection = pickupPart.split(/\bDROPS\b/i)[0] || "";
-  const dropSection = text.split(/\bDROPS\b/i)[1] || "";
+  // sometimes DROPS is placed at the end of OCR or we have "Consignee City State" as section head
+  let pickupSection = "";
+  let dropSection = "";
+
+  const dropsIndex = text.search(/\bDROPS\b/i);
+  const consigneeIndex = text.search(/\bConsignee\b/i);
+
+  let splitIndex = -1;
+  const isDropsIndexAtEnd = dropsIndex > text.length - 150;
+  if (consigneeIndex !== -1 && (consigneeIndex < dropsIndex || dropsIndex === -1 || isDropsIndexAtEnd)) {
+    splitIndex = consigneeIndex;
+  } else {
+    splitIndex = dropsIndex;
+  }
+
+  if (splitIndex !== -1) {
+    pickupSection = text.substring(0, splitIndex);
+    dropSection = text.substring(splitIndex);
+  } else {
+    const splitByDrops = text.split(/\bDROPS\b/i);
+    if (splitByDrops.length > 1) {
+      pickupSection = splitByDrops[0];
+      dropSection = splitByDrops[1];
+    } else {
+      pickupSection = text;
+      dropSection = "";
+    }
+  }
 
   const extractTQLStops = (section: string, type: 'pickup' | 'delivery') => {
     // TQL tables: [Name/Shed] [City] [State] [Zip] [Ref#] [Date] [Time]
     // We look for patterns like "Pittsburgh PA 15225"
-    const stopRegex = /\b([A-Z][A-Za-z\s\.\,\/\(\)\-]{2,40})\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b/g;
+    // Restricting state abbreviation to actual valid US/Canadian identifiers to avoid matching PO Box, etc.
+    const stopRegex = /\b([A-Z][A-Za-z\s\.\,\/\(\)\-]{2,40})\s+(AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY|AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)\s+(\d{5}(?:-\d{4})?)\b/gi;
     let match;
     const addedZips = new Set<string>();
 
@@ -601,7 +627,8 @@ function parseTQL(text: string): ParsedRateCon {
                         forwardWindow.match(/(\d{1,2}:\d{2}\s*(?:to|[-–]|through)\s*\d{1,2}:\d{2})/);
       
       const date = dateMatch ? normalizeDateHelper(dateMatch[1]) : "";
-      let time = timeMatch ? timeMatch[0].trim() : "";
+      // Clean up newlines or extra spacing inside the matched time string
+      let time = timeMatch ? timeMatch[0].replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim() : "";
       
       // Clean up "FCFS", "Appt" from the start of time
       time = time.replace(/^(?:FCFS|Appt|Window|Target)\s+/i, "");
@@ -624,7 +651,7 @@ function parseTQL(text: string): ParsedRateCon {
 
   // Fallback: search the entire text for city, state, zip patterns if no stops were found
   if (result.stops.length === 0) {
-    const stopRegex = /\b([A-Z][A-Za-z\s\.\,\/\(\)\-]{2,40})\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b/g;
+    const stopRegex = /\b([A-Z][A-Za-z\s\.\,\/\(\)\-]{2,40})\s+(AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY|AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)\s+(\d{5}(?:-\d{4})?)\b/gi;
     let match;
     const foundStops: { type: 'pickup' | 'delivery'; address: string; date: string; time: string; index: number }[] = [];
     const addedZips = new Set<string>();
@@ -674,7 +701,7 @@ function parseTQL(text: string): ParsedRateCon {
                         forwardWindow.match(/(\d{1,2}:\d{2}\s*(?:to|[-–]|through)\s*\d{1,2}:\d{2})/);
       
       const date = dateMatch ? normalizeDateHelper(dateMatch[1]) : "";
-      let time = timeMatch ? timeMatch[0].trim() : "";
+      let time = timeMatch ? timeMatch[0].replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim() : "";
       time = time.replace(/^(?:FCFS|Appt|Window|Target)\s+/i, "");
 
       foundStops.push({
@@ -735,9 +762,16 @@ function parseTQL(text: string): ParsedRateCon {
 export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
   
+  // TQL detection - check first to prevent co-brokered boilerplates from triggering other brokers
+  const isTQL = lowerText.includes('tql') && (lowerText.includes('po#') || lowerText.includes('p.o.#') || lowerText.includes('total quality logistics'));
+  if (isTQL) {
+    return parseTQL(text);
+  }
+
   // High-confidence Robinson detection
   const isRobinson = (lowerText.includes('c.h. robinson') || lowerText.includes('ch robinson')) && 
-                     !lowerText.includes('traffix');
+                     !lowerText.includes('traffix') && 
+                     !lowerText.includes('tql');
 
   if (isRobinson) {
     return parseChRobinson(text);
@@ -747,12 +781,6 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const isLandstar = lowerText.includes('landstar') || lowerText.includes('freight bill #');
   if (isLandstar) {
     return parseLandstar(text);
-  }
-
-  // TQL detection
-  const isTQL = lowerText.includes('tql') && (lowerText.includes('po#') || lowerText.includes('p.o.#'));
-  if (isTQL) {
-    return parseTQL(text);
   }
 
   const isTraffix = lowerText.includes('traffix');
@@ -810,6 +838,44 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     }
     
     if (cleaned.length < 5) return "";
+
+    // Deduplicate duplicate consecutive words or phrases (e.g. FOX VALLEY Fox Valley)
+    // Helper to normalize a word/phrase for comparison (lowercase, alphanumeric only)
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    let words = cleaned.replace(/\s+/g, ' ').split(' ');
+    let k = 0;
+
+    while (k < words.length) {
+      let advanced = false;
+      // Check for duplicate phrases of length up to 4 words
+      for (let len = 4; len >= 1; len--) {
+        if (k + len * 2 <= words.length) {
+          const firstPhrase = words.slice(k, k + len).join(' ');
+          const secondPhrase = words.slice(k + len, k + len * 2).join(' ');
+          
+          if (norm(firstPhrase) === norm(secondPhrase)) {
+            const lastWordOfSecond = words[k + len * 2 - 1];
+            const hasComma = lastWordOfSecond.endsWith(',');
+            
+            words.splice(k + len, len);
+            
+            if (hasComma && !words[k + len - 1].endsWith(',')) {
+              words[k + len - 1] += ',';
+            }
+            
+            advanced = true;
+            break; // restart checking at index k with the updated words array
+          }
+        }
+      }
+      if (!advanced) {
+        k++;
+      }
+    }
+
+    cleaned = words.join(' ').replace(/\s+,/g, ',').replace(/\s+/g, ' ').trim();
+
     return cleaned;
   };
 
