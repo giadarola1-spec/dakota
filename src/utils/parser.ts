@@ -139,7 +139,7 @@ function parseChRobinson(text: string): ParsedRateCon {
     result.loadNumber = loadMatch[1].replace(/^T/i, '');
   }
 
-  // Weight extraction (Enhanced for Robinson to handle multiple rows)
+  // Weight extraction (Enhanced for Robinson to handle multiple rows and prevent false positives)
   const weightMatches: number[] = [];
   
   // 1. Look for weights in the commodity table: [Number] [Units]
@@ -151,28 +151,51 @@ function parseChRobinson(text: string): ParsedRateCon {
     if (!isNaN(val) && val > 10) weightMatches.push(val);
   }
 
-  // 2. Look for explicit total line
-  const totalMatch = text.match(/[\s\S]*?(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+Total\b/i) ||
-                     text.match(/(\d+)\s+(\d+)\s+(\d+(?:[,\s]\d{3})*(?:\.\d+)?)\s+Total/i);
-  if (totalMatch) {
-    const totalVal = parseFloat((totalMatch[3] || totalMatch[1]).replace(/[,\s]/g, ''));
-    if (!isNaN(totalVal)) weightMatches.push(totalVal);
+  // 2. Look for explicit total line (restricted to same-line to prevent crossing into fuel surcharge/rates)
+  const sameLineTotalMatch = text.match(/(?:\n|^)[^\n$]*?\b(\d{2,}(?:[,\s]\d{3})*(?:\.\d+)?)[ \t]+Total\b/i);
+  if (sameLineTotalMatch) {
+    const val = parseFloat(sameLineTotalMatch[1].replace(/[,\s]/g, ''));
+    if (!isNaN(val) && val > 10) weightMatches.push(val);
   }
 
-  // 3. Fallback to common labels near "Est Wgt"
-  const labelWeightRegex = /(?:Est\s*Wgt|Total\s*Weight|Weight|Wt)\s*[:]?\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/gi;
+  // 3. Locate the table under "Count Pallets Est Wgt" or similar header
+  const tableHeaderRegex = /Count\s+Pallets\s+(?:Est\s*Wgt|Est\s*Weight|Weight)/i;
+  const headerMatch = text.match(tableHeaderRegex);
+  if (headerMatch && headerMatch.index !== undefined) {
+    const remainingText = text.substring(headerMatch.index);
+    const lines = remainingText.split('\n');
+    for (let i = 1; i < Math.min(lines.length, 6); i++) {
+      const line = lines[i].trim();
+      if (/(?:Units|Stack|Frt|Class|Temp|L\/W\/H|Pieces|Weight|Pallets)/i.test(line)) {
+        continue;
+      }
+      const numbers = line.match(/\b\d+(?:[,\s]\d{3})*(?:\.\d+)?\b/g);
+      if (numbers && numbers.length >= 2) {
+        const floatVals = numbers.map(n => parseFloat(n.replace(/[,\s]/g, '')));
+        const possibleWeights = floatVals.filter(v => v >= 100);
+        if (possibleWeights.length > 0) {
+          const maxW = Math.max(...possibleWeights);
+          weightMatches.push(maxW);
+          break; // Found the data line
+        }
+      }
+    }
+  }
+
+  // 4. Fallback to common labels near "Est Wgt" (ensuring no $ is present on that line before selection)
+  const labelWeightRegex = /(?:\n|^)[^\n$]*?(?:Est\s*Wgt|Total\s*Weight|Weight|Wt)\s*[:]?\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/gi;
   while ((weightMatch = labelWeightRegex.exec(text)) !== null) {
     const val = parseFloat(weightMatch[1].replace(/[,\s]/g, ''));
     if (!isNaN(val) && val > 10) weightMatches.push(val);
   }
 
   if (weightMatches.length > 0) {
-    // Per user request, pick the largest weight found
+    // Pick the largest weight found
     const maxW = Math.max(...weightMatches);
     result.weight = maxW.toLocaleString() + " LBS";
   } else {
-    // Final fallback
-    const genericMatch = text.match(/(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,}(?:[,\s]\d{3})*)/i);
+    // Final fallback (ensuring no $ on that line)
+    const genericMatch = text.match(/(?:\n|^)[^\n$]*?(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,}(?:[,\s]\d{3})*)/i);
     if (genericMatch) {
        result.weight = genericMatch[1].replace(/[,\s]/g, '') + " LBS";
     }
@@ -212,12 +235,12 @@ function parseChRobinson(text: string): ParsedRateCon {
       // We check if it follows a time label or doesn't have 5 digits before the dash
       const militaryRangeStr = section.match(/(?:Time|Open|Close|At)\b[:]?\s*(\d{4}\s*[-–]\s*\d{4})/i)?.[1];
       
-      const apptMatch = section.match(/(\b\d{1,2}:\d{2}(?:\s*AM|PM)?\s*Appt)/i) ||
+      const apptMatch = section.match(/(\b\d{1,2}:\d{2}(?:\s*(?:AM|PM))?\s*Appt)/i) ||
                         section.match(/(\b\d{4}\b\s*Appt)/i);
       
-      const labeledTimeMatch = section.match(/(?:Pick\s*Up\s*Open|Pick\s*Up\s*Time|Pick\s*Up\s*Close|Delivery\s*Open|Delivery\s*Time|Delivery\s*Close)\s*(?:\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})?\s*(\d{1,2}[:]\d{2}(?:\s*AM|PM)?)/i);
+      const labeledTimeMatch = section.match(/(?:Pick\s*Up\s*Open|Pick\s*Up\s*Time|Pick\s*Up\s*Close|Delivery\s*Open|Delivery\s*Time|Delivery\s*Close)\s*(?:\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})?\s*(\d{1,2}[:]\d{2}(?:\s*(?:AM|PM))?)/i);
       
-      const fallbackTimeMatch = section.match(/(\b\d{1,2}:\d{2}(?:\s*AM|PM)?)/i);
+      const fallbackTimeMatch = section.match(/(\b\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i);
       
       let time = "";
       if (rangeMatch) time = rangeMatch[1];
