@@ -144,7 +144,7 @@ function parseChRobinson(text: string): ParsedRateCon {
   
   // 1. Look for weights in the commodity table: [Number] [Units]
   // In Robinson, weight usually precedes the units (Carton(s), Pieces, Units, etc.)
-  const tableWeightRegex = /(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Carton\(s\)|Pieces|Units|Piece|Pallets?\(s\)?|Pallets?|LBS|LB|KGS|KG)/gi;
+  const tableWeightRegex = /(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Carton\(s\)|Cartons?|Ctn\(s\)?|Ctns?|Pieces?|Piece\(s\)?|Pcs?|Units?|Unit\(s\)?|Pallets?\(s\)?|Pallets?|Plt\(s\)?|Plts?|Box\(s\)|Box\(es\)|Boxes|Box|Bxs?|Tote\(s\)?|Totes?|Drum\(s\)?|Drums?|Crate\(s\)?|Crates?|Roll\(s\)?|Rolls?|Bag\(s\)?|Bags?|Pkg\(s\)?|Pkgs?|Package\(s\)?|Packages?|LBS|LB|KGS|KG)/gi;
   let weightMatch;
   while ((weightMatch = tableWeightRegex.exec(text)) !== null) {
     const val = parseFloat(weightMatch[1].replace(/[,\s]/g, ''));
