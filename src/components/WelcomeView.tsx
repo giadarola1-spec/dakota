@@ -60,7 +60,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
               className="text-4xl sm:text-6xl md:text-[68px] font-extrabold text-white tracking-[-0.035em] leading-[1.08] mb-6 max-w-4xl mx-auto"
             >
-              The bill and dispatch better method
+              The best bill and dispatch method
             </motion.h1>
             
             <div className="flex flex-col items-center gap-10">
