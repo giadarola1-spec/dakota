@@ -1138,6 +1138,13 @@ export default function App() {
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>("dakota_hasSeenWelcome", false);
   const [hasSeenTQLUpdate, setHasSeenTQLUpdate] = useLocalStorage<boolean>("dakota_hasSeenTQLUpdate_v1", false);
+  const [lastSeenBannerVersion, setLastSeenBannerVersion] = useLocalStorage<string>("dakota_lastSeenBannerVersion_v1", "");
+  const CURRENT_BANNER_VERSION = "2026-06-04";
+  const showBanner = lastSeenBannerVersion !== CURRENT_BANNER_VERSION;
+
+  const handleDismissBanner = () => {
+    setLastSeenBannerVersion(CURRENT_BANNER_VERSION);
+  };
   
   // History State
   const [history, setHistory] = useLocalStorage<HistoryItem[]>("dakota_history", []);
@@ -2238,6 +2245,23 @@ export default function App() {
         {isLoading && <LoadingScreen isDarkMode={isDarkMode} />}
       </AnimatePresence>
       <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#1e2235" : "#d4d4d8"} />
+      
+      {/* Update Announcement Banner */}
+      {showBanner && (
+        <div className="w-full flex-none bg-[#091b3e] text-blue-100/90 font-sans py-1.5 px-6 border-b border-blue-900/30 select-none z-30 relative shadow-sm flex items-center justify-between">
+          <div className="flex-grow text-center text-xs font-medium tracking-wide">
+            <span className="font-extrabold uppercase tracking-wider text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded mr-2 inline-block">Update</span>
+            <span className="font-bold text-white">Dakota</span> has been updated. Refresh this website daily to get the latest updates.
+          </div>
+          <button 
+            onClick={handleDismissBanner}
+            className="text-blue-300/80 hover:text-white p-1 rounded hover:bg-white/5 transition-colors ml-2 flex-none"
+            title="Dismiss update banner"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
       
       {/* Header */}
       <header className={`border-b ${appState === 'verify' ? 'border-zinc-700' : theme.border} sticky top-0 z-20 ${theme.headerBg} backdrop-blur-md transition-all duration-300 flex-none border-x-0 border-t-0 rounded-none relative`}>
