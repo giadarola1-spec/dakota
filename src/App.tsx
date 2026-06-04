@@ -1357,10 +1357,59 @@ export default function App() {
            setIsProcessing(false);
         }
       }
-    };
-
-    // Handle PDF data via postMessage (for Gmail attachments where fetch fails)
+    };    // Handle PDF data via postMessage (for Gmail attachments where fetch fails)
     const handleMessage = async (event: MessageEvent) => {
+      // Handle connection/ping checks from Dakota Connector Chrome extension
+      if (
+        event.data &&
+        (event.data.type === 'PING' ||
+         event.data.type === 'DAKOTA_PING' ||
+         event.data.action === 'PING' ||
+         event.data.action === 'DAKOTA_PING')
+      ) {
+        console.log("Dakota: Handshake (PING) received from connector extension", event.data);
+        const replyType = (event.data.type === 'DAKOTA_PING' || event.data.action === 'DAKOTA_PING') ? 'DAKOTA_PONG' : 'PONG';
+        const responseData = { type: replyType, status: 'ready', version: '2.0.0', service: 'dakota-connector' };
+        
+        if (event.source) {
+          try {
+            (event.source as WindowProxy).postMessage(responseData, event.origin || '*');
+          } catch (e) {
+            (event.source as WindowProxy).postMessage(responseData, '*');
+          }
+        }
+        window.postMessage(responseData, '*');
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(responseData, '*');
+        }
+        return;
+      }
+
+      if (
+        event.data &&
+        (event.data.type === 'CONNECT' ||
+         event.data.type === 'DAKOTA_CONNECT' ||
+         event.data.action === 'CONNECT' ||
+         event.data.action === 'DAKOTA_CONNECT')
+      ) {
+        console.log("Dakota: Connection request received from connector extension", event.data);
+        const replyType = (event.data.type === 'DAKOTA_CONNECT' || event.data.action === 'DAKOTA_CONNECT') ? 'DAKOTA_CONNECTED' : 'CONNECTED';
+        const responseData = { type: replyType, status: 'connected', version: '2.0.0', service: 'dakota-connector' };
+        
+        if (event.source) {
+          try {
+            (event.source as WindowProxy).postMessage(responseData, event.origin || '*');
+          } catch (e) {
+            (event.source as WindowProxy).postMessage(responseData, '*');
+          }
+        }
+        window.postMessage(responseData, '*');
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(responseData, '*');
+        }
+        return;
+      }
+
       // 1. OPEN_PDF_DATA (Legacy/Alternative)
       if (event.data && event.data.type === 'OPEN_PDF_DATA') {
         const { data, name } = event.data; // data should be base64 string or ArrayBuffer
@@ -1411,7 +1460,7 @@ export default function App() {
           // Use processFile to handle the File object directly
           await processFile(file);
 
-        } catch (error) {
+         } catch (error) {
           console.error("Error processing PDF from extension:", error);
           alert("Error processing PDF from extension.");
         }
@@ -1421,6 +1470,13 @@ export default function App() {
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('message', handleMessage);
+    
+    // Broadcast initial ready handshakes immediately so the extension can detect Dakota
+    const initialReady = { type: 'DAKOTA_READY', status: 'ready', version: '2.0.0' };
+    window.postMessage(initialReady, '*');
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(initialReady, '*');
+    }
     
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
