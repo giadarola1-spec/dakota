@@ -13,6 +13,7 @@ import { DriverNumberModal } from './components/DriverNumberModal';
 import { TemplatesView } from './components/TemplatesView';
 import { WelcomeView } from './components/WelcomeView';
 import { UpdateModal } from './components/UpdateModal';
+import { UploadGlareCard } from './components/UploadGlareCard';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">
@@ -2364,11 +2365,12 @@ export default function App() {
             className="max-w-7xl mx-auto w-full flex-1 flex flex-col"
           >
             {appState === 'upload' && (
-              <label 
+              <UploadGlareCard 
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                className={`flex-1 flex flex-col items-center justify-center text-center space-y-6 transition-all duration-300 cursor-pointer rounded-3xl border-2 border-dashed ${isDragging ? 'border-zinc-500 bg-zinc-500/5 opacity-100 scale-[1.02]' : `${theme.border} opacity-50 hover:opacity-100`} glass-card`}
+                isDragging={isDragging}
+                className={`flex-1 flex flex-col items-center justify-center text-center p-8 rounded-3xl border-2 border-dashed ${isDragging ? 'border-zinc-500 bg-zinc-500/10 opacity-100' : `${theme.border} opacity-50 hover:opacity-100`} glass-card`}
               >
                 <input 
                   type="file" 
@@ -2387,7 +2389,7 @@ export default function App() {
                     {isDragging ? 'Release to upload' : 'Click or drag PDF here to upload'}
                   </p>
                 </div>
-              </label>
+              </UploadGlareCard>
             )}
             {appState === 'verify' && renderVerification()}
             {appState === 'results' && renderResults()}
