@@ -1,19 +1,5 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  ChevronRight, 
-  X, 
-  Search, 
-  MessageSquare, 
-  Zap, 
-  Bot, 
-  ArrowRight,
-  Play,
-  FileText,
-  Clock,
-  ShieldCheck,
-  ChevronDown
-} from 'lucide-react';
+import React from 'react';
+import { motion } from 'motion/react';
 import { DottedMapBackground } from './DottedMapBackground';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
@@ -32,13 +18,6 @@ interface WelcomeViewProps {
   theme: any;
 }
 
-const NavLink = ({ children, active = false }: { children: React.ReactNode, active?: boolean }) => (
-  <button className={`flex items-center gap-1 text-sm font-medium ${active ? 'text-zinc-900' : 'text-zinc-500'} hover:text-zinc-900 transition-colors px-3 py-1.5 rounded-lg hover:bg-zinc-50`}>
-    {children}
-    <ChevronDown size={14} className="opacity-40" />
-  </button>
-);
-
 export const WelcomeView: React.FC<WelcomeViewProps> = ({
   onGetStarted,
   team,
@@ -46,8 +25,6 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
   isDarkMode,
   theme
 }) => {
-  const [view, setView] = useState<'home' | 'about'>('home');
-
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -58,19 +35,10 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
       {/* Header */}
       <header className="sticky top-0 z-50 w-full bg-[#0a0d17]/80 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto rounded-b-2xl shadow-2xl">
         <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => { if (view === 'home') window.location.reload(); else setView('home'); }}>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
             <DakotaLogo className="w-7 h-7" />
             <span className="text-xl font-geologica font-bold tracking-tight text-white lowercase">dakota</span>
           </div>
-          
-          <nav className="hidden md:flex items-center gap-6 ml-4">
-            <button 
-              onClick={() => setView('about')}
-              className={`text-sm font-medium transition-colors ${view === 'about' ? 'text-white underline underline-offset-8' : 'text-zinc-400 hover:text-white'}`}
-            >
-              What is this
-            </button>
-          </nav>
         </div>
 
         <div className="flex items-center gap-4">
@@ -85,85 +53,31 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-6 pt-24 pb-32 relative">
-        <AnimatePresence mode="wait">
-          {view === 'home' && (
-            <motion.div
-              key="home"
-              initial={{ opacity: 0, y: 20 }}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="text-center mb-24">
+            <motion.h1 
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="text-6xl md:text-8xl font-bold text-white tracking-[-0.03em] mb-8"
             >
-              <div className="text-center mb-24">
-                <motion.h1 
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                  className="text-6xl md:text-8xl font-bold text-white tracking-[-0.03em] mb-8"
-                >
-                  Bill and dispatch faster.
-                </motion.h1>
-                
-                <div className="flex flex-col items-center gap-12">
-                  <p className="text-xl text-zinc-400 max-w-2xl mx-auto font-light leading-relaxed">
-                    Precision Logistics Automation. <span className="text-white font-medium">Engineered for speed.</span>
-                  </p>
-                </div>
-              </div>
+              Bill and dispatch faster.
+            </motion.h1>
+            
+            <div className="flex flex-col items-center gap-12">
+              <p className="text-xl text-zinc-400 max-w-2xl mx-auto font-light leading-relaxed">
+                Automate your work, <span className="text-white font-medium">10 times faster</span>
+              </p>
+            </div>
+          </div>
 
-              <div className="relative h-[600px] w-full rounded-[48px] border border-white/5 bg-zinc-900/50 overflow-hidden group">
-                <DottedMapBackground className="opacity-20 !scale-125" color="#ffffff" glow={false} />
-              </div>
-            </motion.div>
-          )}
-
-          {view === 'about' && (
-            <motion.div 
-              key="about"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="max-w-4xl mx-auto py-12 text-left space-y-16"
-            >
-              <div className="space-y-6">
-                <button 
-                  onClick={() => setView('home')}
-                  className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-8 group"
-                >
-                  <ArrowRight size={18} className="rotate-180 group-hover:-translate-x-1 transition-transform" />
-                  <span className="text-sm font-bold uppercase tracking-widest leading-none">Back to Home</span>
-                </button>
-                <h2 className="text-5xl font-bold text-white tracking-tight">The Dakota Regex Engine</h2>
-                <p className="text-2xl text-zinc-400 font-light leading-relaxed">
-                  Dakota is a precision-engineered parsing platform built exclusively for Traffix Rate Confirmations. Dakota does not use AI, ensuring 100% accuracy in data extraction through deterministic regex logic.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                <div className="p-8 rounded-[32px] bg-white/[0.03] border border-white/5 space-y-4">
-                  <div className="w-12 h-12 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center border border-blue-600/20">
-                    <Zap size={24} />
-                  </div>
-                  <h3 className="text-xl font-bold text-white">No AI Hallucinations</h3>
-                  <p className="text-zinc-500 leading-relaxed">
-                    By avoiding Large Language Models, Dakota eliminates "guessing." The engine follows strict rulesets defined by the Traffix document structure, providing zero-error parsing.
-                  </p>
-                </div>
-
-                <div className="p-8 rounded-[32px] bg-white/[0.03] border border-white/5 space-y-4">
-                  <div className="w-12 h-12 bg-emerald-600/10 text-emerald-500 rounded-2xl flex items-center justify-center border border-emerald-600/20">
-                    <Search size={24} />
-                  </div>
-                  <h3 className="text-xl font-bold text-white">Tracer-Centric Design</h3>
-                  <p className="text-zinc-500 leading-relaxed">
-                    We built Dakota to solve the manual entry bottleneck. By automating the extraction of multi-stop coordinates, tracers can focus on other tasks.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-
-        </AnimatePresence>
+          <div className="relative h-[600px] w-full rounded-[48px] border border-white/5 bg-zinc-900/50 overflow-hidden group">
+            <DottedMapBackground className="opacity-20 !scale-125" color="#ffffff" glow={false} />
+          </div>
+        </motion.div>
       </main>
 
       {/* Footer Area */}
@@ -190,4 +104,3 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
     </motion.div>
   );
 };
-
