@@ -12,7 +12,6 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { DriverNumberModal } from './components/DriverNumberModal';
 import { TemplatesView } from './components/TemplatesView';
 import { WelcomeView } from './components/WelcomeView';
-import { UpdateModal } from './components/UpdateModal';
 import { UploadGlareCard } from './components/UploadGlareCard';
 import ColorBends from './components/ColorBends';
 
@@ -1710,6 +1709,14 @@ export default function App() {
   const CURRENT_BANNER_VERSION = "2026-06-04";
   const showBanner = lastSeenBannerVersion !== CURRENT_BANNER_VERSION;
 
+  // Make the update banner show exactly once. On first render/visit, it is displayed
+  // and immediately marked as seen so that subsequent reloads don't show it again.
+  useEffect(() => {
+    if (showBanner) {
+      setLastSeenBannerVersion(CURRENT_BANNER_VERSION);
+    }
+  }, [showBanner, CURRENT_BANNER_VERSION, setLastSeenBannerVersion]);
+
   const handleDismissBanner = () => {
     setLastSeenBannerVersion(CURRENT_BANNER_VERSION);
   };
@@ -2867,12 +2874,6 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-
-      <UpdateModal 
-        isOpen={hasSeenWelcome && !hasSeenTQLUpdate} 
-        onClose={() => setHasSeenTQLUpdate(true)}
-        isDarkMode={isDarkMode}
-      />
 
       {isDarkMode && (
         <div className="atmospheric-bg">

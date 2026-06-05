@@ -35,7 +35,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
       {/* Immersive full-screen background dynamic animation */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-black">
         <ColorBends 
-          colors={["#a855f7", "#7e22ce", "#a855f7", "#c084fc"]}
+          colors={["#e11d48", "#1d4ed8", "#f43f5e", "#3b82f6"]}
           rotation={90}
           speed={0.15}
           scale={1}
@@ -45,7 +45,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
           noise={0.15}
           parallax={0.5}
           iterations={1}
-          intensity={1.5}
+          intensity={1.15}
           bandWidth={6}
           transparent={false}
           autoRotate={0}
@@ -95,6 +95,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
             className="text-4xl sm:text-6xl md:text-[64px] font-bold text-white tracking-[-0.03em] leading-[1.1] mb-12 max-w-3xl mx-auto"
+            style={{ textShadow: '0 2px 20px rgba(0,0,0,0.4), 0 4px 6px rgba(0,0,0,0.3)' }}
           >
             The best bill and dispatch method
           </motion.h1>
@@ -117,14 +118,14 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
       </main>
 
       {/* Footer Area */}
-      <footer className="bg-black/80 border-t border-white/5 py-16 relative z-15">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-zinc-500 text-xs">
+      <footer className="bg-black/40 border-t border-white/5 py-6 mt-auto relative z-15">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4 text-zinc-500 text-[11px]">
           <div className="flex items-center gap-2">
-            <DakotaLogo className="w-5 h-5 opacity-60" />
-            <span className="font-bold tracking-tight text-zinc-400 lowercase text-sm">dakota</span>
+            <DakotaLogo className="w-4 h-4 opacity-50" />
+            <span className="font-bold tracking-tight text-zinc-400 lowercase">dakota</span>
           </div>
-          <p className="text-zinc-600 font-medium uppercase tracking-widest text-[10px]">Dakota Intelligence Systems © 2026</p>
-          <div className="flex gap-4 text-[10px] font-mono uppercase text-zinc-600">
+          <p className="text-zinc-600 font-medium uppercase tracking-widest text-[9px]">Dakota Intelligence Systems © 2026</p>
+          <div className="flex gap-4 text-[9px] font-mono uppercase text-zinc-600">
             <span>Region: us-east-1</span>
             <span>Version: 0.41.0b</span>
           </div>
