@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink, Clock } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink, Clock, Users, Phone, FileSpreadsheet } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to CDN for reliable production behavior
@@ -920,89 +920,655 @@ function useLocalStorage<T>(key: string, initialValue: T) {
   return [storedValue, setStoredValue] as const;
 }
 
-const ManageView = ({ 
+type Driver = {
+  id: string;
+  truck: string;
+  trailer: string;
+  companyCode: string; // OD, LP, TD, OO, CD
+  driverName: string;
+  phoneNumber: string;
+  email?: string;
+};
+
+const DriversView = ({ 
   theme, 
   isDarkMode, 
-  savedTrucks, 
-  setSavedTrucks, 
+  drivers, 
+  setDrivers,
+  savedTrucks,
+  setSavedTrucks,
   onBack 
 }: {
   theme: any,
   isDarkMode: boolean,
+  drivers: Driver[],
+  setDrivers: (v: Driver[]) => void,
   savedTrucks: string[],
   setSavedTrucks: (v: string[]) => void,
   onBack: () => void
 }) => {
-  const [newTruck, setNewTruck] = useState("");
+  const [activeTab, setActiveTab] = useState<'paste' | 'manual'>('paste');
+  const [pasteText, setPasteText] = useState("");
+  const [search, setSearch] = useState("");
+  const [companyFilter, setCompanyFilter] = useState<string>("ALL");
+  const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const addTruck = () => {
-    if (newTruck && !savedTrucks.includes(newTruck)) {
-      setSavedTrucks([...savedTrucks, newTruck]);
-      setNewTruck("");
+  // Manual form state
+  const [manualName, setManualName] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
+  const [manualEmail, setManualEmail] = useState("");
+  const [manualTruck, setManualTruck] = useState("");
+  const [manualTrailer, setManualTrailer] = useState("");
+  const [manualCompany, setManualCompany] = useState("OD");
+
+  // Edit modal / inline mode
+  const [editingDriverId, setEditingDriverId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editTruck, setEditTruck] = useState("");
+  const [editTrailer, setEditTrailer] = useState("");
+  const [editCompany, setEditCompany] = useState("OD");
+
+  // Notifications
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const startEditing = (driver: Driver) => {
+    setEditingDriverId(driver.id);
+    setEditName(driver.driverName);
+    setEditPhone(driver.phoneNumber);
+    setEditEmail(driver.email || "");
+    setEditTruck(driver.truck);
+    setEditTrailer(driver.trailer);
+    setEditCompany(driver.companyCode);
+  };
+
+  const saveEdit = () => {
+    if (!editName || !editTruck) {
+      alert("Driver Name and Truck Number are required.");
+      return;
+    }
+    setDrivers(drivers.map(d => d.id === editingDriverId ? {
+      ...d,
+      driverName: editName.trim(),
+      phoneNumber: editPhone.trim(),
+      email: editEmail.trim(),
+      truck: editTruck.trim().toUpperCase(),
+      trailer: editTrailer.trim().toUpperCase(),
+      companyCode: editCompany.trim().toUpperCase()
+    } : d));
+    setEditingDriverId(null);
+  };
+
+  const handleCopyDriver = (driver: Driver) => {
+    const textToCopy = `${driver.truck}\t${driver.trailer}\t${driver.companyCode}\t"${driver.driverName}\n${driver.phoneNumber}\n${driver.email || ""}"`;
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedId(driver.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleImport = () => {
+    if (!pasteText.trim()) {
+      setImportStatus({ success: false, message: "Please paste some content from your sheet." });
+      return;
+    }
+
+    const newDriversList: Driver[] = [];
+    let currentField = '';
+    let inQuotes = false;
+    let row: string[] = [];
+
+    const textToParse = pasteText;
+    
+    for (let i = 0; i < textToParse.length; i++) {
+      const char = textToParse[i];
+      const nextChar = textToParse[i + 1];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+      
+      if (char === '\t' && !inQuotes) {
+        row.push(currentField);
+        currentField = '';
+        continue;
+      }
+      
+      if ((char === '\r' || char === '\n') && !inQuotes) {
+        if (char === '\r' && nextChar === '\n') {
+          i++; // Skip \n
+        }
+        row.push(currentField);
+        if (row.some(f => f.trim() !== '')) {
+          parseAndPushRow(row, newDriversList);
+        }
+        row = [];
+        currentField = '';
+        continue;
+      }
+      
+      currentField += char;
+    }
+    
+    if (currentField || row.length > 0) {
+      row.push(currentField);
+      if (row.some(f => f.trim() !== '')) {
+        parseAndPushRow(row, newDriversList);
+      }
+    }
+
+    if (newDriversList.length === 0) {
+      setImportStatus({ success: false, message: "No drivers found. Please check your format." });
+      return;
+    }
+
+    // Merge or overwrite? Let's append unique ones based on name + truck
+    let addedCount = 0;
+    const updatedDrivers = [...drivers];
+
+    newDriversList.forEach(newD => {
+      const exists = updatedDrivers.some(
+        d => d.driverName.toLowerCase() === newD.driverName.toLowerCase() && 
+             d.truck.toUpperCase() === newD.truck.toUpperCase()
+      );
+      if (!exists) {
+        updatedDrivers.push(newD);
+        addedCount++;
+      }
+    });
+
+    setDrivers(updatedDrivers);
+    
+    // Also add to savedTrucks dynamically so they are selectable in autocomplete
+    const newTrucks = Array.from(new Set([
+      ...savedTrucks,
+      ...newDriversList.map(d => d.truck).filter(Boolean)
+    ]));
+    setSavedTrucks(newTrucks);
+
+    setImportStatus({ 
+      success: true, 
+      message: `Successfully imported ${newDriversList.length} driver(s). Added ${addedCount} new driver(s) to directory.` 
+    });
+    setPasteText("");
+    setTimeout(() => setImportStatus(null), 5000);
+  };
+
+  const parseAndPushRow = (rowItems: string[], list: Driver[]) => {
+    const cleaned = rowItems.map(f => f.trim());
+    if (cleaned.length < 3) return;
+
+    const truck = cleaned[0].toUpperCase();
+    const trailer = cleaned[1].toUpperCase();
+    let companyCode = cleaned[2].toUpperCase();
+    if (!['OD', 'LP', 'TD', 'OO', 'CD'].includes(companyCode)) {
+      companyCode = companyCode.substring(0, 2);
+    }
+    const driverDetails = cleaned[3] || "";
+    const detailLines = driverDetails.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+
+    let driverName = "";
+    let phoneNumber = "";
+    let email = "";
+
+    if (detailLines.length > 0) {
+      driverName = detailLines[0].replace(/^"+|"+$/g, '').trim();
+    }
+
+    for (let i = 1; i < detailLines.length; i++) {
+      const line = detailLines[i].replace(/^"+|"+$/g, '').trim();
+      if (line.includes('@')) {
+        email = line;
+      } else if (line) {
+        phoneNumber = line;
+      }
+    }
+
+    if (driverName && truck) {
+      list.push({
+        id: "driver-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9),
+        truck,
+        trailer,
+        companyCode: companyCode || "OD",
+        driverName,
+        phoneNumber,
+        email
+      });
     }
   };
 
-  const removeTruck = (t: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSavedTrucks(savedTrucks.filter(truck => truck !== t));
+  const handleManualAdd = () => {
+    if (!manualName.trim() || !manualTruck.trim()) {
+      alert("Driver Name and Truck Number are required.");
+      return;
+    }
+
+    const newDriver: Driver = {
+      id: "driver-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9),
+      driverName: manualName.trim(),
+      phoneNumber: manualPhone.trim(),
+      email: manualEmail.trim() || undefined,
+      truck: manualTruck.trim().toUpperCase(),
+      trailer: manualTrailer.trim().toUpperCase(),
+      companyCode: manualCompany.toUpperCase()
+    };
+
+    setDrivers([...drivers, newDriver]);
+    
+    if (!savedTrucks.includes(newDriver.truck)) {
+      setSavedTrucks([...savedTrucks, newDriver.truck]);
+    }
+
+    setManualName("");
+    setManualPhone("");
+    setManualEmail("");
+    setManualTruck("");
+    setManualTrailer("");
+    
+    setImportStatus({ success: true, message: "Driver added successfully!" });
+    setTimeout(() => setImportStatus(null), 3000);
+  };
+
+  const handleDeleteClick = (id: string) => {
+    if (deleteConfirmId === id) {
+      setDrivers(drivers.filter(d => d.id !== id));
+      setDeleteConfirmId(null);
+    } else {
+      setDeleteConfirmId(id);
+      // Auto-cancel confirmation state after 4 seconds
+      setTimeout(() => {
+        setDeleteConfirmId(current => current === id ? null : current);
+      }, 4000);
+    }
+  };
+
+  const filteredDrivers = drivers.filter(d => {
+    const matchesSearch = 
+      d.driverName.toLowerCase().includes(search.toLowerCase()) ||
+      d.truck.toLowerCase().includes(search.toLowerCase()) ||
+      d.trailer.toLowerCase().includes(search.toLowerCase()) ||
+      (d.phoneNumber && d.phoneNumber.includes(search)) ||
+      (d.email && d.email.toLowerCase().includes(search.toLowerCase()));
+    
+    const matchesCompany = companyFilter === "ALL" || d.companyCode === companyFilter;
+    
+    return matchesSearch && matchesCompany;
+  });
+
+  const getCompanyColor = (code: string) => {
+    switch (code) {
+      case 'OD': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      case 'LP': return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+      case 'TD': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'OO': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+      case 'CD': return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+      default: return 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20';
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 py-8 px-4">
-      <div className="flex items-center justify-between mb-8">
-        <h2 className={`text-3xl font-display font-medium ${theme.text}`}>Manage Data</h2>
+    <div className="max-w-6xl mx-auto space-y-6 py-8 px-4 font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+        <div>
+          <h2 className={`text-3xl font-display font-medium ${theme.text} flex items-center gap-3`}>
+            <Users size={28} className="text-zinc-400" /> Drivers Directory
+          </h2>
+          <p className={`${theme.textMuted} text-sm mt-1`}>
+            Manage driver profiles, associated trucks & trailers.
+          </p>
+        </div>
         <button 
           onClick={onBack}
-          className={`px-4 py-2 rounded-lg border ${theme.border} ${theme.textMuted} hover:${theme.text} hover:${theme.cardBg} transition-colors flex items-center gap-2`}
+          className={`px-4 py-2 self-start sm:self-auto rounded-xl border ${theme.border} ${theme.textMuted} hover:${theme.text} hover:${theme.cardBg} transition-all flex items-center gap-2 text-sm`}
         >
           <ChevronLeft size={18} />
-          Back
+          Back to Dashboard
         </button>
       </div>
-      
-      <div className="max-w-md mx-auto">
-        {/* Trucks Manager */}
-        <div className={`${theme.cardBg} rounded-2xl border ${theme.border} p-6 shadow-sm`}>
-          <div className="flex items-center justify-between mb-6">
-            <h3 className={`text-lg font-medium ${theme.text} flex items-center gap-2`}>
-                <Truck size={20} className="text-zinc-500" /> Trucks
-            </h3>
-            <span className={`text-xs ${theme.textMuted} bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-full`}>{savedTrucks.length} saved</span>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="lg:col-span-5 space-y-6">
+          <div className={`${theme.cardBg} rounded-2xl border ${theme.border} overflow-hidden shadow-xl`}>
+            <div className="flex border-b border-white/5">
+              <button
+                onClick={() => setActiveTab('paste')}
+                className={`flex-1 py-3 text-center text-xs font-semibold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'paste' ? 'border-zinc-400 text-white bg-white/[0.02]' : 'border-transparent text-zinc-400 hover:text-white'}`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <FileSpreadsheet size={16} />
+                  Paste from Sheets
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('manual')}
+                className={`flex-1 py-3 text-center text-xs font-semibold uppercase tracking-wider border-b-2 transition-all ${activeTab === 'manual' ? 'border-zinc-400 text-white bg-white/[0.02]' : 'border-transparent text-zinc-400 hover:text-white'}`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Plus size={16} />
+                  Add Manually
+                </div>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {activeTab === 'paste' ? (
+                <div className="space-y-4">
+                  <textarea
+                    value={pasteText}
+                    onChange={(e) => setPasteText(e.target.value)}
+                    placeholder={`4444\tTR1234\tOD\t"John Doe\n1231231234\ndriver123@gmail.com"`}
+                    rows={6}
+                    className={`w-full ${theme.inputBg} border ${theme.border} rounded-xl p-3 text-xs font-mono mb-2 ${theme.text} focus:outline-none focus:border-zinc-500 custom-scrollbar`}
+                  />
+
+                  <button
+                    onClick={handleImport}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-sm transition-all shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2"
+                  >
+                    <FileSpreadsheet size={16} />
+                    Parse & Import Drivers
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Truck Number *</label>
+                      <input
+                        type="text"
+                        value={manualTruck}
+                        onChange={(e) => setManualTruck(e.target.value.toUpperCase())}
+                        placeholder="e.g. 0227"
+                        className={`w-full ${theme.inputBg} border ${theme.border} rounded-lg px-3 py-2 text-sm ${theme.text} focus:outline-none focus:border-zinc-500`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1">Trailer Number</label>
+                      <input
+                        type="text"
+                        value={manualTrailer}
+                        onChange={(e) => setManualTrailer(e.target.value.toUpperCase())}
+                        placeholder="e.g. H08578"
+                        className={`w-full ${theme.inputBg} border ${theme.border} rounded-lg px-3 py-2 text-sm ${theme.text} focus:outline-none focus:border-zinc-500`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Company Code</label>
+                    <div className="flex gap-2">
+                      {['OD', 'LP', 'TD', 'OO', 'CD'].map((code) => (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => setManualCompany(code)}
+                          className={`flex-1 py-1.5 rounded-lg border text-xs font-bold transition-all ${manualCompany === code ? 'bg-zinc-800 border-zinc-500 text-white' : 'border-white/5 text-zinc-400 bg-white/[0.01] hover:bg-white/[0.04]'}`}
+                        >
+                          {code}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Driver's Name *</label>
+                    <input
+                      type="text"
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      placeholder="e.g. John Doe"
+                      className={`w-full ${theme.inputBg} border ${theme.border} rounded-lg px-3 py-2 text-sm ${theme.text} focus:outline-none focus:border-zinc-500`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Phone Number</label>
+                    <input
+                      type="text"
+                      value={manualPhone}
+                      onChange={(e) => setManualPhone(e.target.value)}
+                      placeholder="e.g. 1231231234"
+                      className={`w-full ${theme.inputBg} border ${theme.border} rounded-lg px-3 py-2 text-sm ${theme.text} focus:outline-none focus:border-zinc-500`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 mb-1">Email (Optional)</label>
+                    <input
+                      type="email"
+                      value={manualEmail}
+                      onChange={(e) => setManualEmail(e.target.value)}
+                      placeholder="e.g. driver123@gmail.com"
+                      className={`w-full ${theme.inputBg} border ${theme.border} rounded-lg px-3 py-2 text-sm ${theme.text} focus:outline-none focus:border-zinc-500`}
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleManualAdd}
+                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all border border-zinc-700"
+                  >
+                    Add Driver Profile
+                  </button>
+                </div>
+              )}
+
+              {importStatus && (
+                <div className={`p-3 rounded-xl border text-xs ${importStatus.success ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+                  {importStatus.message}
+                </div>
+              )}
+            </div>
           </div>
-          
-          <div className="flex gap-2 mb-6">
-            <input 
-              type="text" 
-              value={newTruck}
-              onChange={(e) => setNewTruck(e.target.value.toUpperCase())}
-              placeholder="Add Truck #"
-              className={`flex-1 ${theme.inputBg} border ${theme.border} rounded-lg px-3 py-2 text-sm ${theme.text} focus:outline-none focus:border-zinc-500`}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') addTruck();
-              }}
-            />
-            <button 
-              onClick={addTruck}
-              className="bg-zinc-800 hover:bg-zinc-700 text-white p-2 rounded-lg transition-colors"
-            >
-              <Plus size={20} />
-            </button>
+        </div>
+
+        <div className="lg:col-span-7 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search name, truck, trailer, phone..."
+                className={`w-full pl-9 pr-4 py-2 text-sm ${theme.inputBg} border ${theme.border} rounded-xl text-white focus:outline-none focus:border-zinc-500/50 transition-all`}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-1 bg-zinc-900/40 p-1 rounded-xl border border-white/5">
+              {['ALL', 'OD', 'LP', 'TD', 'OO', 'CD'].map((code) => (
+                <button
+                  key={code}
+                  onClick={() => setCompanyFilter(code)}
+                  className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${companyFilter === code ? 'bg-zinc-805 text-zinc-100 bg-zinc-800' : 'text-zinc-400 hover:text-zinc-200'}`}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-            {savedTrucks.map(t => (
-              <div key={t} className={`flex items-center justify-between p-3 rounded-lg border ${theme.border} ${isDarkMode ? 'bg-white/5' : 'bg-zinc-50'} group hover:border-zinc-500/30 transition-colors`}>
-                <span className={`font-mono font-medium ${theme.text}`}>{t}</span>
-                <button 
-                  onClick={(e) => removeTruck(t, e)}
-                  className="text-zinc-400 hover:text-red-500 p-1 rounded-md hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 border-none"
+          <div className="space-y-3 max-h-[550px] overflow-y-auto pr-1 custom-scrollbar">
+            {filteredDrivers.map((driver) => {
+              const isEditing = editingDriverId === driver.id;
+              
+              if (isEditing) {
+                return (
+                  <div key={driver.id} className={`${theme.cardBg} border ${theme.border} rounded-2xl p-5 space-y-3 shadow-md`}>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Name</label>
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className={`w-full text-xs p-2 rounded border ${theme.border} ${theme.inputBg} text-white focus:outline-none`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Phone</label>
+                        <input
+                          type="text"
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                          className={`w-full text-xs p-2 rounded border ${theme.border} ${theme.inputBg} text-white focus:outline-none`}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Truck #</label>
+                        <input
+                          type="text"
+                          value={editTruck}
+                          onChange={(e) => setEditTruck(e.target.value.toUpperCase())}
+                          className={`w-full text-xs p-2 rounded border ${theme.border} ${theme.inputBg} text-white focus:outline-none`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Trailer #</label>
+                        <input
+                          type="text"
+                          value={editTrailer}
+                          onChange={(e) => setEditTrailer(e.target.value.toUpperCase())}
+                          className={`w-full text-xs p-2 rounded border ${theme.border} ${theme.inputBg} text-white focus:outline-none`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Company</label>
+                        <select
+                          value={editCompany}
+                          onChange={(e) => setEditCompany(e.target.value)}
+                          className={`w-full text-xs p-2 rounded border ${theme.border} ${theme.inputBg} text-white focus:outline-none bg-zinc-900`}
+                        >
+                          {['OD', 'LP', 'TD', 'OO', 'CD'].map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        className={`w-full text-xs p-2 rounded border ${theme.border} ${theme.inputBg} text-white focus:outline-none`}
+                      />
+                    </div>
+                    <div className="flex gap-2 justify-end pt-2">
+                      <button
+                        onClick={() => setEditingDriverId(null)}
+                        className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white transition-all bg-white/5 rounded-lg border border-white/5"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={saveEdit}
+                        className="px-3 py-1.5 text-xs text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-all"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div 
+                  key={driver.id} 
+                  className={`${theme.cardBg} border ${theme.border} rounded-2xl p-4 flex items-center justify-between hover:border-zinc-500/30 transition-all shadow-sm group`}
                 >
-                  <Trash2 size={16} />
-                </button>
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className={`w-12 h-12 rounded-xl border flex flex-col items-center justify-center font-bold tracking-tight shrink-0 ${getCompanyColor(driver.companyCode)}`}>
+                      <span className="text-[10px] leading-none uppercase text-zinc-400">{driver.companyCode}</span>
+                      <span className="text-sm mt-0.5 leading-none">{driver.driverName ? driver.driverName.split(' ').map(n=>n[0]).join('').substr(0, 2).toUpperCase() : 'DR'}</span>
+                    </div>
+
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-bold text-sm ${theme.text} truncate`}>{driver.driverName}</span>
+                        <span className={`text-[10px] uppercase font-bold tracking-wide border px-1.5 py-0.5 rounded-md shrink-0 ${getCompanyColor(driver.companyCode)}`}>
+                          {driver.companyCode}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+                        {driver.phoneNumber && (
+                          <a href={`tel:${driver.phoneNumber}`} className="hover:text-zinc-200 flex items-center gap-1">
+                            <Phone size={12} className="opacity-70" /> {driver.phoneNumber}
+                          </a>
+                        )}
+                        {driver.email && (
+                          <a href={`mailto:${driver.email}`} className="hover:text-zinc-200 flex items-center gap-1 truncate">
+                            <Mail size={12} className="opacity-70" /> {driver.email}
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2.5 text-xs pt-1">
+                        <span className="bg-zinc-800 text-zinc-300 font-mono px-2 py-0.5 rounded flex items-center gap-1 border border-white/5 text-[11px]">
+                          <Truck size={12} className="text-zinc-500" /> Truck: {driver.truck}
+                        </span>
+                        {driver.trailer && (
+                          <span className="bg-zinc-800 text-zinc-300 font-mono px-2 py-0.5 rounded flex items-center gap-1 border border-white/5 text-[11px]">
+                            <Hash size={12} className="text-zinc-500" /> Trailer: {driver.trailer}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 ml-4 shrink-0">
+                    <button
+                      onClick={() => {
+                        setDeleteConfirmId(null);
+                        handleCopyDriver(driver);
+                      }}
+                      className={`p-2 rounded-lg hover:${theme.cardBg} border border-transparent transition-colors relative ${copiedId === driver.id ? 'text-emerald-400' : 'text-zinc-400 hover:text-zinc-200'}`}
+                      title="Copy spreadsheet row text"
+                    >
+                      {copiedId === driver.id ? <Check size={16} /> : <Copy size={16} />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setDeleteConfirmId(null);
+                        startEditing(driver);
+                      }}
+                      className={`p-2 rounded-lg hover:${theme.cardBg} border border-transparent text-zinc-400 hover:text-zinc-200 transition-colors`}
+                      title="Edit driver profile"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    {deleteConfirmId === driver.id ? (
+                      <button
+                        onClick={() => handleDeleteClick(driver.id)}
+                        className="py-1 px-2.5 text-[10px] font-bold tracking-wider uppercase bg-rose-500/20 text-rose-300 border border-rose-500/35 hover:bg-rose-500/30 rounded-xl transition-all animate-pulse"
+                        title="Click again to confirm deletion of this driver profile"
+                      >
+                        Confirm Delete ?
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleDeleteClick(driver.id)}
+                        className="p-2 rounded-lg hover:bg-rose-500/10 text-zinc-400 hover:text-rose-400 transition-colors"
+                        title="Delete driver"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {filteredDrivers.length === 0 && (
+              <div className="text-center py-16 border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
+                <Users size={32} className="mx-auto text-zinc-500 mb-2" />
+                <p className="text-sm text-zinc-400 italic">No drivers found.</p>
+                <p className="text-xs text-zinc-500 mt-1">Try resetting the filter or paste from Sheets to import.</p>
               </div>
-            ))}
-            {savedTrucks.length === 0 && (
-              <p className={`text-sm ${theme.textMuted} text-center py-8 italic`}>No trucks saved yet.</p>
             )}
           </div>
         </div>
@@ -1160,6 +1726,17 @@ export default function App() {
   // Chain State
   const [truckNumber, setTruckNumber] = useState("TRUCK#");
   const [savedTrucks, setSavedTrucks] = useLocalStorage<string[]>("dakota_savedTrucks", []);
+  const [drivers, setDrivers] = useLocalStorage<Driver[]>("dakota_drivers", [
+    {
+      id: "sample-1",
+      truck: "4444",
+      trailer: "TR1234",
+      companyCode: "OD",
+      driverName: "John Doe",
+      phoneNumber: "1231231234",
+      email: "driver123@gmail.com"
+    }
+  ]);
   const [broker, setBroker] = useLocalStorage<string>("dakota_broker", "TRAFFIX");
   const [chainFormat, setChainFormat] = useLocalStorage<'standard' | 'alternative' | 'alt2' | 'alt3'>("dakota_chainFormat", "standard");
   const [notesFormat, setNotesFormat] = useLocalStorage<'standard' | 'alternative'>("dakota_notesFormat", "standard");
@@ -2192,7 +2769,7 @@ export default function App() {
               <span className={`font-medium ${theme.textMuted} text-xs uppercase tracking-wider`}>CHAIN</span>
               
               {/* Truck Selector */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <input 
                   type="text" 
                   value={truckNumber}
@@ -2200,15 +2777,20 @@ export default function App() {
                   className={`w-16 bg-transparent border-b ${theme.border} text-xs ${theme.text} focus:outline-none focus:border-zinc-500 font-mono`}
                   placeholder="TRUCK#"
                 />
-                {savedTrucks.map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setTruckNumber(t)}
-                    className={`px-2 py-1 text-xs rounded border ${truckNumber === t ? 'bg-zinc-800 text-white border-zinc-700' : `${theme.textMuted} border-transparent hover:bg-white/5`} glass-button`}
-                  >
-                    {t}
-                  </button>
-                ))}
+
+                {/* Active Driver Badge */}
+                {(() => {
+                  const activeDriver = drivers.find(d => d.truck === truckNumber);
+                  if (!activeDriver) return null;
+                  return (
+                    <span 
+                      className="text-[10px] bg-zinc-500/10 text-zinc-400 border border-zinc-500/20 px-2 py-1 rounded-lg font-sans flex items-center gap-1.5"
+                      title={`Trailer: ${activeDriver.trailer || "None"} | Phone: ${activeDriver.phoneNumber}`}
+                    >
+                      <Users size={11} className="text-zinc-500" /> {activeDriver.driverName} ({activeDriver.companyCode})
+                    </span>
+                  );
+                })()}
               </div>
 
               {/* Broker Info */}
@@ -2365,9 +2947,9 @@ export default function App() {
             <button 
               onClick={() => setAppState('manage')}
               className={`p-2 rounded-xl transition-all ${appState === 'manage' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
-              title="Manage Data"
+              title="Drivers"
             >
-              <Settings size={20} />
+              <Users size={20} />
             </button>
 
             <div className="flex items-center gap-4">
@@ -2450,9 +3032,11 @@ export default function App() {
             {appState === 'verify' && renderVerification()}
             {appState === 'results' && renderResults()}
             {appState === 'manage' && (
-              <ManageView 
+              <DriversView 
                 theme={theme}
                 isDarkMode={isDarkMode}
+                drivers={drivers}
+                setDrivers={setDrivers}
                 savedTrucks={savedTrucks}
                 setSavedTrucks={setSavedTrucks}
                 onBack={() => setAppState('upload')}
@@ -2596,9 +3180,9 @@ export default function App() {
                         setIsMenuOpen(false);
                       }}
                       className={`flex-1 flex items-center justify-center p-3 rounded-xl transition-all ${appState === 'manage' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/20' : `${theme.textMuted} ${theme.cardBg} border ${theme.border}`}`}
-                      title="Manage Data"
+                      title="Drivers"
                     >
-                      <Settings size={20} />
+                      <Users size={20} />
                     </button>
                   </div>
                 </div>

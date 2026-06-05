@@ -13,18 +13,19 @@ export const UploadGlareCard: React.FC<UploadGlareCardProps> = ({
 }) => {
   const containerRef = useRef<HTMLLabelElement>(null);
   const [isHovered, setIsHovered] = useState(false);
-  const rafIdRef = useRef<number | null>(null);
 
-  // Clean up any remaining animation frame callback on unmount
+  // Initialize CSS custom properties immediately on mount so they exist for the transition on the first hover
   useEffect(() => {
-    return () => {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
-      }
-    };
+    if (containerRef.current) {
+      containerRef.current.style.setProperty('--tilt-x', '0deg');
+      containerRef.current.style.setProperty('--tilt-y', '0deg');
+      containerRef.current.style.setProperty('--glare-x', '50%');
+      containerRef.current.style.setProperty('--glare-y', '50%');
+      containerRef.current.style.setProperty('--glare-angle', '135deg');
+    }
   }, []);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLLabelElement>) => {
+  const calculateAndApplyCoordinates = (e: React.MouseEvent<HTMLLabelElement>) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     
@@ -42,31 +43,25 @@ export const UploadGlareCard: React.FC<UploadGlareCardProps> = ({
     const tiltY = (x - 0.5) * maxTilt;
     const glareAngle = 135 + (tiltX + tiltY) * 2.5;
 
-    // Use requestAnimationFrame to batch styling smoothly with browser refresh clock
-    if (rafIdRef.current) {
-      cancelAnimationFrame(rafIdRef.current);
-    }
-
-    rafIdRef.current = requestAnimationFrame(() => {
-      if (containerRef.current) {
-        containerRef.current.style.setProperty('--glare-x', `${glareX}px`);
-        containerRef.current.style.setProperty('--glare-y', `${glareY}px`);
-        containerRef.current.style.setProperty('--tilt-x', `${tiltX}deg`);
-        containerRef.current.style.setProperty('--tilt-y', `${tiltY}deg`);
-        containerRef.current.style.setProperty('--glare-angle', `${glareAngle}deg`);
-      }
-    });
+    // Set styles synchronously on the Ref element for ultra-smooth responsiveness
+    containerRef.current.style.setProperty('--glare-x', `${glareX}px`);
+    containerRef.current.style.setProperty('--glare-y', `${glareY}px`);
+    containerRef.current.style.setProperty('--tilt-x', `${tiltX}deg`);
+    containerRef.current.style.setProperty('--tilt-y', `${tiltY}deg`);
+    containerRef.current.style.setProperty('--glare-angle', `${glareAngle}deg`);
   };
 
-  const handleMouseEnter = () => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLLabelElement>) => {
+    calculateAndApplyCoordinates(e);
+  };
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLLabelElement>) => {
     setIsHovered(true);
+    calculateAndApplyCoordinates(e);
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
-    if (rafIdRef.current) {
-      cancelAnimationFrame(rafIdRef.current);
-    }
     if (containerRef.current) {
       // Smoothly transition back to centered identity styling values
       containerRef.current.style.setProperty('--tilt-x', '0deg');
