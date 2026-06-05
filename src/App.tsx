@@ -14,6 +14,7 @@ import { TemplatesView } from './components/TemplatesView';
 import { WelcomeView } from './components/WelcomeView';
 import { UpdateModal } from './components/UpdateModal';
 import { UploadGlareCard } from './components/UploadGlareCard';
+import ColorBends from './components/ColorBends';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { DottedMapBackground } from './DottedMapBackground';
+import ColorBends from './ColorBends';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">
@@ -30,90 +30,101 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, scale: 1.05, filter: 'blur(20px)' }}
-      className="fixed inset-0 z-[200] bg-[#030723] text-white overflow-y-auto overflow-x-hidden font-sans"
+      className="fixed inset-0 z-[200] bg-black text-white overflow-y-auto overflow-x-hidden font-sans"
     >
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full bg-[#030723]/80 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto rounded-b-2xl shadow-2xl">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
-            <DakotaLogo className="w-7 h-7" />
-            <span className="text-xl font-geologica font-bold tracking-tight text-white lowercase">dakota</span>
-          </div>
-        </div>
+      {/* Immersive full-screen background dynamic animation */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-black">
+        <ColorBends 
+          colors={["#a855f7", "#7e22ce", "#a855f7", "#c084fc"]}
+          rotation={90}
+          speed={0.15}
+          scale={1}
+          frequency={1}
+          warpStrength={1}
+          mouseInfluence={1}
+          noise={0.15}
+          parallax={0.5}
+          iterations={1}
+          intensity={1.5}
+          bandWidth={6}
+          transparent={false}
+          autoRotate={0}
+          className="absolute inset-0 w-full h-full opacity-100"
+        />
+        {/* Soft atmospheric gradient to keep content perfectly readable while keeping colors pristine */}
+        <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-black to-transparent" />
+      </div>
 
-      </header>
+      {/* Floating Capsule Header */}
+      <div className="w-full max-w-5xl mx-auto px-6 pt-6 relative z-50">
+        <header className="w-full bg-[#12101e]/60 backdrop-blur-xl border border-white/10 px-8 py-3.5 flex items-center justify-between rounded-full shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.reload()}>
+            <DakotaLogo className="w-6 h-6" />
+            <span className="text-lg font-bold tracking-tight text-white lowercase">dakota</span>
+          </div>
+          
+          <div className="flex items-center gap-8 text-sm font-medium text-zinc-400 select-none">
+            <span className="hover:text-white transition-colors cursor-pointer">Features</span>
+            <span className="hover:text-white transition-colors cursor-pointer font-light">About</span>
+          </div>
+        </header>
+      </div>
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-6 pt-24 pb-32 relative">
-        {/* Subtle royal blue ambient glow behind content */}
-        <div className="absolute inset-0 top-1/4 -translate-y-1/2 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-blue-600/15 rounded-full blur-[140px] pointer-events-none z-0" />
-
+      <main className="max-w-5xl mx-auto px-6 pt-36 pb-32 relative flex flex-col items-center justify-center min-h-[75vh]">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative z-10"
+          className="relative z-10 w-full flex flex-col items-center text-center"
         >
-          <div className="text-center mb-24">
-            <motion.h1 
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className="text-4xl sm:text-6xl md:text-[68px] font-extrabold text-white tracking-[-0.035em] leading-[1.08] mb-6 max-w-4xl mx-auto"
-            >
-              The best bill and dispatch method
-            </motion.h1>
-            
-            <div className="flex flex-col items-center gap-10">
-              <p className="text-lg md:text-xl text-zinc-300 max-w-2xl mx-auto font-light leading-relaxed">
-                Tools and workflow for your day, week and month.
-              </p>
-              
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full max-w-[560px]"
-              >
-                {/* GitHub-style action bar */}
-                <div className="flex flex-col sm:flex-row items-stretch justify-center w-full rounded-lg overflow-hidden shadow-2xl border border-white/5 select-none font-sans text-left">
-                  {/* Left-hand placeholder styled container */}
-                  <div className="flex-grow bg-zinc-100 text-zinc-500 px-5 py-4 h-[54px] flex items-center justify-start text-[14.5px] rounded-t-lg sm:rounded-t-none sm:rounded-l-lg tracking-wide border-r border-[#2ea44f]/10">
-                    Process rate confirmations
-                  </div>
-                  {/* Green primary start action */}
-                  <button
-                    onClick={onGetStarted}
-                    className="bg-[#2ea44f] hover:bg-[#2c974b] text-white px-8 py-4 h-[54px] font-bold text-[14.5px] transition-colors duration-200 cursor-pointer text-center flex items-center justify-center whitespace-nowrap rounded-b-lg sm:rounded-b-none sm:rounded-r-lg shadow-sm font-sans"
-                  >
-                    Start Dakota
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          </div>
+          {/* Badge: New Just shipped v2.0 */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/10 bg-zinc-900/40 backdrop-blur-sm shadow-md mb-8 select-none"
+          >
+            <span className="bg-white text-black text-[9px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">NEW</span>
+            <span className="text-zinc-300 font-medium text-[11px] tracking-wide">Just shipped v2.0</span>
+          </motion.div>
 
-          <div className="relative h-[600px] w-full rounded-[48px] border border-white/5 bg-zinc-900/50 overflow-hidden group">
-            <DottedMapBackground className="opacity-20 !scale-125" color="#ffffff" glow={false} />
-          </div>
+          {/* Headline Display Text */}
+          <motion.h1 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+            className="text-4xl sm:text-6xl md:text-[64px] font-bold text-white tracking-[-0.03em] leading-[1.1] mb-12 max-w-3xl mx-auto"
+          >
+            The best bill and dispatch method
+          </motion.h1>
+          
+          {/* Simplified Transparent Action Button */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="flex justify-center"
+          >
+            <button
+              onClick={onGetStarted}
+              className="px-9 py-3.5 bg-transparent hover:bg-white/5 active:scale-[0.98] text-white border border-white/15 hover:border-white/30 rounded-xl font-medium text-sm tracking-widest uppercase transition-all duration-300 shadow-lg backdrop-blur-md cursor-pointer whitespace-nowrap"
+            >
+              Start Dakota
+            </button>
+          </motion.div>
         </motion.div>
       </main>
 
       {/* Footer Area */}
-      <footer className="bg-zinc-950 border-t border-white/5 py-24">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12">
-          <div className="col-span-2">
-            <div className="flex items-center gap-2 mb-6">
-              <DakotaLogo className="w-6 h-6" />
-              <span className="text-xl font-geologica font-bold tracking-tight text-white lowercase">dakota</span>
-            </div>
-            <p className="text-zinc-500 text-sm leading-relaxed max-w-xs mb-8">
-              Designed for billing large scale traffix rate confirmations. Built for speed.
-            </p>
+      <footer className="bg-black/80 border-t border-white/5 py-16 relative z-15">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-zinc-500 text-xs">
+          <div className="flex items-center gap-2">
+            <DakotaLogo className="w-5 h-5 opacity-60" />
+            <span className="font-bold tracking-tight text-zinc-400 lowercase text-sm">dakota</span>
           </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-white/5 flex justify-between items-center text-zinc-600">
-          <p className="text-xs font-medium uppercase tracking-widest">Dakota Intelligence Systems © 2026</p>
-          <div className="flex gap-4 text-[10px] font-mono uppercase">
+          <p className="text-zinc-600 font-medium uppercase tracking-widest text-[10px]">Dakota Intelligence Systems © 2026</p>
+          <div className="flex gap-4 text-[10px] font-mono uppercase text-zinc-600">
             <span>Region: us-east-1</span>
             <span>Version: 0.41.0b</span>
           </div>
