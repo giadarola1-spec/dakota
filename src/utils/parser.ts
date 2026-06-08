@@ -1078,8 +1078,22 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     }
     
     // Windowed extraction within the stop section
-    const timeMatch = section.match(PATTERNS.time);
-    let time = timeMatch ? normalizeTime(timeMatch[1]) : "";
+    const rangeMatch = section.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?\s*(?:[-–]|to|through)\s*\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+    let time = "";
+    if (rangeMatch) {
+      const parts = rangeMatch[1].split(/(?:[-–]|to|through)/gi);
+      const normParts = parts.map(p => normalizeTime(p.trim())).filter(Boolean);
+      if (normParts.length === 2) {
+        time = `${normParts[0]} - ${normParts[1]}`;
+      } else if (normParts.length === 1) {
+        time = normParts[0];
+      } else {
+        time = rangeMatch[1].trim();
+      }
+    } else {
+      const timeMatch = section.match(PATTERNS.time);
+      time = timeMatch ? normalizeTime(timeMatch[1]) : "";
+    }
     const tzMatch = section.match(PATTERNS.timezone);
     if (time && tzMatch) time += ` ${tzMatch[1].toUpperCase()}`;
 
