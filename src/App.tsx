@@ -1715,7 +1715,7 @@ export default function App() {
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>("dakota_hasSeenWelcome", false);
   const [hasSeenTQLUpdate, setHasSeenTQLUpdate] = useLocalStorage<boolean>("dakota_hasSeenTQLUpdate_v1", false);
   const [lastSeenBannerVersion, setLastSeenBannerVersion] = useLocalStorage<string>("dakota_lastSeenBannerVersion_v1", "");
-  const CURRENT_BANNER_VERSION = "2026-06-04";
+  const CURRENT_BANNER_VERSION = "2026-06-08";
   const showBanner = lastSeenBannerVersion !== CURRENT_BANNER_VERSION;
 
   const handleDismissBanner = () => {
@@ -2912,17 +2912,22 @@ export default function App() {
       
       {/* Update Announcement Banner */}
       {showBanner && (
-        <div className="w-full flex-none bg-[#091b3e] text-blue-100/90 font-sans py-1.5 px-6 border-b border-blue-900/30 select-none z-30 relative shadow-sm flex items-center justify-between">
-          <div className="flex-grow text-center text-xs font-medium tracking-wide">
-            <span className="font-extrabold uppercase tracking-wider text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded mr-2 inline-block">Update</span>
-            <span className="font-bold text-white">Dakota</span> has been updated. Refresh this website daily to get the latest updates.
+        <div className="w-full flex-none bg-[#0a182e] text-blue-100/95 font-sans py-2.5 px-6 border-b border-blue-900/40 select-none z-30 relative shadow-lg flex items-center justify-between gap-3 animate-fade-in backdrop-blur-md">
+          <div className="flex-grow flex items-center justify-center gap-2 text-center text-xs font-medium tracking-wide md:flex-row flex-col">
+            <span className="font-bold uppercase tracking-wider text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-md border border-blue-400/20 shrink-0">
+              New Update
+            </span>
+            <span className="text-zinc-200">
+              Now you can copy formatted driver details (<span className="text-white font-semibold">Truck #, Driver's Name, Phone Number</span>) elegantly for emails using the <span className="text-blue-300 font-bold">Copy</span> buttons in both the Directory list and Active Results view!
+            </span>
           </div>
           <button 
             onClick={handleDismissBanner}
-            className="text-blue-300/80 hover:text-white p-1 rounded hover:bg-white/5 transition-colors ml-2 flex-none"
+            className="text-blue-400 hover:text-white p-1.5 rounded-xl hover:bg-blue-500/10 border border-transparent hover:border-blue-500/20 transition-all ml-2 flex-none inline-flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase cursor-pointer select-none"
             title="Dismiss update banner"
           >
-            <X size={14} />
+            <span>Dismiss</span>
+            <X size={13} />
           </button>
         </div>
       )}
