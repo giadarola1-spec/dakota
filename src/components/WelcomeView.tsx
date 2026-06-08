@@ -92,7 +92,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
             </div>
           </div>
 
-          <div className="relative h-[600px] w-full rounded-[48px] border border-white/5 bg-zinc-900/50 overflow-hidden group">
+          <div className="relative h-[600px] w-full rounded-[48px] overflow-hidden group glowing-map-border bg-[#090d16]/75 transition-all duration-300">
             <DottedMapBackground className="opacity-20 !scale-125" color="#ffffff" glow={false} />
           </div>
         </motion.div>

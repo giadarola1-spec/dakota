@@ -930,6 +930,15 @@ type Driver = {
   email?: string;
 };
 
+const formatPhoneForCopy = (phone: string) => {
+  if (!phone) return "N/A";
+  const cleaned = phone.replace(/\D/g, "");
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  return phone;
+};
+
 const DriversView = ({ 
   theme, 
   isDarkMode, 
@@ -1002,7 +1011,7 @@ const DriversView = ({
   };
 
   const handleCopyDriver = (driver: Driver) => {
-    const textToCopy = `${driver.truck}\t${driver.trailer}\t${driver.companyCode}\t"${driver.driverName}\n${driver.phoneNumber}\n${driver.email || ""}"`;
+    const textToCopy = `Truck #: ${driver.truck}\nDriver: ${driver.driverName}\nPhone: ${formatPhoneForCopy(driver.phoneNumber)}`;
     navigator.clipboard.writeText(textToCopy);
     setCopiedId(driver.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -1527,7 +1536,7 @@ const DriversView = ({
                         handleCopyDriver(driver);
                       }}
                       className={`p-2 rounded-lg hover:${theme.cardBg} border border-transparent transition-colors relative ${copiedId === driver.id ? 'text-emerald-400' : 'text-zinc-400 hover:text-zinc-200'}`}
-                      title="Copy spreadsheet row text"
+                      title="Copy driver details for email"
                     >
                       {copiedId === driver.id ? <Check size={16} /> : <Copy size={16} />}
                     </button>
@@ -1744,6 +1753,7 @@ export default function App() {
   const [copiedChain, setCopiedChain] = useState(false);
   const [renameText, setRenameText] = useState("");
   const [copiedRename, setCopiedRename] = useState(false);
+  const [copiedActiveDriver, setCopiedActiveDriver] = useState(false);
   const [team, setTeam] = useLocalStorage<'green' | 'purple' | 'red' | 'blue' | 'none'>("dakota_team", 'none');
 
   // Quick Look State
@@ -2783,12 +2793,27 @@ export default function App() {
                   const activeDriver = drivers.find(d => d.truck === truckNumber);
                   if (!activeDriver) return null;
                   return (
-                    <span 
-                      className="text-[10px] bg-zinc-500/10 text-zinc-400 border border-zinc-500/20 px-2 py-1 rounded-lg font-sans flex items-center gap-1.5"
-                      title={`Trailer: ${activeDriver.trailer || "None"} | Phone: ${activeDriver.phoneNumber}`}
-                    >
-                      <Users size={11} className="text-zinc-500" /> {activeDriver.driverName} ({activeDriver.companyCode})
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span 
+                        className="text-[10px] bg-zinc-500/10 text-zinc-400 border border-zinc-500/20 px-2 py-1 rounded-lg font-sans flex items-center gap-1.5"
+                        title={`Trailer: ${activeDriver.trailer || "None"} | Phone: ${activeDriver.phoneNumber}`}
+                      >
+                        <Users size={11} className="text-zinc-500" /> {activeDriver.driverName} ({activeDriver.companyCode})
+                      </span>
+                      <button
+                        onClick={() => {
+                          const textToCopy = `Truck #: ${activeDriver.truck}\nDriver: ${activeDriver.driverName}\nPhone: ${formatPhoneForCopy(activeDriver.phoneNumber)}`;
+                          navigator.clipboard.writeText(textToCopy);
+                          setCopiedActiveDriver(true);
+                          setTimeout(() => setCopiedActiveDriver(false), 2000);
+                        }}
+                        className={`p-1 px-1.5 rounded border transition-all flex items-center gap-1 text-[9px] font-bold tracking-wider uppercase leading-none cursor-pointer select-none ${copiedActiveDriver ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-zinc-400 border-zinc-500/15 bg-zinc-500/5 hover:text-zinc-200 hover:border-zinc-500/25 transition-colors duration-150'}`}
+                        title="Copy driver details (Truck, Name, Phone)"
+                      >
+                        {copiedActiveDriver ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                        {copiedActiveDriver ? "COPIED" : "COPY INFO"}
+                      </button>
+                    </div>
                   );
                 })()}
               </div>
