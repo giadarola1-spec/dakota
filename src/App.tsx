@@ -939,6 +939,12 @@ const formatPhoneForCopy = (phone: string) => {
   return phone;
 };
 
+const cleanTruckNumber = (truckStr: string): string => {
+  if (!truckStr) return "";
+  const digits = truckStr.replace(/\D/g, "");
+  return digits || truckStr.trim().toUpperCase();
+};
+
 const DriversView = ({ 
   theme, 
   isDarkMode, 
@@ -998,12 +1004,17 @@ const DriversView = ({
       alert("Driver Name and Truck Number are required.");
       return;
     }
+    const cleanedTruck = cleanTruckNumber(editTruck);
+    if (!cleanedTruck) {
+      alert("Please enter a valid numeric Truck Number.");
+      return;
+    }
     setDrivers(drivers.map(d => d.id === editingDriverId ? {
       ...d,
       driverName: editName.trim(),
       phoneNumber: editPhone.trim(),
       email: editEmail.trim(),
-      truck: editTruck.trim().toUpperCase(),
+      truck: cleanedTruck,
       trailer: editTrailer.trim().toUpperCase(),
       companyCode: editCompany.trim().toUpperCase()
     } : d));
@@ -1109,7 +1120,8 @@ const DriversView = ({
     const cleaned = rowItems.map(f => f.trim());
     if (cleaned.length < 3) return;
 
-    const truck = cleaned[0].toUpperCase();
+    const truck = cleanTruckNumber(cleaned[0]);
+    if (!truck) return; // Skip rows that don't have a valid truck number
     const trailer = cleaned[1].toUpperCase();
     let companyCode = cleaned[2].toUpperCase();
     if (!['OD', 'LP', 'TD', 'OO', 'CD'].includes(companyCode)) {
@@ -1154,12 +1166,18 @@ const DriversView = ({
       return;
     }
 
+    const cleanedTruck = cleanTruckNumber(manualTruck);
+    if (!cleanedTruck) {
+      alert("Please enter a valid numeric Truck Number.");
+      return;
+    }
+
     const newDriver: Driver = {
       id: "driver-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9),
       driverName: manualName.trim(),
       phoneNumber: manualPhone.trim(),
       email: manualEmail.trim() || undefined,
-      truck: manualTruck.trim().toUpperCase(),
+      truck: cleanedTruck,
       trailer: manualTrailer.trim().toUpperCase(),
       companyCode: manualCompany.toUpperCase()
     };
@@ -2209,12 +2227,12 @@ export default function App() {
   };
 
   const handleDriverNumberConfirm = (num: string) => {
-    setTruckNumber(num);
+    setTruckNumber(cleanTruckNumber(num));
     setIsDriverModalOpen(false);
     
     // If we were in the middle of a flow, finish it
     if (appState === 'verify') {
-      finishVerification(null, num);
+      finishVerification(null, cleanTruckNumber(num));
     }
   };
 
@@ -2783,7 +2801,7 @@ export default function App() {
                 <input 
                   type="text" 
                   value={truckNumber}
-                  onChange={(e) => setTruckNumber(e.target.value.toUpperCase())}
+                  onChange={(e) => setTruckNumber(cleanTruckNumber(e.target.value))}
                   className={`w-16 bg-transparent border-b ${theme.border} text-xs ${theme.text} focus:outline-none focus:border-zinc-500 font-mono`}
                   placeholder="TRUCK#"
                 />
