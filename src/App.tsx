@@ -14,6 +14,7 @@ import { TemplatesView } from './components/TemplatesView';
 import { WelcomeView } from './components/WelcomeView';
 import { UpdateModal } from './components/UpdateModal';
 import { UploadGlareCard } from './components/UploadGlareCard';
+import { TermsModal, TermsBlockedView } from './components/TermsModal';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">
@@ -1731,6 +1732,7 @@ export default function App() {
   const [currentSteps, setCurrentSteps] = useState<VerificationStep[]>([]);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage<boolean>("dakota_hasSeenWelcome", false);
+  const [termsStatus, setTermsStatus] = useLocalStorage<'accepted' | 'rejected' | 'pending'>("dakota_termsStatus_v1", 'pending');
   const [hasSeenTQLUpdate, setHasSeenTQLUpdate] = useLocalStorage<boolean>("dakota_hasSeenTQLUpdate_v1", false);
   const [lastSeenBannerVersion, setLastSeenBannerVersion] = useLocalStorage<string>("dakota_lastSeenBannerVersion_v1", "");
   const CURRENT_BANNER_VERSION = "2026-06-08";
@@ -2896,8 +2898,24 @@ export default function App() {
     );
   };
 
+  if (termsStatus === 'rejected') {
+    return (
+      <TermsBlockedView 
+        isDarkMode={isDarkMode} 
+        onReviewTerms={() => setTermsStatus('pending')} 
+      />
+    );
+  }
+
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.text} font-sans selection:bg-zinc-500/30 transition-colors duration-300 flex flex-col relative overflow-hidden`}>
+      <TermsModal 
+        isOpen={termsStatus === 'pending'}
+        onAccept={() => setTermsStatus('accepted')}
+        onReject={() => setTermsStatus('rejected')}
+        isDarkMode={isDarkMode}
+      />
+
       <AnimatePresence>
         {!hasSeenWelcome && (
           <WelcomeView 
