@@ -82,8 +82,7 @@ export const TermsModal: React.FC<TermsModalProps> = ({
                 <p>
                   Please read these Terms and Conditions ("Terms", "Agreement") carefully before downloading, installing, or
                   using <strong>Dakota</strong> (hereinafter referred to as the "Software" or the "Application"). This Agreement constitutes a
-                  legally binding contract between you (the "User") and <strong>Gianfranco Iadarola Aponte</strong>, the sole creator,
-                  developer, and lawful owner of the Software.
+                  legally binding contract between you (the "User") and the developer, <strong>Gianfranco Iadarola</strong>.
                 </p>
                 <p>
                   By installing, copying, or otherwise using Dakota, you acknowledge that you have read, understood, and agree
@@ -106,8 +105,7 @@ export const TermsModal: React.FC<TermsModalProps> = ({
                 </h3>
                 <p>
                   Dakota, including its source code, object code, user interface, design, algorithms, documentation, and all
-                  associated intellectual property rights, is and shall remain the exclusive property of <strong>Gianfranco Iadarola
-                  Aponte</strong>. The Software is protected by national and international copyright laws and treaties.
+                  associated intellectual property rights, is and shall remain the exclusive property of the developer. The Software is protected by national and international copyright laws and treaties.
                 </p>
                 <p>
                   This Agreement does not sell, transfer, or assign any ownership rights of the Software to the User. The User is
@@ -163,12 +161,12 @@ export const TermsModal: React.FC<TermsModalProps> = ({
                   4. RIGHT TO MODIFY, SUSPEND, OR TERMINATE SERVICE
                 </h3>
                 <p>
-                  Gianfranco Iadarola Aponte reserves the absolute, unilateral right to modify, suspend, update, or permanently 
+                  The developer reserves the absolute, unilateral right to modify, suspend, update, or permanently 
                   <strong> discontinue and delete Dakota at any time, for any reason, or no reason at all, without prior notice</strong> and 
                   without any liability to the User or any third party.
                 </p>
                 <p>
-                  In the event that the Software is discontinued, deleted, or rendered obsolete, Gianfranco Iadarola Aponte is
+                  In the event that the Software is discontinued, deleted, or rendered obsolete, the developer is
                   under no obligation to provide support, updates, source code access, or alternative solutions. The User
                   acknowledges that their reliance on the continued availability of Dakota is entirely at their own risk.
                 </p>
@@ -181,8 +179,8 @@ export const TermsModal: React.FC<TermsModalProps> = ({
                 </h3>
                 <p className="uppercase tracking-wide text-[11px] leading-relaxed select-all">
                   THE SOFTWARE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-                  EITHER EXPRESS OR IMPLIED. TO THE MAXIMUM EXTENT PERMITTED BY LAW, GIANFRANCO IADAROLA
-                  APONTE DISCLAIMS ALL WARRANTIES, INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS
+                  EITHER EXPRESS OR IMPLIED. TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE DEVELOPER
+                  DISCLAIMS ALL WARRANTIES, INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS
                   FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. NO WARRANTY IS MADE THAT THE SOFTWARE WILL
                   MEET YOUR REQUIREMENTS, OPERATE WITHOUT INTERRUPTION, BE COMPLETELY ERROR-FREE, OR
                   CORRECTLY EXTRACT TEXT FROM ALL INPUT FORMATS.
@@ -195,7 +193,7 @@ export const TermsModal: React.FC<TermsModalProps> = ({
                   6. LIMITATION OF LIABILITY
                 </h3>
                 <p className="uppercase tracking-wide text-[11px] leading-relaxed select-all">
-                  IN NO EVENT SHALL GIANFRANCO IADAROLA APONTE BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+                  IN NO EVENT SHALL THE DEVELOPER BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
                   SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
                   PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
                   INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
@@ -210,7 +208,7 @@ export const TermsModal: React.FC<TermsModalProps> = ({
                   7. INDEMNIFICATION
                 </h3>
                 <p>
-                  The User agrees to defend, indemnify, and hold harmless Gianfranco Iadarola Aponte from and against any
+                  The User agrees to defend, indemnify, and hold harmless the developer from and against any
                   and all claims, damages, obligations, losses, liabilities, costs, or debt, and expenses (including but not limited to
                   attorney's fees) arising from the User's misuse of the Software, violation of any third-party privacy or intellectual
                   property rights, or breach of this Agreement.
@@ -236,7 +234,7 @@ export const TermsModal: React.FC<TermsModalProps> = ({
                 </h3>
                 <p>
                   This Agreement and any dispute arising out of or in connection with it shall be governed by, and construed in
-                  accordance with, the laws governing the domicile of the creator, <strong>Gianfranco Iadarola Aponte</strong>, without regard to
+                  accordance with, the laws governing the domicile of the developer, without regard to
                   conflict of law principles. Any legal action or proceeding relating to this Software shall be brought exclusively in
                   the competent courts of said jurisdiction.
                 </p>
@@ -248,9 +246,7 @@ export const TermsModal: React.FC<TermsModalProps> = ({
                   10. ENTIRE AGREEMENT
                 </h3>
                 <p>
-                  These Terms and Conditions constitute the entire legal agreement between the User and <strong>Gianfranco Iadarola
-                  Aponte</strong> regarding Dakota, superseding any prior verbal or written agreements, communications, or
-                  understandings regarding the Software.
+                  These Terms and Conditions constitute the entire legal agreement between the User and the developer regarding Dakota, superseding any prior verbal or written agreements, communications, or understandings regarding the Software.
                 </p>
               </div>
             </div>
@@ -357,7 +353,7 @@ export const TermsBlockedView: React.FC<TermsBlockedViewProps> = ({
         </button>
 
         <p className={`text-[10px] ${isDarkMode ? 'text-zinc-550' : 'text-zinc-400'}`}>
-          Dakota © 2026. Manufactured by Gianfranco Iadarola Aponte.
+          Dakota © 2026. Developed by Gianfranco Iadarola.
         </p>
       </motion.div>
     </div>

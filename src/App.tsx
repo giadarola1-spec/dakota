@@ -12,7 +12,6 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { DriverNumberModal } from './components/DriverNumberModal';
 import { TemplatesView } from './components/TemplatesView';
 import { WelcomeView } from './components/WelcomeView';
-import { UpdateModal } from './components/UpdateModal';
 import { UploadGlareCard } from './components/UploadGlareCard';
 import { TermsModal, TermsBlockedView } from './components/TermsModal';
 
@@ -2927,12 +2926,6 @@ export default function App() {
           />
         )}
       </AnimatePresence>
-
-      <UpdateModal 
-        isOpen={hasSeenWelcome && !hasSeenTQLUpdate} 
-        onClose={() => setHasSeenTQLUpdate(true)}
-        isDarkMode={isDarkMode}
-      />
 
       {isDarkMode && (
         <div className="atmospheric-bg">

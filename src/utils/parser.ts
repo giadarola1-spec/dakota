@@ -118,6 +118,23 @@ function parseChRobinson(text: string): ParsedRateCon {
   // Normalize line endings
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
 
+  // Extract a reference year from the document text to format 2-part dates (MM/DD)
+  let documentYear = "";
+  const globalYearRegex = /\b\d{1,2}[/.-]\d{1,2}[/.-](\d{2,4})\b/g;
+  let ym;
+  while ((ym = globalYearRegex.exec(text)) !== null) {
+    const y = ym[1];
+    if (y.length === 4 && (y.startsWith("20") || y.startsWith("21"))) {
+      documentYear = y;
+      break;
+    } else if (y.length === 2 && !documentYear) {
+      documentYear = "20" + y;
+    }
+  }
+  if (!documentYear) {
+    documentYear = new Date().getFullYear().toString();
+  }
+
   const result: ParsedRateCon = {
     loadNumber: "",
     weight: "",
@@ -223,7 +240,22 @@ function parseChRobinson(text: string): ParsedRateCon {
       // Date extraction: Scheduled Pick Up* 5/13/2026 or Pick Up Date: 5/12/2026
       const dateMatch = section.match(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/) || 
                         section.match(/(?:Pick\s*Up\s*Date|Delivery\s*Date)\s*[:]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i);
-      let date = dateMatch ? normalizeDateHelper(dateMatch[1]) : "";
+      let date = "";
+      if (dateMatch) {
+        date = normalizeDateHelper(dateMatch[1]);
+      } else {
+        // Fallback for 2-part dates like "07/13" or "7/13" (MM/DD) without a year
+        const twoPartMatch = section.match(/\b(\d{1,2})[\/.-](\d{1,2})\b/);
+        if (twoPartMatch) {
+          const m = twoPartMatch[1].padStart(2, '0');
+          const d = twoPartMatch[2].padStart(2, '0');
+          const monthInt = parseInt(m, 10);
+          const dayInt = parseInt(d, 10);
+          if (monthInt >= 1 && monthInt <= 12 && dayInt >= 1 && dayInt <= 31) {
+            date = `${m}.${d}.${documentYear}`;
+          }
+        }
+      }
 
       // Time extraction: Pick Up Open 5/13/2026 5:10 AM or Pick Up Time: 22:00 Appt.
       // Handlers ranges like 07:00-14:30 or 13:00 Appt or 0700-1400
