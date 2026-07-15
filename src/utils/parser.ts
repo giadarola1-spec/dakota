@@ -542,6 +542,396 @@ function parseLandstar(text: string): ParsedRateCon {
   return result;
 }
 
+function parseNST(text: string): ParsedRateCon {
+  // Normalize
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
+
+  // Look for sequences of single characters separated by single spaces
+  text = text.replace(/(?:^|(?<=\s))([A-Z0-9])\s(?=([A-Z0-9])(?:\s|$))/gi, '$1');
+  text = text.replace(/(?:^|(?<=\s))([A-Z0-9])\s(?=([A-Z0-9])(?:\s|$))/gi, '$1');
+
+  const cleanAddress = (addr: string): string => {
+    if (!addr) return "";
+    
+    // Replace newlines with spaces and normalize whitespace
+    let cleaned = addr.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
+    
+    // Replace "EARLIEST" and "LATEST" from the address if they appear
+    cleaned = cleaned.replace(/\b(?:EARLIEST|LATEST)\b/gi, "").trim();
+    
+    // Exclude DC if it looks like a Distribution Center rather than District of Columbia state (e.g., DC 2042)
+    if (/\bDC\s+\d{2,4}\b/i.test(cleaned) && !/Washington/i.test(cleaned)) {
+      return "";
+    }
+
+    // Specifically handle common OCR artifacts where multiple labels are joined
+    // Remove specific labels from anywhere in the string
+    const noisyLabels = [/REFERENCE\s*NUMBERS/i, /CONSIGNEE\s*[:]?/i, /SHIPPER\s*[:]?/i, /FACILITY\s*NAME\s*[:]?/i, /SPRINGFIELD\s*NDC\s*01Z/i, /\bEARLIEST\b/i, /\bLATEST\b/i];
+    for (const label of noisyLabels) {
+      cleaned = cleaned.replace(label, "");
+    }
+
+    // If "Address:" or "Location:" is in the middle of the string, it often indicates facility name noise before it
+    const addrLabelMatch = cleaned.match(/(?:ADDRESS|LOCATION)\s*[:]?\s*/i);
+    if (addrLabelMatch && addrLabelMatch.index && addrLabelMatch.index > 5) {
+      cleaned = cleaned.substring(addrLabelMatch.index + addrLabelMatch[0].length).trim();
+    }
+
+    // If there is Phone/Earliest/Latest/Date/Jul/Aug etc., truncate there to prevent matching date as address
+    const truncateIndex = cleaned.search(/\b(?:Phone|Earliest|Latest|Date|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i);
+    if (truncateIndex !== -1 && truncateIndex > 5) {
+      cleaned = cleaned.substring(0, truncateIndex).trim();
+    }
+
+    // Remove leading noise (labels at the start)
+    const prefixPattern = /^(?:\s*(?:\d+\s+)?(?:EARLIEST|LATEST|LOCATION|DATE|TIME|PICK-UP|DELIVERY|DESTINATION|ORIGIN|SHIPPER|CONSIGNEE|PICKUP|ADDRESS|FROM|TO|RECEIVER|STOP\s*(?:#?\d+)?|LOADING|UNLOADING|PU|P\/U|DO|DEL|FACILITY\s*NAME|SHIPPING\s*ADDRESS|RECEIVING\s*ADDRESS|DROP\s*OFF|PICK-UP\s*LOCATION|DELIVERY\s*LOCATION|DATE\s*TIME|NOTES|SPECIAL\s*INSTRUCTIONS|UP|PICK|INFO|CONTACT|NAME|PHONE|EMAIL|FAX|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|UNLOADING|RECEIPT|EXCHANGE|NOTE|CARRIER|COMMODITY|HANDLING|UNITS|STACKABLE|PIECES|DIMS|TEMP|TEMPERATURE|CONFIRM|RECEIPT|OF|REFERENCE\s*NUMBERS|REF\s*#|REFERENCE)\s*[:\/\-]?\s*)+/i;
+    cleaned = cleaned.replace(prefixPattern, "").trim();
+    
+    // Handle cases like "480 Address: 711..." where a number from a previous field is caught
+    cleaned = cleaned.replace(/^\d+\s+(?:ADDRESS|LOCATION|SHIPPER|CONSIGNEE|PICKUP|DELIVERY|REFERENCE\s*NUMBERS)[:\-]?\s*/i, "").trim();
+
+    // Remove trailing noise
+    const suffixPattern = /(?:\s*(?:REFERENCE\s*NUMBERS|REF\s*#|BOL\s*#|PICKUP\s*#|PU\s*#|DO\s*#|STOP\s*#|NOTES|SPECIAL\s*INSTRUCTIONS|CONTACT|PHONE|EMAIL|FAX|DATE|TIME|APPOINTMENT|APPT|WINDOW|ETA|SCHEDULED|ARRIVAL|CHECK-IN|FCFS|ASAP|DELIVERY|PICKUP|SHIPPER|CONSIGNEE|ORIGIN|DESTINATION|LOCATION|ADDRESS|FROM|TO|RECEIVER|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY|SHIPPING|RECEIVING|DROP|UP|PICK|INFO|NAME|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|RECEIPT|EXCHANGE|NOTE|CARRIER|COMMODITY|HANDLING|UNITS|STACKABLE|PIECES|DIMS|TEMP|CONFIRM|OF)\s*[:\/\-]?\s*)+$/i;
+    cleaned = cleaned.replace(suffixPattern, "").trim();
+    
+    const blacklist = [
+      "1701 Edison Drive", "PO Box 9049", "Louisville, KY 40209", "Milford, OH 45150",
+      "FLEET ONE FACTORING", "WEX", "PO BOX 94565",
+      "pickup / delivery", "pickup/delivery", "pickup / delivery OR BOTH",
+      "delivery OR BOTH", "pickup / delivery OR", "Pallet Yes", "Piece 20000",
+      "Pallet", "Piece", "Commodity", "Handling Units"
+    ];
+    
+    for (const item of blacklist) {
+      if (cleaned.toUpperCase().includes(item.toUpperCase())) return "";
+    }
+    
+    if (cleaned.length < 5) return "";
+
+    // Deduplicate duplicate consecutive words or phrases
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    let words = cleaned.replace(/\s+/g, ' ').split(' ');
+    let k = 0;
+
+    while (k < words.length) {
+      let advanced = false;
+      for (let len = 4; len >= 1; len--) {
+        if (k + len * 2 <= words.length) {
+          const firstPhrase = words.slice(k, k + len).join(' ');
+          const secondPhrase = words.slice(k + len, k + len * 2).join(' ');
+          
+          if (norm(firstPhrase) === norm(secondPhrase)) {
+            const lastWordOfSecond = words[k + len * 2 - 1];
+            const hasComma = lastWordOfSecond.endsWith(',');
+            
+            words.splice(k + len, len);
+            
+            if (hasComma && !words[k + len - 1].endsWith(',')) {
+              words[k + len - 1] += ',';
+            }
+            
+            advanced = true;
+            break;
+          }
+        }
+      }
+      if (!advanced) {
+        k++;
+      }
+    }
+
+    cleaned = words.join(' ').replace(/\s+,/g, ',').replace(/\s+/g, ' ').trim();
+
+    return cleaned;
+  };
+
+  const result: ParsedRateCon = {
+    loadNumber: "",
+    weight: "",
+    rate: "",
+    stops: [],
+    pickupTime: "",
+    pickupDate: "",
+    deliveryTime: "",
+    originAddress: "",
+    destinationAddress: "",
+    brokerName: "NST",
+    rawTextPreview: text.substring(0, 200) + "..."
+  };
+
+  const normalizeWeight = (w: string): string => {
+    if (!w) return "";
+    const clean = w.replace(/,/g, '').trim();
+    return clean ? `${clean} LBS` : "";
+  };
+
+  const normalizeDate = (d: string): string => {
+    // If the date contains alphabetical month (e.g. Jul 15, 2026)
+    const m = d.match(/([A-Za-z]{3})\s+(\d{1,2}),?\s*(\d{4})/i);
+    if (m) {
+      const months: Record<string, string> = {
+        jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+        jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+      };
+      const month = months[m[1].substring(0, 3).toLowerCase()] || '01';
+      const day = m[2].padStart(2, '0');
+      const year = m[3];
+      return `${month}.${day}.${year}`;
+    }
+    return normalizeDateHelper(d);
+  };
+
+  const normalizeTime = (t: string): string => {
+    if (!t) return "";
+    const upper = t.toUpperCase();
+    if (upper === "TBD" || upper === "ASAP" || upper === "FCFS") return upper;
+
+    let clean = t.replace(/hrs?/i, '')
+                 .replace(/Appointment\s*Time\s*[:]?/i, '')
+                 .replace(/Appointment/i, '')
+                 .replace(/Appt/i, '')
+                 .replace(/Window/i, '')
+                 .replace(/ETA/i, '')
+                 .replace(/Scheduled/i, '')
+                 .replace(/Arrival/i, '')
+                 .replace(/Time\s*[:]?/i, '')
+                 .trim();
+    
+    const isPM = /PM/i.test(clean);
+    const isAM = /AM/i.test(clean);
+    clean = clean.replace(/(?:AM|PM)/i, '').trim();
+    
+    // Handle HHMM format
+    if (!clean.includes(':') && clean.length === 4 && !isNaN(Number(clean))) {
+      const h = parseInt(clean.substring(0, 2), 10);
+      const m = parseInt(clean.substring(2, 4), 10);
+      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+      }
+      return "";
+    }
+
+    // Handle HH:MM format
+    if (clean.includes(':')) {
+      let [hours, minutes] = clean.split(':');
+      let h = parseInt(hours, 10);
+      let mStr = minutes.match(/^\d{2}/)?.[0] || "00";
+      let m = parseInt(mStr, 10);
+      
+      if (isNaN(h) || isNaN(m)) return "";
+      
+      if (isPM && h < 12) h += 12;
+      if (isAM && h === 12) h = 0;
+      
+      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+      }
+      return "";
+    }
+
+    return "";
+  };
+
+  // --- Windowed Extraction for Header Fields ---
+  result.loadNumber = extractInWindow(text, 
+    ['Our Invoice Reference Load #', 'Turvo Shipment #', 'Load #', 'Order #', 'PO #', 'PO#', 'Shipment ID', 'Pro #', 'PRO NUMBER', 'Reference #', 'Booking #', 'Confirmation #', 'Trip #', 'Job #', 'Convoy ID'], 
+    [/\s*[:.]?\s*([A-Z0-9-]{4,})/i, /([A-Z0-9-]{4,})/i]
+  ) || (text.match(PATTERNS.loadNumber[0])?.[1] || "");
+
+  result.weight = normalizeWeight(extractInWindow(text, 
+    ['total gross weight', 'Gross Weight', 'Estimated Weight', 'Total Weight', 'Actual Weight', 'Weight', 'Wt', 'Wgt', 'Est Wgt'], 
+    [/\s*[:.]?\s*(\d+(?:,\d{3})*|\d+)/i]
+  )) || normalizeWeight(text.match(PATTERNS.weight[0])?.[1] || "");
+
+  // Rate extraction with scoring
+  const rateAnchors = ['Total Pay', 'Rate', 'Total', 'Amount', 'Pay', 'Flat Rate', 'Carrier Pay', 'Linehaul', 'All-in', 'Grand Total', 'Agreed Amount', 'Amount to invoice'];
+  let bestRate = "";
+  let bestScore = -100;
+
+  for (const anchor of rateAnchors) {
+    const escaped = anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+    const startBound = /^\w/.test(anchor) ? '\\b' : '';
+    const endBound = /\w$/.test(anchor) ? '\\b' : '';
+    const anchorRegex = new RegExp(`${startBound}${escaped}${endBound}`, 'i');
+    
+    const match = text.match(anchorRegex);
+    if (match && match.index !== undefined) {
+      const window = text.substring(match.index, Math.min(match.index + 100, text.length));
+      for (const pattern of PATTERNS.rate) {
+        const vMatch = window.match(pattern);
+        if (vMatch && vMatch[1]) {
+          const val = vMatch[1].replace(/,/g, '');
+          const num = parseFloat(val);
+          if (isNaN(num)) continue;
+          let score = 0;
+          if (window.includes('$')) score += 10;
+          if (window.toUpperCase().includes('USD')) score += 10;
+          if (anchor.toLowerCase().includes('total')) score += 5;
+          if (num > 10000) score -= 20; 
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestRate = val;
+          }
+        }
+      }
+    }
+  }
+  result.rate = bestRate || (text.match(PATTERNS.rate[0])?.[1]?.replace(/,/g, '') || "");
+  
+  // Extract Broker Email
+  const emailMatch = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/);
+  if (emailMatch) {
+    result.brokerEmail = emailMatch[0];
+  }
+
+  // --- Multi-Stop Detection with Segmentation ---
+  const stopMarkers = [
+    { pattern: /(?:Shipper|Origin|Pickup|Pick-up)\s*[\-\u2010-\u2015]\s*(?:Pickup|Stop)\s*(\d+)\s*of\s*(\d+)/i, type: 'pickup', priority: 5 },
+    { pattern: /(?:Consignee|Destination|Delivery)\s*[\-\u2010-\u2015]\s*(?:Delivery|Stop)\s*(\d+)\s*of\s*(\d+)/i, type: 'delivery', priority: 5 },
+    { pattern: /(?:PU|DO|Stop)\s*#?\s*(\d+)/i, type: 'auto', priority: 4 },
+    { pattern: /#\s*(\d+)\s*(Shipper|Consignee|Destination)/i, type: 'auto', priority: 4 },
+    { pattern: /Stop\s*#?\s*(\d+)\s*[:\-]?\s*(Pick|Del)/i, type: 'auto', priority: 2 },
+    { pattern: /Stop\s*#?\s*(\d+)/i, type: 'auto', priority: 2 },
+    { pattern: /(?:Shipper|Origin|Pickup|Pick-up)\s*(?:Location|Address)?(?:\s*[:\-]|(?=\s+Date))/i, type: 'pickup', priority: 1 },
+    { pattern: /(?:Consignee|Destination|Delivery)\s*(?:Location|Address)?(?:\s*[:\-]|(?=\s+Date))/i, type: 'delivery', priority: 1 }
+  ];
+
+  let foundMarkers: { index: number, type: string, label: string, priority: number }[] = [];
+  
+  for (const marker of stopMarkers) {
+    const matches = text.matchAll(new RegExp(marker.pattern, 'gi'));
+    for (const match of matches) {
+      let type = marker.type;
+      let label = "";
+      if (type === 'auto') {
+        const sub = match[0].toLowerCase();
+        type = sub.includes('pick') || sub.includes('shipper') || sub.includes('pu') ? 'pickup' : 'delivery';
+      }
+      if (match[1] && match[2]) {
+        label = `${type.charAt(0).toUpperCase() + type.slice(1)} ${match[1]} of ${match[2]}`;
+      } else if (match[1]) {
+        label = `${type.charAt(0).toUpperCase() + type.slice(1)} ${match[1]}`;
+      } else {
+        label = `${type.charAt(0).toUpperCase() + type.slice(1)}`;
+      }
+      if (!foundMarkers.some(m => Math.abs(m.index - (match.index || 0)) < 15)) {
+        foundMarkers.push({ index: match.index || 0, type, label, priority: marker.priority });
+      }
+    }
+  }
+
+  const maxPriority = foundMarkers.length > 0 ? Math.max(...foundMarkers.map(m => m.priority)) : 0;
+  if (maxPriority > 1) {
+    foundMarkers = foundMarkers.filter(m => m.priority === maxPriority);
+  }
+  foundMarkers.sort((a, b) => a.index - b.index);
+
+  if (foundMarkers.length === 0) {
+    const pickupMatch = text.match(/(?:pickup|pick-up|shipper|origin)/i);
+    const deliveryMatch = text.match(/(?:delivery|consignee|destination)/i);
+    
+    if (pickupMatch) foundMarkers.push({ index: pickupMatch.index || 0, type: 'pickup', label: 'Pickup', priority: 1 });
+    if (deliveryMatch) foundMarkers.push({ index: deliveryMatch.index || 0, type: 'delivery', label: 'Delivery', priority: 1 });
+  }
+
+  for (let i = 0; i < foundMarkers.length; i++) {
+    const start = foundMarkers[i].index;
+    const end = (i < foundMarkers.length - 1) ? foundMarkers[i + 1].index : text.length;
+    let section = text.substring(start, end);
+    
+    if (i === foundMarkers.length - 1) {
+      const termsIndex = section.search(/\b(?:Terms\s*(?:and|&)\s*Conditions|FAILURE\s*TO\s*COMPLY|Special\s*Instructions:|Trailer\s*Maintenance|Accept\/Decline\/View\s*Tender)\b/i);
+      if (termsIndex !== -1) {
+        section = section.substring(0, termsIndex);
+      }
+    }
+    
+    // Windowed extraction within the stop section
+    const rangeMatch = section.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?\s*(?:[-–]|to|through)\s*\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+    let time = "";
+    if (rangeMatch) {
+      const parts = rangeMatch[1].split(/(?:[-–]|to|through)/gi);
+      const normParts = parts.map(p => normalizeTime(p.trim())).filter(Boolean);
+      if (normParts.length === 2) {
+        time = `${normParts[0]} - ${normParts[1]}`;
+      } else if (normParts.length === 1) {
+        time = normParts[0];
+      } else {
+        time = rangeMatch[1].trim();
+      }
+    } else {
+      // Look for Date Jul 15, 2026 17:00
+      const dateWithTimeMatch = section.match(/Date\s+[A-Za-z]{3}\s+\d{1,2},?\s*\d{4}\s+(\d{1,2}:\d{2})/i);
+      if (dateWithTimeMatch) {
+        time = normalizeTime(dateWithTimeMatch[1]);
+      } else {
+        const timeMatch = section.match(PATTERNS.time);
+        time = timeMatch ? normalizeTime(timeMatch[1]) : "";
+      }
+    }
+    const tzMatch = section.match(PATTERNS.timezone);
+    if (time && tzMatch) time += ` ${tzMatch[1].toUpperCase()}`;
+
+    // Handle alpha date match like "Date Jul 15, 2026"
+    const alphaDateMatch = section.match(/Date\s+([A-Za-z]{3}\s+\d{1,2},?\s*\d{4})/i);
+    let date = "";
+    if (alphaDateMatch) {
+      date = normalizeDate(alphaDateMatch[1]);
+    } else {
+      const dateMatch = section.match(PATTERNS.date);
+      date = dateMatch ? normalizeDate(dateMatch[1]) : "";
+    }
+
+    // Address extraction
+    let address = "";
+    for (const pattern of PATTERNS.address) {
+      const mAll = section.matchAll(new RegExp(pattern, 'gi'));
+      for (const m of mAll) {
+        const cleaned = cleanAddress(m[0]);
+        if (cleaned) {
+          address = cleaned;
+          break;
+        }
+      }
+      if (address) break;
+    }
+
+    result.stops.push({
+      type: foundMarkers[i].type as 'pickup' | 'delivery',
+      label: foundMarkers[i].label,
+      address,
+      date,
+      time
+    });
+  }
+
+  const uniqueStops: Stop[] = [];
+  for (const stop of result.stops) {
+    if (stop.address && !uniqueStops.some(s => s.address === stop.address)) {
+      uniqueStops.push(stop);
+    }
+  }
+  result.stops = uniqueStops;
+
+  const pickups = result.stops.filter(s => s.type === 'pickup');
+  const deliveries = result.stops.filter(s => s.type === 'delivery');
+
+  if (pickups.length > 0) {
+    result.pickupTime = pickups[0].time;
+    result.pickupDate = pickups[0].date;
+    result.originAddress = pickups[0].address;
+  }
+  if (deliveries.length > 0) {
+    const lastDel = deliveries[deliveries.length - 1];
+    result.deliveryTime = lastDel.time;
+    result.destinationAddress = lastDel.address;
+  }
+
+  return result;
+}
+
 function parseTQL(text: string): ParsedRateCon {
   // Normalize
   text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
@@ -813,6 +1203,12 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const isLandstar = lowerText.includes('landstar') || lowerText.includes('freight bill #');
   if (isLandstar) {
     return parseLandstar(text);
+  }
+
+  // NST detection
+  const isNST = lowerText.includes('north star transport') || lowerText.includes('turvo shipment') || (lowerText.includes('carrier load confirmation') && lowerText.includes('rcmoore.com'));
+  if (isNST) {
+    return parseNST(text);
   }
 
   const isTraffix = lowerText.includes('traffix');

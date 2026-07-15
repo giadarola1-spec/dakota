@@ -2840,7 +2840,25 @@ export default function App() {
               {/* Broker Info */}
               <div className="flex items-center gap-2 ml-4">
                 <button 
-                  onClick={() => setBroker(prev => prev === "TRAFFIX" ? "CH ROBINSON" : "TRAFFIX")}
+                  onClick={() => {
+                    const brokersList = ["TRAFFIX", "CH ROBINSON", "LANDSTAR", "TQL", "NST"];
+                    const currentUpper = broker.toUpperCase();
+                    let currentNormalized = "TRAFFIX";
+                    if (currentUpper.includes("ROBINSON")) {
+                      currentNormalized = "CH ROBINSON";
+                    } else if (currentUpper.includes("LANDSTAR")) {
+                      currentNormalized = "LANDSTAR";
+                    } else if (currentUpper.includes("TQL")) {
+                      currentNormalized = "TQL";
+                    } else if (currentUpper.includes("NST")) {
+                      currentNormalized = "NST";
+                    } else if (currentUpper.includes("TRAFFIX")) {
+                      currentNormalized = "TRAFFIX";
+                    }
+                    const idx = brokersList.indexOf(currentNormalized);
+                    const nextIndex = (idx + 1) % brokersList.length;
+                    setBroker(brokersList[nextIndex]);
+                  }}
                   className={`px-2 py-1 text-xs rounded border bg-zinc-500/10 text-zinc-500 border-zinc-500/30 font-bold uppercase hover:bg-zinc-500/20 transition-colors`}
                   title="Click to toggle broker"
                 >
