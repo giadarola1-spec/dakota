@@ -3103,6 +3103,21 @@ export default function App() {
                   <p className={`text-sm ${theme.textMuted}`}>
                     {isDragging ? 'Release to upload' : 'Click or drag PDF here to upload'}
                   </p>
+                  {!isDragging && (
+                    <div className="pt-4 flex flex-col items-center gap-2">
+                      <span className="text-[10px] font-bold tracking-wider uppercase opacity-40">Permitted Rate Confirmations</span>
+                      <div className="flex flex-wrap justify-center gap-1.5 max-w-md px-4">
+                        {['Traffix', 'CH ROBINSON', 'North Star Transport', 'TQL', 'Landstar'].map((brokerName) => (
+                          <span 
+                            key={brokerName}
+                            className={`px-2.5 py-0.5 text-[11px] font-medium rounded-full border ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-400' : 'bg-zinc-100/60 border-zinc-200 text-zinc-600'} transition-all`}
+                          >
+                            {brokerName}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </UploadGlareCard>
             )}
