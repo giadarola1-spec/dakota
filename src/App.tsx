@@ -2546,6 +2546,30 @@ export default function App() {
     }
   }, [isSimplifiedAddress, extractedData, appState, isViewingHistory]);
 
+  // Dynamic Browser Tab Title
+  useEffect(() => {
+    if (extractedData) {
+      const getRegionForTitle = (addr: string | undefined): string => {
+        if (!addr) return "??";
+        const match = addr.match(/,\s*([A-Z]{2})/);
+        if (match) return match[1];
+        const matchNoComma = addr.match(/\s+([A-Z]{2})(?:\s+\d+)?$/i);
+        if (matchNoComma) return matchNoComma[1].toUpperCase();
+        const matchAnyState = addr.match(/\b(AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\b/i);
+        return matchAnyState ? matchAnyState[1].toUpperCase() : "??";
+      };
+
+      const loadNo = extractedData.loadNumber?.trim() || "LOAD#";
+      const originState = getRegionForTitle(extractedData.originAddress);
+      const destState = getRegionForTitle(extractedData.destinationAddress);
+      const truckNo = truckNumber && truckNumber !== "TRUCK#" ? truckNumber : "TRUCK#";
+
+      document.title = `${loadNo} - ${originState}-${destState} - ${truckNo}`;
+    } else {
+      document.title = "Dakota";
+    }
+  }, [extractedData, truckNumber]);
+
   const copyToClipboard = (text: string, setCopied: (v: boolean) => void) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
