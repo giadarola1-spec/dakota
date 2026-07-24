@@ -1181,6 +1181,192 @@ function parseTQL(text: string): ParsedRateCon {
   return result;
 }
 
+function extractAddressFromRXOBlock(block: string): string {
+  let cleaned = block.replace(/\s+/g, ' ').trim();
+  
+  // Look for city, state zip at end or near end
+  const cityStateZipMatch = cleaned.match(/(?:,\s*|\s+)([A-Za-z\s.-]+,\s*[A-Z]{2}\s*\d{5}(?:-\d{4})?)/i) ||
+                            cleaned.match(/(?:,\s*|\s+)([A-Za-z\s.-]+\s+[A-Z]{2}\s+\d{5}(?:-\d{4})?)/i) ||
+                            cleaned.match(/(?:,\s*|\s+)([A-Za-z\s.-]+,\s*[A-Z]{2})/i);
+
+  if (!cityStateZipMatch) {
+    return cleaned;
+  }
+
+  const cityStateZip = cityStateZipMatch[1].trim();
+  const prefix = cleaned.substring(0, cityStateZipMatch.index).trim();
+
+  if (!prefix) return cityStateZip;
+
+  // Find street address inside prefix:
+  // Look for street number followed by street suffix words
+  const streetRegex = /\b(\d{1,5}\s+[A-Za-z0-9\s.#\/-]+?(?:DR|ROAD|RD|AVE|AVENUE|ST|STREET|BLVD|BOULDER|WAY|LN|LANE|CT|COURT|PL|PLACE|HWY|HIGHWAY|PKWY|PARKWAY|SUITE|STE|UNIT|BLDG|BUILDING)\b(?:\s+(?:SUITE|STE|UNIT|#|BLDG)\s*[A-Za-z0-9-]+)?)/gi;
+  
+  const streetMatches = [...prefix.matchAll(streetRegex)];
+  if (streetMatches.length > 0) {
+    let street = streetMatches[streetMatches.length - 1][1].trim();
+    if (street.includes('.')) {
+      const parts = street.split('.').map(p => p.trim()).filter(Boolean);
+      street = parts[parts.length - 1];
+    }
+    return `${street}, ${cityStateZip}`;
+  }
+
+  // Fallback: try matching simple street number + words
+  const simpleStreetMatch = prefix.match(/\b(\d{1,5}\s+[A-Za-z0-9\s.#\/-]{3,40})$/i);
+  if (simpleStreetMatch) {
+    let street = simpleStreetMatch[1].trim();
+    if (street.includes('.')) {
+      const parts = street.split('.').map(p => p.trim()).filter(Boolean);
+      street = parts[parts.length - 1];
+    }
+    return `${street}, ${cityStateZip}`;
+  }
+
+  return cityStateZip;
+}
+
+function parseRXO(text: string): ParsedRateCon {
+  // Normalize line endings and spaces
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
+
+  const result: ParsedRateCon = {
+    loadNumber: "",
+    weight: "",
+    rate: "",
+    stops: [],
+    pickupTime: "",
+    pickupDate: "",
+    deliveryTime: "",
+    originAddress: "",
+    destinationAddress: "",
+    brokerName: "RXO",
+    rawTextPreview: text.substring(0, 200) + "..."
+  };
+
+  // Load Number
+  // "Load Confirmation 23604126", "Order # ... 23604126", "LZ23604126"
+  const loadMatch = text.match(/Load\s*Confirmation\s*[:#]?\s*(\d+)/i) ||
+                    text.match(/Order\s*#[\s\S]*?\n?\s*(\d{7,10})/i) ||
+                    text.match(/\bLZ(\d{7,10})\b/i) ||
+                    text.match(/\b(\d{7,9})\b/);
+  if (loadMatch) {
+    result.loadNumber = loadMatch[1];
+  }
+
+  // Weight extraction
+  let extractedWeight = "";
+  const totalWeightMatch = text.match(/Total\s*Weight\s*\([^)]*\)[\s\S]{0,100}?\b(\d{4,6}(?:\.\d{1,2})?)\b/i) ||
+                           text.match(/Order\s*#[\s\S]{0,100}?\b(\d{4,6}(?:\.\d{1,2})?)\b/i) ||
+                           text.match(/Weight[\s\S]{0,50}?\b(\d{4,6}(?:\.\d{1,2})?)\b/i);
+
+  if (totalWeightMatch) {
+    const wVal = parseFloat(totalWeightMatch[1]);
+    if (!isNaN(wVal) && wVal > 1000 && wVal < 80000) {
+      extractedWeight = Math.round(wVal).toLocaleString() + " LBS";
+    }
+  }
+
+  if (!extractedWeight) {
+    const stopWeightRegex = /\b(\d{4,5}(?:\.\d{1,2})?)\b(?=\s*(?:\(\d+\)|PO|SI|AO|WATER|LBS|\(lbs\)))/gi;
+    const matches: number[] = [];
+    let m;
+    while ((m = stopWeightRegex.exec(text)) !== null) {
+      const val = parseFloat(m[1]);
+      if (!isNaN(val) && val > 1000 && val < 80000) matches.push(val);
+    }
+    if (matches.length > 0) {
+      extractedWeight = Math.max(...matches).toLocaleString() + " LBS";
+    }
+  }
+  result.weight = extractedWeight;
+
+  // Rate
+  const rateMatch = text.match(/Total\s*Carrier\s*Pay\s*\$?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/Line\s*Haul[\s\S]*?\$?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/Total\s*[:]?\s*\$?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i);
+  if (rateMatch) {
+    result.rate = rateMatch[1].replace(/[,\s]/g, '');
+  }
+
+  // Broker Email
+  const rxoEmailMatch = text.match(/([a-zA-Z0-9._-]+@rxo\.com)/i);
+  if (rxoEmailMatch) {
+    result.brokerEmail = rxoEmailMatch[1];
+  } else {
+    const genericEmail = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/);
+    if (genericEmail) result.brokerEmail = genericEmail[0];
+  }
+
+  // Stops Extraction
+  const stopDetailIndex = text.search(/STOP\s*DETAIL/i);
+  const stopSectionText = stopDetailIndex !== -1 ? text.substring(stopDetailIndex) : text;
+
+  const stopRegex = /\b(PU|SO|DO|DEL)\b\s+(?:Arrival|Scheduled|\d{1,2}[\/.-])[\s\S]*?(?=\b(?:PU|SO|DO|DEL)\b\s+(?:Arrival|Scheduled|\d{1,2}[\/.-])|\bNOTES\b|\bOrder Notes\b|\bINSTRUCTIONS\b|$)/gi;
+  const stopMatches = [...stopSectionText.matchAll(stopRegex)];
+
+  stopMatches.forEach(sm => {
+    const section = sm[0];
+    const stopTypeStr = sm[1].toUpperCase();
+    const isPickup = stopTypeStr === 'PU';
+    const type = isPickup ? 'pickup' : 'delivery';
+    const label = isPickup ? 'PU' : 'SO';
+
+    // Date: e.g. Arrival 07/22/26 or 07/22/2026
+    const dateMatch = section.match(/(?:Arrival|Scheduled|\b)\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i) ||
+                      section.match(/\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/);
+    let date = dateMatch ? normalizeDateHelper(dateMatch[1]) : "";
+
+    // Time: e.g. 09:00 - 21:59 or 09:00 - 12:00 or 09:00 - 1200
+    const timeRangeMatch = section.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?\s*[-–]\s*\d{1,2}:?\d{2}\s*(?:AM|PM)?)/i);
+    const singleTimeMatch = section.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+    let time = "";
+    if (timeRangeMatch) {
+      time = timeRangeMatch[1].trim();
+      time = time.replace(/(\b\d{1,2}):?(\d{2})\b/g, (_m, h, min) => {
+        return `${h.padStart(2, '0')}:${min}`;
+      });
+    } else if (singleTimeMatch) {
+      time = singleTimeMatch[1].trim();
+    }
+
+    // Extract address block: everything between departure/N/A and commodity/WATER/PO/Dim:/Weight
+    let addrBlock = section.replace(/^[\s\S]*?(?:Arrival|Departure|N\/A|\d{1,2}:\d{2}(?:\s*[-–]\s*\d{1,2}:?\d{2})?)\s*(?:N\/A)?/i, "")
+                          .split(/\b(?:WATER|Dim:|PO\b|SI\b|AO\b|Commodity|Weight|Reference)\b/i)[0]
+                          .trim();
+
+    let address = extractAddressFromRXOBlock(addrBlock);
+
+    if (address) {
+      result.stops.push({
+        type,
+        address,
+        date,
+        time,
+        label
+      });
+    }
+  });
+
+  if (result.stops.length > 0) {
+    const pickups = result.stops.filter(s => s.type === 'pickup');
+    const deliveries = result.stops.filter(s => s.type === 'delivery');
+
+    if (pickups.length > 0) {
+      result.pickupTime = pickups[0].time;
+      result.pickupDate = pickups[0].date;
+      result.originAddress = pickups[0].address;
+    }
+    if (deliveries.length > 0) {
+      const lastDel = deliveries[deliveries.length - 1];
+      result.deliveryTime = lastDel.time;
+      result.destinationAddress = lastDel.address;
+    }
+  }
+
+  return result;
+}
+
 export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
   
@@ -1188,6 +1374,12 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const isTQL = lowerText.includes('tql') && (lowerText.includes('po#') || lowerText.includes('p.o.#') || lowerText.includes('total quality logistics'));
   if (isTQL) {
     return parseTQL(text);
+  }
+
+  // RXO detection
+  const isRXO = lowerText.includes('rxo') || lowerText.includes('tracking@rxo.com');
+  if (isRXO) {
+    return parseRXO(text);
   }
 
   // High-confidence Robinson detection

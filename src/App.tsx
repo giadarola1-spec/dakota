@@ -517,10 +517,21 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
           .map(char => char === ' ' ? '\\s+' : char + '[^a-z0-9]*')
           .join('');
         
-        const specificRegex = new RegExp(escapedSpecific, 'i');
-        let match = combinedText.match(specificRegex);
+        const specificRegex = new RegExp(escapedSpecific, 'gi');
+        const allSpecificMatches = [...combinedText.matchAll(specificRegex)];
+        let match: RegExpMatchArray | null = null;
 
-        // Strategy 2: Fallback to Fuzzy Alphanumeric (Current behavior)
+        if (allSpecificMatches.length > 0) {
+          // Prefer match that is preceded by $ or space/punctuation (not directly attached to leading letters like 'at1000')
+          const bestMatch = allSpecificMatches.find(m => {
+            if (m.index === undefined || m.index === 0) return true;
+            const charBefore = combinedText[m.index - 1];
+            return !/[a-z]/i.test(charBefore);
+          });
+          match = bestMatch || allSpecificMatches[0];
+        }
+
+        // Strategy 2: Fallback to Fuzzy Alphanumeric
         if (!match) {
           let cleanSearch = normalize(highlightText);
           if (cleanSearch.endsWith('lbs')) cleanSearch = cleanSearch.replace(/lbs$/, '');
@@ -529,8 +540,16 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
 
           if (cleanSearch.length >= 2) {
             const escapedFuzzy = cleanSearch.split('').join('[^a-z0-9]*');
-            const fuzzyRegex = new RegExp(escapedFuzzy, 'i');
-            match = combinedText.match(fuzzyRegex);
+            const fuzzyRegex = new RegExp(escapedFuzzy, 'gi');
+            const allFuzzyMatches = [...combinedText.matchAll(fuzzyRegex)];
+            if (allFuzzyMatches.length > 0) {
+              const bestMatch = allFuzzyMatches.find(m => {
+                if (m.index === undefined || m.index === 0) return true;
+                const charBefore = combinedText[m.index - 1];
+                return !/[a-z]/i.test(charBefore);
+              });
+              match = bestMatch || allFuzzyMatches[0];
+            }
           }
         }
 
@@ -1734,7 +1753,7 @@ export default function App() {
   const [termsStatus, setTermsStatus] = useLocalStorage<'accepted' | 'rejected' | 'pending'>("dakota_termsStatus_v1", 'pending');
   const [hasSeenTQLUpdate, setHasSeenTQLUpdate] = useLocalStorage<boolean>("dakota_hasSeenTQLUpdate_v1", false);
   const [lastSeenBannerVersion, setLastSeenBannerVersion] = useLocalStorage<string>("dakota_lastSeenBannerVersion_v1", "");
-  const CURRENT_BANNER_VERSION = "2026-06-08";
+  const CURRENT_BANNER_VERSION = "0724";
   const showBanner = lastSeenBannerVersion !== CURRENT_BANNER_VERSION;
 
   const handleDismissBanner = () => {
@@ -2865,7 +2884,7 @@ export default function App() {
               <div className="flex items-center gap-2 ml-4">
                 <button 
                   onClick={() => {
-                    const brokersList = ["TRAFFIX", "CH ROBINSON", "LANDSTAR", "TQL", "NST"];
+                    const brokersList = ["TRAFFIX", "CH ROBINSON", "LANDSTAR", "TQL", "NST", "RXO"];
                     const currentUpper = broker.toUpperCase();
                     let currentNormalized = "TRAFFIX";
                     if (currentUpper.includes("ROBINSON")) {
@@ -2876,6 +2895,8 @@ export default function App() {
                       currentNormalized = "TQL";
                     } else if (currentUpper.includes("NST")) {
                       currentNormalized = "NST";
+                    } else if (currentUpper.includes("RXO")) {
+                      currentNormalized = "RXO";
                     } else if (currentUpper.includes("TRAFFIX")) {
                       currentNormalized = "TRAFFIX";
                     }
@@ -2986,10 +3007,10 @@ export default function App() {
         <div className="w-full flex-none bg-[#0a182e] text-blue-100/95 font-sans py-2.5 px-6 border-b border-blue-900/40 select-none z-30 relative shadow-lg flex items-center justify-between gap-3 animate-fade-in backdrop-blur-md">
           <div className="flex-grow flex items-center justify-center gap-2 text-center text-xs font-medium tracking-wide md:flex-row flex-col">
             <span className="font-bold uppercase tracking-wider text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-md border border-blue-400/20 shrink-0">
-              New Update
+              New Update (0724)
             </span>
             <span className="text-zinc-200">
-              Now you can copy formatted driver details (<span className="text-white font-semibold">Truck #, Driver's Name, Phone Number</span>) elegantly for emails using the <span className="text-blue-300 font-bold">Copy</span> buttons in both the Directory list and Active Results view!
+              Various errors and bugs fixed in this version
             </span>
           </div>
           <button 
@@ -3131,7 +3152,7 @@ export default function App() {
                     <div className="pt-4 flex flex-col items-center gap-2">
                       <span className="text-[10px] font-bold tracking-wider uppercase opacity-40">Permitted Rate Confirmations</span>
                       <div className="flex flex-wrap justify-center gap-1.5 max-w-md px-4">
-                        {['Traffix', 'CH ROBINSON', 'North Star Transport', 'TQL', 'Landstar'].map((brokerName) => (
+                        {['Traffix', 'CH ROBINSON', 'North Star Transport', 'TQL', 'Landstar', 'RXO'].map((brokerName) => (
                           <span 
                             key={brokerName}
                             className={`px-2.5 py-0.5 text-[11px] font-medium rounded-full border ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-400' : 'bg-zinc-100/60 border-zinc-200 text-zinc-600'} transition-all`}

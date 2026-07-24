@@ -115,7 +115,7 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
           <p className="text-xs font-medium uppercase tracking-widest">Dakota Intelligence Systems © 2026</p>
           <div className="flex gap-4 text-[10px] font-mono uppercase">
             <span>Region: us-east-1</span>
-            <span>Version: 0.41.0b</span>
+            <span>Version: 0724</span>
           </div>
         </div>
       </footer>
