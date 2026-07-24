@@ -1,6 +1,7 @@
-import React from 'react';
-import { motion } from 'motion/react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { DottedMapBackground } from './DottedMapBackground';
+import { WelcomeSplash } from './WelcomeSplash';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">
@@ -25,23 +26,39 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
   isDarkMode,
   theme
 }) => {
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.05, filter: 'blur(20px)' }}
-      className="fixed inset-0 z-[200] bg-[#030723] text-white overflow-y-auto overflow-x-hidden font-sans"
-    >
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full bg-[#030723]/80 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto rounded-b-2xl shadow-2xl">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
-            <DakotaLogo className="w-7 h-7" />
-            <span className="text-xl font-geologica font-bold tracking-tight text-white lowercase">dakota</span>
-          </div>
-        </div>
+  const [hasSeenSplash, setHasSeenSplash] = useState<boolean>(() => {
+    return localStorage.getItem("dakota_hasSeenSplash_v1") === "true";
+  });
 
-      </header>
+  const handleSplashComplete = () => {
+    localStorage.setItem("dakota_hasSeenSplash_v1", "true");
+    setHasSeenSplash(true);
+  };
+
+  return (
+    <>
+      <AnimatePresence>
+        {!hasSeenSplash && (
+          <WelcomeSplash onComplete={handleSplashComplete} />
+        )}
+      </AnimatePresence>
+
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0, scale: 1.05, filter: 'blur(20px)' }}
+        className="fixed inset-0 z-[200] bg-[#030723] text-white overflow-y-auto overflow-x-hidden font-sans"
+      >
+        {/* Header */}
+        <header className="sticky top-0 z-50 w-full bg-[#030723]/80 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto rounded-b-2xl shadow-2xl">
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setHasSeenSplash(false)} title="Replay intro animation">
+              <DakotaLogo className="w-7 h-7" />
+              <span className="text-xl font-geologica font-bold tracking-tight text-white lowercase">dakota</span>
+            </div>
+          </div>
+
+        </header>
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-6 pt-24 pb-32 relative">
@@ -120,5 +137,6 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
         </div>
       </footer>
     </motion.div>
-  );
+  </>
+);
 };

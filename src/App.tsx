@@ -1759,6 +1759,20 @@ export default function App() {
   const handleDismissBanner = () => {
     setLastSeenBannerVersion(CURRENT_BANNER_VERSION);
   };
+
+  // Developer Easter Egg
+  const [easterEggClicks, setEasterEggClicks] = useState(0);
+  const handleEasterEggClick = () => {
+    const next = easterEggClicks + 1;
+    if (next >= 3) {
+      setEasterEggClicks(0);
+      localStorage.setItem("dakota_hasSeenSplash_v1", "false");
+      setHasSeenWelcome(false);
+      setIsMenuOpen(false);
+    } else {
+      setEasterEggClicks(next);
+    }
+  };
   
   // History State
   const [history, setHistory] = useLocalStorage<HistoryItem[]>("dakota_history", []);
@@ -3531,7 +3545,13 @@ export default function App() {
 
               <div className="p-5 border-t border-white/5 bg-black/5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-medium text-zinc-600 uppercase tracking-tighter">Dakota 0626</span>
+                  <span 
+                    onClick={handleEasterEggClick}
+                    className="text-[10px] font-medium text-zinc-600 hover:text-blue-400 uppercase tracking-tighter cursor-pointer select-none transition-colors"
+                    title="Developer Easter Egg (Click 3x to trigger intro animation)"
+                  >
+                    Dakota 0724
+                  </span>
                   <div className="flex gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   </div>
