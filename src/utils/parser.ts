@@ -1367,6 +1367,158 @@ function parseRXO(text: string): ParsedRateCon {
   return result;
 }
 
+function parseOpenRoad(text: string): ParsedRateCon {
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  const result: ParsedRateCon = {
+    loadNumber: "",
+    weight: "",
+    rate: "",
+    stops: [],
+    pickupTime: "",
+    pickupDate: "",
+    deliveryTime: "",
+    originAddress: "",
+    destinationAddress: "",
+    brokerName: "OPENROAD",
+    rawTextPreview: text.substring(0, 200) + "..."
+  };
+
+  // Load Number
+  const loadMatch = text.match(/(?:Carrier\s*Rate\s*Confirmation|Load\s*Number|Load\s*#)\s*[:#]?\s*([A-Z0-9-]+)/i) ||
+                    text.match(/\b(OR\d{5,8})\b/i);
+  if (loadMatch) {
+    result.loadNumber = loadMatch[1].trim();
+  }
+
+  // Weight
+  const weightMatch = text.match(/(\d+(?:,\d{3})*|\d+)\s*(?:lbs|LBS|pounds)/i) ||
+                      text.match(/Weight\s*[:]?\s*(\d+(?:,\d{3})*|\d+)/i);
+  if (weightMatch) {
+    const rawW = weightMatch[1].replace(/,/g, '');
+    const numW = parseInt(rawW, 10);
+    if (!isNaN(numW)) {
+      result.weight = numW.toLocaleString() + " LBS";
+    }
+  }
+
+  // Rate
+  const rateMatch = text.match(/Total\s*Cost\s*(?:USD|\$)?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/Net\s*Freight\s*Charges\s*(?:USD|\$)?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/(?:Rate|Total|Pay)\s*[:]?\s*(?:USD|\$)?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i);
+  if (rateMatch) {
+    result.rate = rateMatch[1].replace(/[,\s]/g, '');
+  }
+
+  // Broker Email
+  const openRoadEmailMatch = text.match(/([a-zA-Z0-9._-]+@openroad\.inc)/i);
+  if (openRoadEmailMatch) {
+    result.brokerEmail = openRoadEmailMatch[1];
+  } else {
+    const genericEmail = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/);
+    if (genericEmail) result.brokerEmail = genericEmail[0];
+  }
+
+  // Stops extraction
+  const stopBlockRegex = /(Shipper\s*Pickup|Consignee\s*Delivery|Pickup|Delivery)\s*\((?:Stop\s*)?(\d+)\)[\s\S]*?(?=(?:Shipper\s*Pickup|Consignee\s*Delivery|Pickup|Delivery)\s*\((?:Stop\s*)?\d+\)|Shipment\s*Information|Carrier\s*Fees|Pursuant\s*to|$)/gi;
+
+  const matches = [...text.matchAll(stopBlockRegex)];
+
+  if (matches.length > 0) {
+    matches.forEach(m => {
+      const section = m[0];
+      const headerType = m[1].toLowerCase();
+      const isPickup = headerType.includes('pickup') || headerType.includes('shipper');
+      const type: 'pickup' | 'delivery' = isPickup ? 'pickup' : 'delivery';
+      const stopNum = m[2];
+      const label = `${isPickup ? 'Pickup' : 'Delivery'} ${stopNum}`;
+
+      // Date
+      const dateMatch = section.match(/(?:Pick\s*Up\s*Date|Delivery\s*Date|Expected\s*Date)\s*[:]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i) ||
+                        section.match(/\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/);
+      const date = dateMatch ? normalizeDateHelper(dateMatch[1]) : "";
+
+      // Time
+      const timeMatch = section.match(/Appointment\s*Time\s*[:]?\s*(\d{1,2}:\d{2}(?:\s*[-–]\s*\d{1,2}:\d{2})?(?:\s*(?:AM|PM))?)/i) ||
+                        section.match(/(\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2})/i) ||
+                        section.match(/(\d{1,2}:\d{2})/);
+      let time = "";
+      if (timeMatch) {
+        time = timeMatch[1].trim();
+        if (time.includes('-')) {
+          time = time.replace(/\s*-\s*/, ' - ');
+        }
+      }
+
+      // Address
+      const lines = section.split('\n').map(l => l.trim()).filter(Boolean);
+      let address = "";
+
+      const cityStateZipIdx = lines.findIndex(l => 
+        /\b[A-Za-z\s.-]+,\s*[A-Z]{2}\s*(?:US\s*)?\d{5}(?:-\d{4})?\b/i.test(l)
+      );
+
+      if (cityStateZipIdx !== -1) {
+        let cityStateZip = lines[cityStateZipIdx].match(/\b([A-Za-z\s.-]+,\s*[A-Z]{2}\s*(?:US\s*)?\d{5}(?:-\d{4})?)\b/i)?.[1] || lines[cityStateZipIdx];
+        cityStateZip = cityStateZip.replace(/\b([A-Z]{2})\s+US\s+(\d{5})/i, '$1 $2');
+
+        let street = "";
+        let facility = "";
+
+        if (cityStateZipIdx > 0) {
+          const lineBefore = lines[cityStateZipIdx - 1];
+          if (/\d{1,5}\s+[A-Za-z0-9\s.#\/-]+/i.test(lineBefore)) {
+            street = lineBefore;
+            if (cityStateZipIdx > 1) {
+              const line2Before = lines[cityStateZipIdx - 2];
+              if (!/Shipper|Consignee|Pickup|Delivery|Stop|Date|Appointment/i.test(line2Before)) {
+                facility = line2Before;
+              }
+            }
+          } else if (!/Shipper|Consignee|Pickup|Delivery|Stop|Date|Appointment/i.test(lineBefore)) {
+            facility = lineBefore;
+          }
+        }
+
+        const addrParts = [facility, street, cityStateZip].filter(Boolean);
+        address = addrParts.join(', ');
+      }
+
+      if (!address) {
+        const generalAddrMatch = section.match(/\b(\d{1,5}\s+[A-Za-z0-9\s.#\/-]+,\s*[A-Za-z\s.-]+,\s*[A-Z]{2}\s*(?:US\s*)?\d{5})\b/i);
+        if (generalAddrMatch) {
+          address = generalAddrMatch[1].replace(/\b([A-Z]{2})\s+US\s+(\d{5})/i, '$1 $2');
+        }
+      }
+
+      result.stops.push({
+        type,
+        address,
+        date,
+        time,
+        label
+      });
+    });
+  }
+
+  if (result.stops.length > 0) {
+    const pickups = result.stops.filter(s => s.type === 'pickup');
+    const deliveries = result.stops.filter(s => s.type === 'delivery');
+    if (pickups.length > 0) {
+      result.pickupDate = pickups[0].date;
+      result.pickupTime = pickups[0].time;
+      result.originAddress = pickups[0].address;
+    }
+    if (deliveries.length > 0) {
+      const lastDel = deliveries[deliveries.length - 1];
+      result.deliveryTime = lastDel.time;
+      result.destinationAddress = lastDel.address;
+    }
+  }
+
+  return result;
+}
+
 export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
   
@@ -1374,6 +1526,12 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   const isTQL = lowerText.includes('tql') && (lowerText.includes('po#') || lowerText.includes('p.o.#') || lowerText.includes('total quality logistics'));
   if (isTQL) {
     return parseTQL(text);
+  }
+
+  // OPENROAD detection
+  const isOpenRoad = lowerText.includes('openroad') || lowerText.includes('open road');
+  if (isOpenRoad) {
+    return parseOpenRoad(text);
   }
 
   // High-confidence Robinson detection
