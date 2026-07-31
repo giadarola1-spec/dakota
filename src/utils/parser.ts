@@ -1376,12 +1376,6 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     return parseTQL(text);
   }
 
-  // RXO detection
-  const isRXO = lowerText.includes('rxo') || lowerText.includes('tracking@rxo.com');
-  if (isRXO) {
-    return parseRXO(text);
-  }
-
   // High-confidence Robinson detection
   const isRobinson = (lowerText.includes('c.h. robinson') || lowerText.includes('ch robinson')) && 
                      !lowerText.includes('traffix') && 
