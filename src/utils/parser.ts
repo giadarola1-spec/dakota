@@ -1519,8 +1519,207 @@ function parseOpenRoad(text: string): ParsedRateCon {
   return result;
 }
 
+function parseArrive(text: string): ParsedRateCon {
+  // Normalize line endings
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  const result: ParsedRateCon = {
+    loadNumber: "",
+    weight: "",
+    rate: "",
+    stops: [],
+    pickupTime: "",
+    pickupDate: "",
+    deliveryTime: "",
+    originAddress: "",
+    destinationAddress: "",
+    brokerName: "ARRIVE",
+    rawTextPreview: text.substring(0, 200) + "..."
+  };
+
+  // Helper for dates like "Aug 12, 2026", "August 12, 2026", "08/12/2026"
+  const parseArriveDate = (str: string): string => {
+    if (!str) return "";
+    const m = str.match(/([A-Za-z]{3,9})\s+(\d{1,2}),?\s*(\d{4})/i);
+    if (m) {
+      const months: Record<string, string> = {
+        jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+        jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+      };
+      const key = m[1].substring(0, 3).toLowerCase();
+      const month = months[key] || '01';
+      const day = m[2].padStart(2, '0');
+      const year = m[3];
+      return `${month}.${day}.${year}`;
+    }
+    const std = str.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})\b/);
+    if (std) {
+      return normalizeDateHelper(std[0]);
+    }
+    return normalizeDateHelper(str);
+  };
+
+  // 1. Load Number (Arrive Order 9412775 or reference order 9412775)
+  const loadMatch = text.match(/Arrive\s*Order\s*[:#]?\s*(\d+)/i) ||
+                    text.match(/reference\s*order\s*[:#]?\s*(\d+)/i) ||
+                    text.match(/Order\s*[:#]?\s*(\d{7,10})/i) ||
+                    text.match(/\b(\d{7})\b/);
+  if (loadMatch) {
+    result.loadNumber = loadMatch[1].trim();
+  }
+
+  // 2. Weight (Total Weight 44604 lb or Weight 44604 lb)
+  const weightMatch = text.match(/Total\s*Weight\s*[:]?\s*(\d+(?:,\d{3})*|\d+)\s*(?:lb|lbs)?/i) ||
+                      text.match(/Weight\s*[:]?\s*(\d+(?:,\d{3})*|\d+)\s*(?:lb|lbs)?/i) ||
+                      text.match(/(\d+(?:,\d{3})*|\d+)\s*(?:lb|lbs)\b/i);
+  if (weightMatch) {
+    const rawVal = weightMatch[1].replace(/,/g, '');
+    const num = parseInt(rawVal, 10);
+    if (!isNaN(num)) {
+      result.weight = num.toLocaleString() + " LBS";
+    }
+  }
+
+  // 3. Rate (LineHaul $3,100.00 / Total $3,100.00)
+  const totalRateMatch = text.match(/Total\s*[:]?\s*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
+                         text.match(/LineHaul\s*[:]?\s*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
+                         text.match(/Total\s*[:]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i);
+  if (totalRateMatch) {
+    result.rate = totalRateMatch[1].replace(/,/g, '');
+  }
+
+  // 4. Broker Email
+  const arriveEmailMatch = text.match(/([a-zA-Z0-9._-]+@arrivelogistics\.com)/i) ||
+                           text.match(/([a-zA-Z0-9._-]+@arrivefresh\.com)/i) ||
+                           text.match(/([a-zA-Z0-9._-]+@arvy\.us)/i) ||
+                           text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/i);
+  if (arriveEmailMatch) {
+    result.brokerEmail = arriveEmailMatch[1];
+  }
+
+  // 5. Stops (Pickup #1, Delivery #1, etc.)
+  const stopSections = text.split(/(?=(?:Pickup|Delivery)\s*#\d+)/i);
+
+  stopSections.forEach(section => {
+    const isPickup = /Pickup\s*#\d+/i.test(section);
+    const isDelivery = /Delivery\s*#\d+/i.test(section);
+
+    if (isPickup || isDelivery) {
+      const type = isPickup ? 'pickup' : 'delivery';
+      const labelMatch = section.match(/(?:Pickup|Delivery)\s*#\d+/i);
+      const label = labelMatch ? labelMatch[0].trim() : (isPickup ? 'Pickup' : 'Delivery');
+
+      // Date: e.g. "Aug 12, 2026" or "08/12/2026"
+      const dateMatch = section.match(/(?:Appointment[\s\S]{0,40}?)?([A-Za-z]{3,9}\s+\d{1,2},?\s*\d{4})/i) ||
+                        section.match(/\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/);
+      const date = dateMatch ? parseArriveDate(dateMatch[1] || dateMatch[0]) : "";
+
+      // Time: e.g. "18:00 EDT" or "07:30 EDT" or "08:00 - 12:00"
+      const rangeTimeMatch = section.match(/(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?\s*[-–]\s*\d{1,2}:\d{2}(?:\s*(?:AM|PM))?(?:\s*[A-Z]{3})?)/i);
+      const singleTimeMatch = section.match(/(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?(?:\s*(?:EDT|EST|CDT|CST|MDT|MST|PDT|PST))?)/i);
+      let time = "";
+      if (rangeTimeMatch) {
+        time = rangeTimeMatch[1].trim();
+      } else if (singleTimeMatch) {
+        time = singleTimeMatch[1].trim();
+      }
+
+      // Address:
+      // In Arrive format:
+      // Pickup Address Appointment Ref/PO# Commodity Weight
+      // GUARDIAN GLASS -
+      // RICHBURG
+      // 610 L C RAILWAY DIST.
+      // PARK
+      // STATE HIGHWAY 9
+      // Richburg, SC 29729
+      
+      // Let's locate the city, state zip line: e.g. "Richburg, SC 29729"
+      const cityStateZipMatch = section.match(/([A-Za-z\s.-]+),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/);
+      let address = "";
+      if (cityStateZipMatch) {
+        const fullCityStateZip = cityStateZipMatch[0].trim();
+        
+        // Let's get preceding lines before this city/state/zip but after "Pickup Address" / "Delivery Address" / "Pickup #1"
+        const preLines = section.substring(0, cityStateZipMatch.index).split('\n');
+        const validAddrParts: string[] = [];
+        
+        for (let i = preLines.length - 1; i >= 0; i--) {
+          const l = preLines[i].trim();
+          if (!l) continue;
+          if (/Pickup\s*Address|Delivery\s*Address|Appointment|Ref\/PO#|Commodity|Weight|Pickup\s*#|Delivery\s*#/i.test(l)) {
+            break;
+          }
+          // Avoid noise lines
+          if (/Driver\s*Instructions|Pickup\s*Notes|Delivery\s*Notes|Comments|Loading\s*Type|Live\s*Load|Appt\.?\s*Type|By\s*Appointment|Confirmed|Customer\s*Ref|PO\s*#/i.test(l)) {
+            continue;
+          }
+          // Filter out standalone timezone strings or times that leaked into address
+          const cleanedLine = l
+            .replace(/\b(?:EDT|EST|CDT|CST|MDT|MST|PDT|PST|AST|HST|AKST|AKDT|UTC|GMT)\b/gi, '')
+            .replace(/\b\d{1,2}:\d{2}(?:\s*(?:AM|PM))?\b/gi, '')
+            .replace(/\b(?:Loading\s*Type|Live\s*Load|Appt\.?\s*Type|By\s*Appointment|Confirmed)\b/gi, '')
+            .trim();
+
+          if (cleanedLine) {
+            validAddrParts.unshift(cleanedLine);
+          }
+          if (validAddrParts.length >= 4) break;
+        }
+
+        // Also clean the cityStateZip in case it had prefix noise
+        const cleanCityStateZip = fullCityStateZip
+          .replace(/\b(?:Loading\s*Type|Live\s*Load|EDT|EST|CDT|CST|MDT|MST|PDT|PST)\b/gi, '')
+          .trim();
+
+        if (validAddrParts.length > 0) {
+          address = `${validAddrParts.join(' ')}, ${cleanCityStateZip}`.replace(/\s+/g, ' ').replace(/,\s*,/g, ',');
+        } else {
+          address = cleanCityStateZip;
+        }
+      }
+
+      if (address || date || time) {
+        result.stops.push({
+          type,
+          label,
+          address,
+          date,
+          time
+        });
+      }
+    }
+  });
+
+  if (result.stops.length > 0) {
+    const pickups = result.stops.filter(s => s.type === 'pickup');
+    const deliveries = result.stops.filter(s => s.type === 'delivery');
+    if (pickups.length > 0) {
+      result.pickupDate = pickups[0].date;
+      result.pickupTime = pickups[0].time;
+      result.originAddress = pickups[0].address;
+    }
+    if (deliveries.length > 0) {
+      const lastDel = deliveries[deliveries.length - 1];
+      result.deliveryTime = lastDel.time;
+      result.destinationAddress = lastDel.address;
+    }
+  }
+
+  return result;
+}
+
 export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
+  
+  // ARRIVE detection
+  const isArrive = lowerText.includes('arrive logistics') || 
+                   lowerText.includes('arrivelogistics.com') ||
+                   lowerText.includes('arrive order') ||
+                   (lowerText.includes('arrive') && (lowerText.includes('dm trans') || lowerText.includes('arvy.us') || lowerText.includes('arrivenow')));
+  if (isArrive) {
+    return parseArrive(text);
+  }
   
   // TQL detection - check first to prevent co-brokered boilerplates from triggering other brokers
   const isTQL = lowerText.includes('tql') && (lowerText.includes('po#') || lowerText.includes('p.o.#') || lowerText.includes('total quality logistics'));

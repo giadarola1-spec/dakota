@@ -1,5 +1,6 @@
 {
   "name": "Dakota",
   "description": "Extracts data from Rate Confirmation PDFs and sends it to Google Sheets.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

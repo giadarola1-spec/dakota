@@ -87,7 +87,7 @@ export const TemplatesView: React.FC<TemplatesViewProps> = ({ theme, isDarkMode,
 
   const pickupTemplate = `Hi team, 
 
-Your load is now picked up. Please see attached BOL. 
+Your load is now picked up. Please see the attached BOL. 
 
 Arrived at Shipper 
 ${dates.pickupArrived} ${times.pickupArrived}
@@ -99,7 +99,7 @@ Kind regards.`;
 
   const deliveryTemplate = `Hi team, 
 
-Your load is now delivered. Please see attached POD. 
+Your load is now delivered. Please see the attached POD. 
 
 Arrived at Receiver 
 ${dates.deliveryArrived} ${times.deliveryArrived}

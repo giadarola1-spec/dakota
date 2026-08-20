@@ -10,6 +10,9 @@ import { parseRateConfirmation, ParsedRateCon, normalizeDateHelper } from './uti
 import { DottedMapBackground } from './components/DottedMapBackground';
 import { LoadingScreen } from './components/LoadingScreen';
 import { DriverNumberModal } from './components/DriverNumberModal';
+import { ChainEditorModal } from './components/ChainEditorModal';
+import { CustomChainStyle } from './types/chain';
+import { PRESET_CHAINS, renderChainSubject } from './utils/chainBuilder';
 import { TemplatesView } from './components/TemplatesView';
 import { WelcomeView } from './components/WelcomeView';
 import { UploadGlareCard } from './components/UploadGlareCard';
@@ -220,14 +223,21 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
     const suiteRegex = /(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/gi;
     
     let cleanedPart = partBefore.trim();
-    // Strip suite info from the start
-    cleanedPart = cleanedPart.replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, "").trim();
+    // Strip suite/unit info and unwanted table header/timezone noise
+    cleanedPart = cleanedPart
+      .replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, "")
+      .replace(/\b(?:LOADING\s*TYPE|LIVE\s*LOAD|APPT\.?\s*TYPE|BY\s*APPOINTMENT|CONFIRMED|CUSTOMER\s*REF|PO\s*#|DRIVER\s*INSTRUCTIONS)\b/gi, "")
+      .replace(/\b(?:EDT|EST|CDT|CST|MDT|MST|PDT|PST|AST|HST|AKST|AKDT|UTC|GMT)\b/gi, "")
+      .trim();
 
     // Strategy 1: If there's a comma, assume City is after the last comma
     if (cleanedPart.includes(',')) {
       const parts = cleanedPart.split(',');
       let city = parts[parts.length - 1].trim();
-      city = city.replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, "").trim();
+      city = city
+        .replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, "")
+        .replace(/\b(?:LOADING\s*TYPE|LIVE\s*LOAD|EDT|EST|CDT|CST|MDT|MST|PDT|PST)\b/gi, "")
+        .trim();
       if (city && isNaN(Number(city))) {
         return `${city.toUpperCase()}, ${state.toUpperCase()} ${zip}`.trim();
       }
@@ -408,18 +418,138 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
     };
   }, [pdfDocument, currentPage]);
 
+  // Helper to find exact or fuzzy match index and length in combined lowercased text
+  const findMatchInCombinedText = (searchVal: string, combinedText: string): { index: number, length: number } | null => {
+    if (!searchVal || searchVal.trim().length < 2) return null;
+    const raw = searchVal.trim();
+    const lowerCombined = combinedText.toLowerCase();
+
+    // 1. Date Detection & Matching (e.g. 08.19.2026 -> 08/19/2026, Aug 19, 2026, etc.)
+    const dateMatch = raw.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})$/);
+    if (dateMatch) {
+      const monthNum = parseInt(dateMatch[1], 10);
+      const dayNum = parseInt(dateMatch[2], 10);
+      const yearStr = dateMatch[3].length === 2 ? '20' + dateMatch[3] : dateMatch[3];
+      const monthNames = ['', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      const monthFull = ['', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+      const mShort = monthNames[monthNum] || '';
+      const mLong = monthFull[monthNum] || '';
+      const mm = String(monthNum).padStart(2, '0');
+      const dd = String(dayNum).padStart(2, '0');
+
+      const datePatterns = [
+        `${mm}[./-]${dd}[./-]${yearStr}`,
+        `${monthNum}[./-]${dayNum}[./-]${yearStr}`,
+        `${mShort}\\.?\\s+${dayNum}(?:st|nd|rd|th)?,?\\s*${yearStr}`,
+        `${mLong}\\s+${dayNum}(?:st|nd|rd|th)?,?\\s*${yearStr}`,
+        `${mShort}\\.?\\s+${dayNum}(?:st|nd|rd|th)?`,
+        `${dayNum}\\s+${mShort}\\s+${yearStr}`
+      ];
+      const dateRegex = new RegExp(`(?:${datePatterns.join('|')})`, 'gi');
+      const matches = [...lowerCombined.matchAll(dateRegex)];
+      if (matches.length > 0) {
+        return { index: matches[0].index!, length: matches[0][0].length };
+      }
+    }
+
+    // 2. Numerical / Monetary / Rate / Weight / Load# Matching
+    const isWeight = /lbs?$/i.test(raw);
+    const numClean = raw.replace(/[$,]/g, '').replace(/\s*lbs?$/i, '').trim();
+    const isPureNumber = /^\d+(\.\d+)?$/.test(numClean);
+
+    if (isPureNumber) {
+      const parts = numClean.split('.');
+      const intPart = parts[0];
+      const decPart = parts[1] || '';
+      const withCommas = Number(intPart).toLocaleString('en-US');
+
+      const variants = new Set<string>();
+      if (decPart && decPart !== '00') {
+        variants.add(`${withCommas}.${decPart}`);
+        variants.add(`${intPart}.${decPart}`);
+      } else {
+        variants.add(`${withCommas}.00`);
+        variants.add(`${intPart}.00`);
+        variants.add(withCommas);
+        variants.add(intPart);
+      }
+
+      if (isWeight) {
+        const weightVariants: string[] = [];
+        variants.forEach(v => {
+          weightVariants.push(`${v}\\s*lbs?\\b`);
+          weightVariants.push(v);
+        });
+        variants.clear();
+        weightVariants.forEach(wv => variants.add(wv));
+      }
+
+      const escapedVar = Array.from(variants).map(v => v.replace(/\./g, '\\.'));
+      // Ensure it is bounded by non-digits (e.g. $ or word boundary, and NOT followed by digits)
+      const numRegex = new RegExp(`(?:\\$|\\b)(${escapedVar.join('|')})(?!\\d)`, 'gi');
+      const allMatches = [...lowerCombined.matchAll(numRegex)];
+
+      if (allMatches.length > 0) {
+        // Prioritize matches that are explicitly preceded by $ or context keywords (total, linehaul, rate)
+        const best = allMatches.find(m => {
+          const preceding = lowerCombined.substring(Math.max(0, (m.index || 0) - 30), m.index || 0);
+          return preceding.includes('total') || preceding.includes('linehaul') || preceding.includes('rate') || m[0].startsWith('$');
+        }) || allMatches[0];
+        return { index: best.index!, length: best[0].length };
+      }
+    }
+
+    // 3. Literal Text Match (safely escaped)
+    const escapedChars: string[] = [];
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+      if (/\s/.test(ch)) {
+        escapedChars.push('\\s+');
+      } else if (/[a-zA-Z0-9]/.test(ch)) {
+        escapedChars.push(ch + '[^a-zA-Z0-9]*');
+      } else {
+        escapedChars.push('\\' + ch + '[^a-zA-Z0-9]*');
+      }
+    }
+    const specificRegex = new RegExp(escapedChars.join(''), 'gi');
+    const specificMatches = [...lowerCombined.matchAll(specificRegex)];
+    if (specificMatches.length > 0) {
+      const best = specificMatches.find(m => {
+        if (m.index === 0) return true;
+        const charBefore = lowerCombined[(m.index || 0) - 1];
+        return !/[a-z0-9]/i.test(charBefore);
+      }) || specificMatches[0];
+      return { index: best.index!, length: best[0].length };
+    }
+
+    // 4. Fuzzy Alphanumeric Fallback
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    let cleanSearch = normalize(raw);
+    if (cleanSearch.endsWith('lbs')) cleanSearch = cleanSearch.replace(/lbs$/, '');
+    const timeMatch = cleanSearch.match(/^(\d{4})(?:est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
+    if (timeMatch) cleanSearch = timeMatch[1];
+
+    if (cleanSearch.length >= 3) {
+      const escapedFuzzy = cleanSearch.split('').join('[^a-z0-9]*');
+      const fuzzyRegex = new RegExp(escapedFuzzy, 'gi');
+      const fuzzyMatches = [...lowerCombined.matchAll(fuzzyRegex)];
+      if (fuzzyMatches.length > 0) {
+        const best = fuzzyMatches.find(m => {
+          if (m.index === 0) return true;
+          const charBefore = lowerCombined[(m.index || 0) - 1];
+          return !/[a-z0-9]/i.test(charBefore);
+        }) || fuzzyMatches[0];
+        return { index: best.index!, length: best[0].length };
+      }
+    }
+
+    return null;
+  };
+
   // 2. Search all pages for highlight text and jump to page
   useEffect(() => {
     const findPageWithText = async () => {
       if (!pdfDocument || !highlightText || highlightText.length < 2) return;
-
-      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-      let cleanSearch = normalize(highlightText);
-      
-      // Special cases for weights and times
-      if (cleanSearch.endsWith('lbs')) cleanSearch = cleanSearch.replace(/lbs$/, '');
-      const timeMatch = cleanSearch.match(/^(\d{4})(?:est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
-      if (timeMatch) cleanSearch = timeMatch[1];
 
       const isMatchOnPage = async (page: any) => {
         const textContent = await page.getTextContent();
@@ -433,8 +563,9 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
         let combined = "";
         items.forEach(it => { combined += it.str.toLowerCase() + " "; });
         
-        // Exact match first (normalized)
-        if (combined.replace(/[^a-z0-9]/g, '').includes(cleanSearch)) return true;
+        // Use our high-precision matcher
+        const found = findMatchInCombinedText(highlightText, combined);
+        if (found) return true;
         
         // Word based fallback for searches with spaces
         const searchWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length >= 5);
@@ -513,53 +644,11 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
           charToItemMap.push({ item: null, indexInItem: -1 });
         });
 
-        // Strategy 1: Specific Match (Respects separators in search string)
-        const escapedSpecific = highlightText.toLowerCase().trim()
-          .replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // Escape regex chars
-          .split('')
-          .map(char => char === ' ' ? '\\s+' : char + '[^a-z0-9]*')
-          .join('');
-        
-        const specificRegex = new RegExp(escapedSpecific, 'gi');
-        const allSpecificMatches = [...combinedText.matchAll(specificRegex)];
-        let match: RegExpMatchArray | null = null;
+        const match = findMatchInCombinedText(highlightText, combinedText);
 
-        if (allSpecificMatches.length > 0) {
-          // Prefer match that is preceded by $ or space/punctuation (not directly attached to leading letters like 'at1000')
-          const bestMatch = allSpecificMatches.find(m => {
-            if (m.index === undefined || m.index === 0) return true;
-            const charBefore = combinedText[m.index - 1];
-            return !/[a-z]/i.test(charBefore);
-          });
-          match = bestMatch || allSpecificMatches[0];
-        }
-
-        // Strategy 2: Fallback to Fuzzy Alphanumeric
-        if (!match) {
-          let cleanSearch = normalize(highlightText);
-          if (cleanSearch.endsWith('lbs')) cleanSearch = cleanSearch.replace(/lbs$/, '');
-          const timeMatch = cleanSearch.match(/^(\d{4})(?:est|cst|mst|pst|edt|cdt|mdt|pdt|ast|hst|akst|akdt|utc|gmt)$/);
-          if (timeMatch) cleanSearch = timeMatch[1];
-
-          if (cleanSearch.length >= 2) {
-            const escapedFuzzy = cleanSearch.split('').join('[^a-z0-9]*');
-            const fuzzyRegex = new RegExp(escapedFuzzy, 'gi');
-            const allFuzzyMatches = [...combinedText.matchAll(fuzzyRegex)];
-            if (allFuzzyMatches.length > 0) {
-              const bestMatch = allFuzzyMatches.find(m => {
-                if (m.index === undefined || m.index === 0) return true;
-                const charBefore = combinedText[m.index - 1];
-                return !/[a-z]/i.test(charBefore);
-              });
-              match = bestMatch || allFuzzyMatches[0];
-            }
-          }
-        }
-
-        if (match && match.index !== undefined) {
-          // ... existing logic ...
+        if (match) {
           const startIndex = match.index;
-          const endIndex = startIndex + match[0].length;
+          const endIndex = startIndex + match.length;
           
           const matchedItems = new Set<any>();
           for (let i = startIndex; i < endIndex; i++) {
@@ -615,13 +704,13 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
             setPosition({ x: translateX, y: translateY });
           }
         } else {
-        // Fallback to word-based matching IF sequence fails
-        // But be more restrictive to avoid highlighting generic titles
-        const highlightWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length >= 5);
-        const newHighlights: any[] = [];
-        let firstMatchRect: number[] | null = null;
+          // Fallback to word-based matching IF sequence fails
+          // But be more restrictive to avoid highlighting generic titles
+          const highlightWords = highlightText.toLowerCase().split(/\s+/).filter(w => w.length >= 5);
+          const newHighlights: any[] = [];
+          let firstMatchRect: number[] | null = null;
 
-        const genericWords = ['address', 'origin', 'destination', 'pickup', 'delivery', 'weight', 'load', 'conf', 'rate', 'con', 'scheduled', 'arrival', 'time', 'date'];
+          const genericWords = ['address', 'origin', 'destination', 'pickup', 'delivery', 'weight', 'load', 'conf', 'rate', 'con', 'scheduled', 'arrival', 'time', 'date', 'cargo', 'value'];
 
           items.forEach(item => {
             const cleanItem = normalize(item.str);
@@ -1788,7 +1877,9 @@ export default function App() {
     }
   ]);
   const [broker, setBroker] = useLocalStorage<string>("dakota_broker", "TRAFFIX");
-  const [chainFormat, setChainFormat] = useLocalStorage<'standard' | 'alternative' | 'alt2' | 'alt3'>("dakota_chainFormat", "standard");
+  const [chainFormat, setChainFormat] = useLocalStorage<string>("dakota_chainFormat", "standard");
+  const [customChains, setCustomChains] = useLocalStorage<CustomChainStyle[]>("dakota_customChains", []);
+  const [isChainEditorOpen, setIsChainEditorOpen] = useState(false);
   const [notesFormat, setNotesFormat] = useLocalStorage<'standard' | 'alternative'>("dakota_notesFormat", "standard");
   const [chainText, setChainText] = useState("");
   const [copiedChain, setCopiedChain] = useState(false);
@@ -2407,62 +2498,33 @@ export default function App() {
     setHistory(prev => [historyItem, ...prev].slice(0, 100)); // Keep last 100
   };
 
-  const generateChainString = (data: ParsedRateCon, tNum: string, brk: string, tm: string, format: 'standard' | 'alternative' | 'alt2' | 'alt3' = 'standard') => {
-    // Logic: [EMOJI] [TRUCK#]-[LANE]-[DATE] [BROKER] [LOAD#]
-    
-    // Team Emoji
-    const emojis: Record<string, string> = {
-      green: "🟢",
-      purple: "🟣",
-      red: "🔴",
-      blue: "🔵",
-      none: ""
-    };
-    const emoji = emojis[tm] || "";
+  const generateChainString = (data: ParsedRateCon, tNum: string, brk: string, tm: string, format: string = 'standard') => {
+    const activeDriver = drivers.find(d => d.truck === tNum);
+    const allChains = [...PRESET_CHAINS, ...customChains];
+    const targetChain = allChains.find(c => c.id === format);
 
-    // Lane: Origin State - Dest State
-    const getRegion = (addr: string) => {
-      const match = addr.match(/,\s*([A-Z]{2})/);
-      return match ? match[1] : "??";
-    };
-
-    const originState = getRegion(data.originAddress);
-    const destState = getRegion(data.destinationAddress);
-    const lane = `${originState}-${destState}`;
-
-    // Date: MM.DD.YYYY
-    const date = data.pickupDate ? normalizeDateHelper(data.pickupDate) : "MM.DD.YYYY";
-
-    let displayBroker = brk;
-    if (brk.toUpperCase().includes('ROBINSON')) {
-      displayBroker = robinsonDisplayMode === 'no-space' ? 'CHROBINSON' : 'CH ROBINSON';
+    if (targetChain && targetChain.tokens && targetChain.tokens.length > 0) {
+      return renderChainSubject(
+        targetChain.tokens,
+        data,
+        tNum,
+        brk,
+        tm,
+        activeDriver,
+        robinsonDisplayMode
+      );
     }
 
-    // Load Number
-    let loadNum = data.loadNumber;
-    if (displayBroker.toUpperCase().includes('TRAFFIX') && !loadNum.startsWith('T')) {
-      loadNum = `T${loadNum}`;
-    }
-    if (displayBroker.toUpperCase().includes('ROBINSON')) {
-      loadNum = loadNum.replace(/^T/i, '');
-    }
-
-    if (format === 'alternative') {
-       return `${emoji ? emoji + " " : ""}TRUCK# ${tNum}-${lane}-${date} ${displayBroker} LOAD# ${loadNum}`;
-    }
-
-    if (format === 'alt2') {
-       // Example: 🟢 TRUCK #1021 OH-IN 04.17.2026 PLS LOAD #32067460
-       return `${emoji ? emoji + " " : ""}TRUCK #${tNum} ${lane} ${date} ${displayBroker} LOAD #${loadNum}`;
-    }
-
-    if (format === 'alt3') {
-       // Example: 🟢TRUCK 7255 IL-IN 04.16.2026 FITZMARK LOAD# 2302630
-       return `${emoji}TRUCK ${tNum} ${lane} ${date} ${displayBroker} LOAD# ${loadNum}`;
-    }
-
-    const chain = `${emoji ? emoji + " " : ""}${tNum}-${lane}-${date} ${displayBroker} LOAD ${loadNum}`;
-    return chain;
+    const stdChain = PRESET_CHAINS[0];
+    return renderChainSubject(
+      stdChain.tokens,
+      data,
+      tNum,
+      brk,
+      tm,
+      activeDriver,
+      robinsonDisplayMode
+    );
   };
 
   const generateRenameString = (data: ParsedRateCon, tNum: string) => {
@@ -2548,7 +2610,7 @@ export default function App() {
         return notes;
       });
     }
-  }, [truckNumber, broker, extractedData, team, isViewingHistory, appState, chainFormat, notesFormat]);
+  }, [truckNumber, broker, extractedData, team, isViewingHistory, appState, chainFormat, notesFormat, customChains, drivers, robinsonDisplayMode]);
 
   useEffect(() => {
     if (appState === 'results' && extractedData && !isViewingHistory) {
@@ -2887,7 +2949,7 @@ export default function App() {
               <div className="flex items-center gap-2 ml-4">
                 <button 
                   onClick={() => {
-                    const brokersList = ["TRAFFIX", "CH ROBINSON", "LANDSTAR", "TQL", "NST", "OPENROAD"];
+                    const brokersList = ["TRAFFIX", "CH ROBINSON", "LANDSTAR", "TQL", "NST", "OPENROAD", "ARRIVE"];
                     const currentUpper = broker.toUpperCase();
                     let currentNormalized = "TRAFFIX";
                     if (currentUpper.includes("ROBINSON")) {
@@ -2900,6 +2962,8 @@ export default function App() {
                       currentNormalized = "NST";
                     } else if (currentUpper.includes("OPENROAD") || currentUpper.includes("OPEN ROAD")) {
                       currentNormalized = "OPENROAD";
+                    } else if (currentUpper.includes("ARRIVE")) {
+                      currentNormalized = "ARRIVE";
                     } else if (currentUpper.includes("TRAFFIX")) {
                       currentNormalized = "TRAFFIX";
                     }
@@ -3155,7 +3219,7 @@ export default function App() {
                     <div className="pt-4 flex flex-col items-center gap-2">
                       <span className="text-[10px] font-bold tracking-wider uppercase opacity-40">Permitted Rate Confirmations</span>
                       <div className="flex flex-wrap justify-center gap-1.5 max-w-md px-4">
-                        {['Traffix', 'CH ROBINSON', 'North Star Transport', 'TQL', 'Landstar', 'OpenRoad'].map((brokerName) => (
+                        {['Traffix', 'CH ROBINSON', 'North Star Transport', 'TQL', 'Landstar', 'OpenRoad', 'Arrive'].map((brokerName) => (
                           <span 
                             key={brokerName}
                             className={`px-2.5 py-0.5 text-[11px] font-medium rounded-full border ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-400' : 'bg-zinc-100/60 border-zinc-200 text-zinc-600'} transition-all`}
@@ -3331,36 +3395,97 @@ export default function App() {
                 <div className="space-y-4">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 px-1">Preferences</p>
                   
-                  {/* Chain Format Toggle */}
+                  {/* Chain Format Section */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
                       <span className="text-xs font-medium text-zinc-400">Chain Format</span>
-                      <span className="text-[10px] font-mono text-zinc-400 uppercase">{chainFormat}</span>
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase truncate max-w-[140px]">
+                        {(() => {
+                          const all = [...PRESET_CHAINS, ...customChains];
+                          const cur = all.find(c => c.id === chainFormat);
+                          return cur ? cur.name : chainFormat;
+                        })()}
+                      </span>
                     </div>
-                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-100'} border ${theme.border}`}>
-                      <button 
-                        onClick={() => setChainFormat('standard')}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'standard' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-400'}`}
+                    <div className={`p-1.5 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-100'} border ${theme.border} space-y-1.5`}>
+                      <div className="grid grid-cols-4 gap-1">
+                        <button 
+                          onClick={() => setChainFormat('standard')}
+                          className={`py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'standard' ? 'bg-white shadow-sm text-zinc-900 font-bold' : 'text-zinc-500 hover:text-zinc-400'}`}
+                        >
+                          Std
+                        </button>
+                        <button 
+                          onClick={() => setChainFormat('alternative')}
+                          className={`py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alternative' ? 'bg-zinc-800 shadow-sm text-white font-bold' : 'text-zinc-500 hover:text-zinc-400'}`}
+                        >
+                          Alt 1
+                        </button>
+                        <button 
+                          onClick={() => setChainFormat('alt2')}
+                          className={`py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alt2' ? 'bg-blue-600 shadow-sm text-white font-bold' : 'text-zinc-500 hover:text-zinc-400'}`}
+                        >
+                          Alt 2
+                        </button>
+                        <button 
+                          onClick={() => setChainFormat('alt3')}
+                          className={`py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alt3' ? 'bg-indigo-600 shadow-sm text-white font-bold' : 'text-zinc-500 hover:text-zinc-400'}`}
+                        >
+                          Alt 3
+                        </button>
+                      </div>
+
+                      {/* Custom Chains Pills with Delete Option */}
+                      {customChains.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1 border-t border-zinc-500/10">
+                          {customChains.map(c => (
+                            <div
+                              key={c.id}
+                              className={`group inline-flex items-center rounded-lg border transition-all ${
+                                chainFormat === c.id
+                                  ? 'bg-blue-600 border-blue-500 text-white shadow-sm'
+                                  : isDarkMode
+                                    ? 'bg-zinc-800/80 border-zinc-700 text-zinc-300 hover:border-zinc-500'
+                                    : 'bg-white border-zinc-200 text-zinc-700 hover:border-zinc-400'
+                              }`}
+                            >
+                              <button
+                                onClick={() => setChainFormat(c.id)}
+                                className="px-2 py-1 text-[11px] font-semibold truncate max-w-[100px]"
+                                title={`Select ${c.name}`}
+                              >
+                                {c.name}
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const updated = customChains.filter(item => item.id !== c.id);
+                                  setCustomChains(updated);
+                                  if (chainFormat === c.id) {
+                                    setChainFormat('standard');
+                                  }
+                                }}
+                                className={`p-1 pr-1.5 opacity-60 hover:opacity-100 hover:text-red-400 transition-colors ${
+                                  chainFormat === c.id ? 'text-blue-200 hover:text-white' : 'text-zinc-400 hover:text-red-400'
+                                }`}
+                                title={`Delete ${c.name}`}
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setIsChainEditorOpen(true);
+                          setIsMenuOpen(false);
+                        }}
+                        className="w-full py-1.5 px-3 rounded-lg border border-dashed border-blue-500/40 text-blue-400 bg-blue-500/5 hover:bg-blue-500/10 transition-colors flex items-center justify-center gap-1.5 text-xs font-semibold"
                       >
-                        Std
-                      </button>
-                      <button 
-                        onClick={() => setChainFormat('alternative')}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alternative' ? 'bg-zinc-800 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
-                      >
-                        Alt 1
-                      </button>
-                      <button 
-                        onClick={() => setChainFormat('alt2')}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alt2' ? 'bg-blue-600 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
-                      >
-                        Alt 2
-                      </button>
-                      <button 
-                        onClick={() => setChainFormat('alt3')}
-                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${chainFormat === 'alt3' ? 'bg-indigo-600 shadow-sm text-white' : 'text-zinc-500 hover:text-zinc-400'}`}
-                      >
-                        Alt 3
+                        <Sliders size={13} />
+                        Design Chain (Drag & Drop)
                       </button>
                     </div>
                   </div>
@@ -3551,6 +3676,23 @@ export default function App() {
         onConfirm={handleDriverNumberConfirm}
         isDarkMode={isDarkMode}
         theme={theme}
+      />
+
+      <ChainEditorModal
+        isOpen={isChainEditorOpen}
+        onClose={() => setIsChainEditorOpen(false)}
+        isDarkMode={isDarkMode}
+        theme={theme}
+        customChains={customChains}
+        setCustomChains={setCustomChains}
+        activeFormatId={chainFormat}
+        setActiveFormatId={setChainFormat}
+        currentData={extractedData || undefined}
+        truckNumber={truckNumber}
+        broker={broker}
+        team={team}
+        driver={drivers.find(d => d.truck === truckNumber) || null}
+        robinsonDisplayMode={robinsonDisplayMode}
       />
     </div>
   );
