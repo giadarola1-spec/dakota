@@ -153,25 +153,97 @@ export const PRESET_CHAINS: CustomChainStyle[] = [
   }
 ];
 
-// Helper to extract State code
-const getState = (addr?: string): string => {
-  if (!addr) return "??";
-  const match = addr.match(/,\s*([A-Z]{2})/i) || addr.match(/\b([A-Z]{2})\s+\d{5}/i);
-  return match ? match[1].toUpperCase() : "??";
-};
+export const US_STATES = new Set([
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+  'DC', 'PR', 'VI', 'GU', 'AS', 'MP',
+  'ON', 'QC', 'BC', 'AB', 'MB', 'SK', 'NS', 'NB', 'NL', 'PE', 'NT', 'YT', 'NU'
+]);
 
-// Helper to extract City
-const getCity = (addr?: string): string => {
+// Helper to extract State code accurately
+export const getState = (addr?: string): string => {
   if (!addr) return "??";
-  const parts = addr.split(',');
-  if (parts.length >= 2) {
-    return parts[0].trim();
+  
+  // 1. Look for State before a 4-5 digit zip code (e.g. 'IN 46241' or ', IN 46241' or 'IN, 46241')
+  const stateZipMatch = addr.match(/\b([A-Za-z]{2})\b[,\s]+\d{4,5}(?:-\d{4})?/);
+  if (stateZipMatch) {
+    const st = stateZipMatch[1].toUpperCase();
+    if (US_STATES.has(st)) return st;
   }
+
+  // 2. Look for comma followed by standalone 2-letter state at end or before zip
+  const commaStateMatch = addr.match(/,\s*\b([A-Za-z]{2})\b(?:\s+\d{4,5})?\s*$/);
+  if (commaStateMatch) {
+    const st = commaStateMatch[1].toUpperCase();
+    if (US_STATES.has(st)) return st;
+  }
+
+  // 3. Find all standalone 2-letter tokens matching US_STATES from right to left (end of address to start)
+  const tokens = addr.match(/\b([A-Za-z]{2})\b/g) || [];
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const st = tokens[i].toUpperCase();
+    if (US_STATES.has(st)) return st;
+  }
+
   return "??";
 };
 
+// Helper to extract City accurately
+export const getCity = (addr?: string): string => {
+  if (!addr) return "??";
+  
+  // Strip zip code and state from end
+  let text = addr.trim();
+  text = text.replace(/^\d{2,4}\s+(?=\d{2,5}\s+[A-Za-z])/i, '').replace(/^\bDC\s*\d+\s+/i, '');
+  text = text.replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, '').replace(/,\s*Decatur\s*,?\s*(?=Indianapolis\b)/gi, ', ');
+  text = text.replace(/,?\s*\b[A-Za-z]{2}\b[,\s]+\d{4,5}(?:-\d{4})?\s*$/i, '');
+  text = text.replace(/,?\s*\b[A-Za-z]{2}\b\s*$/i, '');
+  text = text.replace(/\s+\d{5}(?:-\d{4})?\s*$/i, '');
+
+  if (!text) return "??";
+
+  // If there is a comma, city is usually after the last comma or second to last
+  if (text.includes(',')) {
+    const parts = text.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length > 0) {
+      let candidate = parts[parts.length - 1];
+      candidate = candidate.replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, '').trim();
+      candidate = candidate.replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, '').trim();
+      if (candidate && isNaN(Number(candidate))) {
+        return candidate;
+      }
+    }
+  }
+
+  // Check street suffixes to find city name after street
+  const suffixes = ['AVE', 'RD', 'ST', 'DR', 'BLVD', 'LN', 'CT', 'PL', 'WAY', 'CIR', 'PKWY', 'HWY', 'TER', 'TRL', 'LOOP', 'PIKE', 'SQUARE', 'SQ', 'PARKWAY', 'ROAD', 'STREET', 'DRIVE', 'AVENUE', 'LANE', 'COURT', 'PLACE'];
+  const suffixPattern = new RegExp('\\b(?:' + suffixes.join('|') + ')\\.?\\s*,?\\s+([^,]+)$', 'i');
+  const match = text.match(suffixPattern);
+  if (match && match[1].trim().length > 0) {
+    let candidate = match[1].trim();
+    candidate = candidate.replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, '').trim();
+    candidate = candidate.replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, '').trim();
+    if (candidate && isNaN(Number(candidate))) {
+      return candidate;
+    }
+  }
+
+  // If starts with street numbers, fallback to remainder
+  if (/^\d+/.test(text)) {
+    const words = text.split(/\s+/);
+    if (words.length > 1) {
+      return words.slice(1).join(' ');
+    }
+  }
+
+  return text;
+};
+
 // Helper to extract City, ST
-const getCityState = (addr?: string): string => {
+export const getCityState = (addr?: string): string => {
   if (!addr) return "??, ??";
   const state = getState(addr);
   const city = getCity(addr);

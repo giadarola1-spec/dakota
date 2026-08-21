@@ -12,7 +12,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { DriverNumberModal } from './components/DriverNumberModal';
 import { ChainEditorModal } from './components/ChainEditorModal';
 import { CustomChainStyle } from './types/chain';
-import { PRESET_CHAINS, renderChainSubject } from './utils/chainBuilder';
+import { PRESET_CHAINS, renderChainSubject, getState } from './utils/chainBuilder';
 import { TemplatesView } from './components/TemplatesView';
 import { WelcomeView } from './components/WelcomeView';
 import { UploadGlareCard } from './components/UploadGlareCard';
@@ -252,6 +252,8 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
       .replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, "")
       .replace(/\b(?:LOADING\s*TYPE|LIVE\s*LOAD|APPT\.?\s*TYPE|BY\s*APPOINTMENT|CONFIRMED|CUSTOMER\s*REF|PO\s*#|DRIVER\s*INSTRUCTIONS)\b/gi, "")
       .replace(/\b(?:EDT|EST|CDT|CST|MDT|MST|PDT|PST|AST|HST|AKST|AKDT|UTC|GMT)\b/gi, "")
+      .replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, "")
+      .replace(/,\s*Decatur\s*,?\s*(?=Indianapolis\b)/gi, ", ")
       .trim();
 
     // Strategy 1: If there's a comma, assume City is after the last comma
@@ -261,6 +263,7 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
       city = city
         .replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, "")
         .replace(/\b(?:LOADING\s*TYPE|LIVE\s*LOAD|EDT|EST|CDT|CST|MDT|MST|PDT|PST)\b/gi, "")
+        .replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, "")
         .trim();
       if (city && isNaN(Number(city))) {
         return `${city.toUpperCase()}, ${state.toUpperCase()} ${zip}`.trim();
@@ -276,6 +279,7 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
       let cityCandidate = match[1].trim();
       cityCandidate = cityCandidate.replace(/^(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/i, "").trim();
       cityCandidate = cityCandidate.replace(/(?:STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM)\.?\s*[A-Z0-9-]+\.?\s+/gi, "").trim();
+      cityCandidate = cityCandidate.replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, "").trim();
 
       if (cityCandidate && isNaN(Number(cityCandidate))) {
         return `${cityCandidate.toUpperCase()}, ${state.toUpperCase()} ${zip}`.trim();
@@ -300,7 +304,9 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
     return `${cleanedPart.toUpperCase()}, ${state.toUpperCase()} ${zip}`.trim();
   };
 
-  const trimmedAddr = fullAddress.trim();
+  let trimmedAddr = fullAddress.trim();
+  trimmedAddr = trimmedAddr.replace(/^\d{2,4}\s+(?=\d{2,5}\s+[A-Za-z])/i, "").replace(/^\bDC\s*\d+\s+/i, "");
+  trimmedAddr = trimmedAddr.replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, "").replace(/,\s*Decatur\s*,?\s*(?=Indianapolis\b)/gi, ", ");
 
   // 1. Find State and Zip at the end (Zip is optional but preferred)
   const stateZipMatch = trimmedAddr.match(/,\s*([A-Z]{2})(?:\s+(\d{4,5}(?:-\d{4})?))?\s*$/i);
@@ -2589,14 +2595,8 @@ export default function App() {
 
   const generateRenameString = (data: ParsedRateCon, tNum: string) => {
     // Logic: TRUCK#-ORIGIN_STATE-DEST_STATE-DATE-C
-    
-    const getRegion = (addr: string) => {
-      const match = addr.match(/,\s*([A-Z]{2})/);
-      return match ? match[1] : "??";
-    };
-
-    const originState = getRegion(data.originAddress);
-    const destState = getRegion(data.destinationAddress);
+    const originState = getState(data.originAddress);
+    const destState = getState(data.destinationAddress);
     
     // Date: MM.DD.YYYY
     const date = data.pickupDate ? normalizeDateHelper(data.pickupDate) : "MM.DD.YYYY";
@@ -2693,19 +2693,9 @@ export default function App() {
   // Dynamic Browser Tab Title
   useEffect(() => {
     if (extractedData) {
-      const getRegionForTitle = (addr: string | undefined): string => {
-        if (!addr) return "??";
-        const match = addr.match(/,\s*([A-Z]{2})/);
-        if (match) return match[1];
-        const matchNoComma = addr.match(/\s+([A-Z]{2})(?:\s+\d+)?$/i);
-        if (matchNoComma) return matchNoComma[1].toUpperCase();
-        const matchAnyState = addr.match(/\b(AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\b/i);
-        return matchAnyState ? matchAnyState[1].toUpperCase() : "??";
-      };
-
       const loadNo = extractedData.loadNumber?.trim() || "LOAD#";
-      const originState = getRegionForTitle(extractedData.originAddress);
-      const destState = getRegionForTitle(extractedData.destinationAddress);
+      const originState = getState(extractedData.originAddress);
+      const destState = getState(extractedData.destinationAddress);
       const truckNo = truckNumber && truckNumber !== "TRUCK#" ? truckNumber : "TRUCK#";
 
       document.title = `${loadNo} - ${originState}-${destState} - ${truckNo}`;
