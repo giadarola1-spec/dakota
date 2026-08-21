@@ -668,16 +668,20 @@ function parseNST(text: string): ParsedRateCon {
 
   const normalizeDate = (d: string): string => {
     // If the date contains alphabetical month (e.g. Jul 15, 2026)
-    const m = d.match(/([A-Za-z]{3})\s+(\d{1,2}),?\s*(\d{4})/i);
+    const m = d.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{2,4})\b/i);
     if (m) {
       const months: Record<string, string> = {
         jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
         jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
       };
-      const month = months[m[1].substring(0, 3).toLowerCase()] || '01';
-      const day = m[2].padStart(2, '0');
-      const year = m[3];
-      return `${month}.${day}.${year}`;
+      const key = m[1].substring(0, 3).toLowerCase();
+      const month = months[key];
+      if (month) {
+        const day = m[2].padStart(2, '0');
+        let year = m[3];
+        if (year.length === 2) year = `20${year}`;
+        return `${month}.${day}.${year}`;
+      }
     }
     return normalizeDateHelper(d);
   };
@@ -863,7 +867,7 @@ function parseNST(text: string): ParsedRateCon {
       }
     } else {
       // Look for Date Jul 15, 2026 17:00
-      const dateWithTimeMatch = section.match(/Date\s+[A-Za-z]{3}\s+\d{1,2},?\s*\d{4}\s+(\d{1,2}:\d{2})/i);
+      const dateWithTimeMatch = section.match(/Date\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s*\d{4}\s+(\d{1,2}:\d{2})/i);
       if (dateWithTimeMatch) {
         time = normalizeTime(dateWithTimeMatch[1]);
       } else {
@@ -872,13 +876,13 @@ function parseNST(text: string): ParsedRateCon {
       }
     }
     const tzMatch = section.match(PATTERNS.timezone);
-    if (time && tzMatch) time += ` ${tzMatch[1].toUpperCase()}`;
+    if (time && tzMatch && !PATTERNS.timezone.test(time)) time += ` ${tzMatch[1].toUpperCase()}`;
 
     // Handle alpha date match like "Date Jul 15, 2026"
-    const alphaDateMatch = section.match(/Date\s+([A-Za-z]{3}\s+\d{1,2},?\s*\d{4})/i);
+    const alphaDateMatch = section.match(/(?:Date\s+)?\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{2,4})\b/i);
     let date = "";
     if (alphaDateMatch) {
-      date = normalizeDate(alphaDateMatch[1]);
+      date = normalizeDate(alphaDateMatch[0]);
     } else {
       const dateMatch = section.match(PATTERNS.date);
       date = dateMatch ? normalizeDate(dateMatch[1]) : "";
@@ -1540,17 +1544,20 @@ function parseArrive(text: string): ParsedRateCon {
   // Helper for dates like "Aug 12, 2026", "August 12, 2026", "08/12/2026"
   const parseArriveDate = (str: string): string => {
     if (!str) return "";
-    const m = str.match(/([A-Za-z]{3,9})\s+(\d{1,2}),?\s*(\d{4})/i);
+    const m = str.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(\d{2,4})\b/i);
     if (m) {
       const months: Record<string, string> = {
         jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
         jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
       };
       const key = m[1].substring(0, 3).toLowerCase();
-      const month = months[key] || '01';
-      const day = m[2].padStart(2, '0');
-      const year = m[3];
-      return `${month}.${day}.${year}`;
+      const month = months[key];
+      if (month) {
+        const day = m[2].padStart(2, '0');
+        let year = m[3];
+        if (year.length === 2) year = `20${year}`;
+        return `${month}.${day}.${year}`;
+      }
     }
     const std = str.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})\b/);
     if (std) {
@@ -1610,9 +1617,9 @@ function parseArrive(text: string): ParsedRateCon {
       const label = labelMatch ? labelMatch[0].trim() : (isPickup ? 'Pickup' : 'Delivery');
 
       // Date: e.g. "Aug 12, 2026" or "08/12/2026"
-      const dateMatch = section.match(/(?:Appointment[\s\S]{0,40}?)?([A-Za-z]{3,9}\s+\d{1,2},?\s*\d{4})/i) ||
+      const dateMatch = section.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?,?\s*\d{2,4}\b/i) ||
                         section.match(/\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/);
-      const date = dateMatch ? parseArriveDate(dateMatch[1] || dateMatch[0]) : "";
+      const date = dateMatch ? parseArriveDate(dateMatch[0]) : "";
 
       // Time: e.g. "18:00 EDT" or "07:30 EDT" or "08:00 - 12:00"
       const rangeTimeMatch = section.match(/(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?\s*[-–]\s*\d{1,2}:\d{2}(?:\s*(?:AM|PM))?(?:\s*[A-Z]{3})?)/i);
@@ -2066,7 +2073,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
       time = timeMatch ? normalizeTime(timeMatch[1]) : "";
     }
     const tzMatch = section.match(PATTERNS.timezone);
-    if (time && tzMatch) time += ` ${tzMatch[1].toUpperCase()}`;
+    if (time && tzMatch && !PATTERNS.timezone.test(time)) time += ` ${tzMatch[1].toUpperCase()}`;
 
     const dateMatch = section.match(PATTERNS.date);
     const date = dateMatch ? normalizeDate(dateMatch[1]) : "";

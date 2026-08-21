@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink, Clock, Users, Phone, FileSpreadsheet } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink, Clock, Users, Phone, FileSpreadsheet, DollarSign } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to CDN for reliable production behavior
@@ -17,6 +17,9 @@ import { TemplatesView } from './components/TemplatesView';
 import { WelcomeView } from './components/WelcomeView';
 import { UploadGlareCard } from './components/UploadGlareCard';
 import { TermsModal, TermsBlockedView } from './components/TermsModal';
+import { CustomWallpaperBackground } from './components/CustomWallpaperBackground';
+import { WallpaperSettingsSection } from './components/WallpaperSettingsSection';
+import { WallpaperConfig, DEFAULT_WALLPAPER_CONFIG, loadWallpaperImage, saveWallpaperImage } from './utils/wallpaperStorage';
 
 const DakotaLogo = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 349.899 349.898" xmlns="http://www.w3.org/2000/svg">
@@ -144,6 +147,27 @@ const getTimezoneByAddress = (address: string | undefined): string => {
   };
 
   return tzMap[state] ? ` ${tzMap[state]}` : (upperAddr.includes("MA") ? " EDT" : "");
+};
+
+const formatStopTimeWithTimezone = (time: string | undefined, address: string | undefined): string => {
+  const tzFromAddr = getTimezoneByAddress(address);
+  if (!time || !time.trim() || time.trim() === "?") {
+    return `?${tzFromAddr}`;
+  }
+
+  // Deduplicate any repeated consecutive timezone tokens like "CDT CDT" or "EDT EDT"
+  let cleaned = time.trim()
+    .replace(/\b(EDT|EST|CDT|CST|MDT|MST|PDT|PST|AST|HST|AKST|AKDT|UTC|GMT)(?:\s+\1)+\b/gi, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // If time already contains a known timezone abbreviation, do not append another one
+  const hasTimezone = /\b(?:EDT|EST|CDT|CST|MDT|MST|PDT|PST|AST|HST|AKST|AKDT|UTC|GMT)\b/i.test(cleaned);
+  if (hasTimezone) {
+    return cleaned;
+  }
+
+  return `${cleaned}${tzFromAddr}`;
 };
 
 const getBaseSteps = (data: ParsedRateCon | null): VerificationStep[] => {
@@ -2211,20 +2235,56 @@ export default function App() {
   const [robinsonDisplayMode, setRobinsonDisplayMode] = useLocalStorage<'with-space' | 'no-space'>("dakota_robinson_display_mode", 'with-space');
   const [dragSensitivity, setDragSensitivity] = useLocalStorage("dakota_dragSensitivity", 1.5);
 
+  // Custom Wallpaper State
+  const [wallpaperConfig, setWallpaperConfig] = useLocalStorage<WallpaperConfig>("dakota_wallpaper_config", DEFAULT_WALLPAPER_CONFIG);
+
+  // Load saved wallpaper image from IndexedDB on startup
+  useEffect(() => {
+    let isMounted = true;
+    loadWallpaperImage().then((imgData) => {
+      if (isMounted && imgData) {
+        setWallpaperConfig(prev => ({
+          ...prev,
+          imageData: imgData,
+        }));
+      }
+    }).catch((err) => {
+      console.warn("Could not load wallpaper from storage:", err);
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  const handleWallpaperChange = (newConfig: WallpaperConfig) => {
+    setWallpaperConfig(newConfig);
+  };
+
+  const handleRemoveWallpaper = async () => {
+    await saveWallpaperImage(null);
+    setWallpaperConfig(prev => ({
+      ...prev,
+      imageData: null,
+      enabled: false,
+    }));
+  };
+
   // --- Styles Helper ---
+  const hasCustomWallpaper = Boolean(wallpaperConfig.enabled && wallpaperConfig.imageData && hasSeenWelcome && termsStatus === 'accepted');
+
   const theme = React.useMemo(() => ({
     bg: isDarkMode ? 'bg-[#0a0d17]' : 'bg-white',
     text: isDarkMode ? 'text-white' : 'text-zinc-900',
     textMuted: isDarkMode ? 'text-zinc-400' : 'text-zinc-500',
-    border: isDarkMode ? 'border-zinc-800' : 'border-zinc-200',
+    border: isDarkMode ? (hasCustomWallpaper ? 'border-white/10' : 'border-zinc-800') : (hasCustomWallpaper ? 'border-zinc-300/40' : 'border-zinc-200'),
     cardBg: isDarkMode ? 'bg-[#111626]' : 'bg-white',
     cardHover: isDarkMode ? 'hover:bg-[#1a2035]' : 'hover:bg-zinc-50',
-    inputBg: isDarkMode ? 'bg-[#1a2035]' : 'bg-zinc-100',
-    headerBg: isDarkMode ? 'bg-[#0a0d17]/80' : 'bg-white/80',
+    inputBg: isDarkMode ? (hasCustomWallpaper ? 'bg-[#1a2035]/50' : 'bg-[#1a2035]') : (hasCustomWallpaper ? 'bg-zinc-100/60' : 'bg-zinc-100'),
+    headerBg: hasCustomWallpaper
+      ? (isDarkMode ? 'bg-[#0a0d17]/25' : 'bg-white/35')
+      : (isDarkMode ? 'bg-[#0a0d17]/80' : 'bg-white/80'),
     accent: isDarkMode ? 'text-white' : 'text-zinc-900',
     accentBg: isDarkMode ? 'bg-zinc-700' : 'bg-zinc-900',
     accentHover: isDarkMode ? 'hover:bg-zinc-600' : 'hover:bg-zinc-800',
-  }), [isDarkMode]);
+  }), [isDarkMode, hasCustomWallpaper]);
 
   const processPdfData = async (pdf: any) => {
     let fullText = "";
@@ -2445,14 +2505,14 @@ export default function App() {
 
       const puNotes = weightLine + pickups.map(s => {
         const label = s.label.match(/\d+/)?.[0] || "";
-        const tz = getTimezoneByAddress(s.address);
-        return `PU${label ? ' ' + label : ''} ${s.time || "?"}${tz}`;
+        const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
+        return `PU${label ? ' ' + label : ''} ${timeFormatted}`;
       }).join('\n') + '\n' + chain;
 
       const delNotes = weightLine + deliveries.map(s => {
         const label = s.label.match(/\d+/)?.[0] || "";
-        const tz = getTimezoneByAddress(s.address);
-        return `DEL${label ? ' ' + label : ''} ${s.time || "?"}${tz}`;
+        const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
+        return `DEL${label ? ' ' + label : ''} ${timeFormatted}`;
       }).join('\n') + '\n' + chain;
 
       notes = puNotes + "\n\n" + delNotes;
@@ -2463,13 +2523,13 @@ export default function App() {
         data.stops.forEach((s, idx) => {
           const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
           const label = s.label.match(/\d+/)?.[0] || "";
-          const tz = getTimezoneByAddress(s.address);
-          notes += `${prefix}${label ? ' ' + label : ''} ${s.time || "?"}${tz}\n`;
+          const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
+          notes += `${prefix}${label ? ' ' + label : ''} ${timeFormatted}\n`;
         });
       } else {
-        const puTz = getTimezoneByAddress(data.originAddress);
-        const delTz = getTimezoneByAddress(data.destinationAddress);
-        notes += `PU ${data.pickupTime || "?"}${puTz}\nDEL ${data.deliveryTime || "?"}${delTz}\n`;
+        const puTime = formatStopTimeWithTimezone(data.pickupTime, data.originAddress);
+        const delTime = formatStopTimeWithTimezone(data.deliveryTime, data.destinationAddress);
+        notes += `PU ${puTime}\nDEL ${delTime}\n`;
       }
       notes += chain;
     }
@@ -2570,14 +2630,14 @@ export default function App() {
 
           const puSection = pickups.map(s => {
             const label = s.label.match(/\d+/)?.[0] || "";
-            const tz = getTimezoneByAddress(s.address);
-            return `PU${label ? ' ' + label : ''} ${s.time || "?"}${tz}`;
+            const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
+            return `PU${label ? ' ' + label : ''} ${timeFormatted}`;
           }).join('\n') + '\n';
 
           const delSection = deliveries.map(s => {
             const label = s.label.match(/\d+/)?.[0] || "";
-            const tz = getTimezoneByAddress(s.address);
-            return `DEL${label ? ' ' + label : ''} ${s.time || "?"}${tz}`;
+            const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
+            return `DEL${label ? ' ' + label : ''} ${timeFormatted}`;
           }).join('\n') + '\n';
 
           if (notesFormat === 'alternative') {
@@ -2591,13 +2651,13 @@ export default function App() {
             ? extractedData.stops.map((s, idx) => {
                 const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
                 const label = s.label.match(/\d+/)?.[0] || "";
-                const tz = getTimezoneByAddress(s.address);
-                return `${prefix}${label ? ' ' + label : ''} ${s.time || "?"}${tz}`;
+                const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
+                return `${prefix}${label ? ' ' + label : ''} ${timeFormatted}`;
               }).join('\n') + '\n'
             : (() => {
-                const puTz = getTimezoneByAddress(extractedData.originAddress);
-                const delTz = getTimezoneByAddress(extractedData.destinationAddress);
-                return `PU ${extractedData.pickupTime || "?"}${puTz}\nDEL ${extractedData.deliveryTime || "?"}${delTz}\n`;
+                const puTime = formatStopTimeWithTimezone(extractedData.pickupTime, extractedData.originAddress);
+                const delTime = formatStopTimeWithTimezone(extractedData.deliveryTime, extractedData.destinationAddress);
+                return `PU ${puTime}\nDEL ${delTime}\n`;
               })();
 
           if (notesFormat === 'alternative') {
@@ -2780,41 +2840,55 @@ export default function App() {
 
     return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-3">
-          <h2 className={`text-2xl font-display font-medium ${theme.text}`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-500/10">
+        <div className="flex items-center flex-wrap gap-3 sm:gap-4">
+          <h2 className={`text-2xl font-display font-semibold tracking-tight ${theme.text}`}>
             {isViewingHistory ? currentHistoryItem?.loadNumber : (extractedData?.loadNumber || "Generated Output")}
           </h2>
+          
           {(isViewingHistory ? currentHistoryItem?.isOvernight : isOvernight(extractedData)) && (
             <span 
-              className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-500 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tighter border border-amber-500/20 shadow-sm animate-pulse-slow cursor-help"
+              className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-500 text-xs font-bold px-2.5 py-1 rounded-xl uppercase tracking-tight border border-amber-500/20 shadow-xs animate-pulse-slow cursor-help"
               title={isViewingHistory ? currentHistoryItem?.overnightMessage : getOvernightMessage(extractedData)}
             >
-              <Clock size={10} />
+              <Clock size={12} />
               Overnight
             </span>
           )}
+
           {(isViewingHistory ? currentHistoryItem?.rate : extractedData?.rate) && (
-            <span className={`text-lg ${theme.textMuted} opacity-60 font-normal`}>
-              ${isViewingHistory ? currentHistoryItem?.rate : extractedData?.rate}
-            </span>
+            <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-xl text-sm font-semibold tracking-tight border shadow-xs transition-all ${
+              isDarkMode 
+                ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400' 
+                : 'bg-emerald-50 border-emerald-300/60 text-emerald-700'
+            }`}>
+              <DollarSign size={14} className="stroke-[2.5] opacity-80" />
+              <span className="font-mono">
+                {(isViewingHistory ? currentHistoryItem?.rate : extractedData?.rate)?.replace(/^\$/, '')}
+              </span>
+            </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2.5 flex-wrap">
           {isCurrentPdf && (
             <button
               onClick={() => setShowPdfInResults(!showPdfInResults)}
-              className={`px-4 py-2 rounded-lg border ${theme.border} ${theme.textMuted} hover:${theme.text} hover:${theme.cardBg} transition-all flex items-center gap-2 shadow-sm text-sm`}
+              className={`px-3.5 py-2 rounded-xl border transition-all flex items-center gap-2 shadow-xs text-xs md:text-sm font-medium ${
+                showPdfInResults
+                  ? 'border-indigo-500/30 bg-indigo-500/10 text-indigo-400'
+                  : `${theme.border} ${theme.textMuted} hover:${theme.text} hover:${theme.cardBg}`
+              }`}
             >
-              <FileText size={16} className="text-zinc-500" />
+              <FileText size={15} className={showPdfInResults ? "text-indigo-400" : "text-zinc-500"} />
               {showPdfInResults ? 'Hide RateCon' : 'View RateCon'}
             </button>
           )}
           <button 
             onClick={startOver}
-            className={`text-sm ${theme.textMuted} hover:${theme.text} flex items-center gap-2 transition-colors`}
+            className={`px-3.5 py-2 rounded-xl border border-zinc-500/20 hover:border-zinc-500/40 text-xs md:text-sm font-medium ${theme.textMuted} hover:${theme.text} bg-zinc-500/5 hover:bg-zinc-500/10 flex items-center gap-1.5 transition-all shadow-xs`}
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={13} />
             Start Over
           </button>
         </div>
@@ -3067,7 +3141,19 @@ export default function App() {
       <AnimatePresence>
         {isLoading && <LoadingScreen isDarkMode={isDarkMode} />}
       </AnimatePresence>
-      <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#1e2235" : "#d4d4d8"} />
+
+      {/* Local Custom Wallpaper (Active on Home, Verify, Results, etc. - Not Welcome) */}
+      {hasSeenWelcome && termsStatus === 'accepted' && (
+        <CustomWallpaperBackground 
+          config={wallpaperConfig} 
+          isDarkMode={isDarkMode} 
+        />
+      )}
+
+      {/* Dotted map background - hidden when custom wallpaper is active */}
+      {!hasCustomWallpaper && (
+        <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#1e2235" : "#d4d4d8"} />
+      )}
       
       {/* Update Announcement Banner */}
       {showBanner && (
@@ -3092,7 +3178,7 @@ export default function App() {
       )}
       
       {/* Header */}
-      <header className={`border-b ${appState === 'verify' ? 'border-zinc-700' : theme.border} sticky top-0 z-20 ${theme.headerBg} backdrop-blur-md transition-all duration-300 flex-none border-x-0 border-t-0 rounded-none relative`}>
+      <header className={`border-b ${appState === 'verify' ? 'border-zinc-700' : theme.border} sticky top-0 z-20 ${theme.headerBg} ${hasCustomWallpaper ? 'backdrop-blur-2xl shadow-xs' : 'backdrop-blur-md'} transition-all duration-300 flex-none border-x-0 border-t-0 rounded-none relative`}>
         <div className="w-full px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setHasSeenWelcome(false)}>
             <DakotaLogo className="w-7 h-7" />
@@ -3113,7 +3199,7 @@ export default function App() {
                     setAppState('history');
                   }
                 }}
-                className={`w-full pl-10 pr-4 py-2 rounded-xl border ${theme.border} ${theme.inputBg} ${theme.text} text-sm focus:outline-none focus:border-zinc-500/50 focus:ring-4 focus:ring-zinc-500/5 transition-all`}
+                className={`w-full pl-10 pr-4 py-2 rounded-xl border ${theme.border} ${theme.inputBg} ${theme.text} text-sm focus:outline-none focus:border-zinc-500/50 focus:ring-4 focus:ring-zinc-500/5 transition-all ${hasCustomWallpaper ? 'backdrop-blur-md shadow-xs' : ''}`}
               />
             </div>
           </div>
@@ -3143,7 +3229,7 @@ export default function App() {
 
             <div className="flex items-center gap-4">
             {appState !== 'upload' && (
-              <div className={`hidden md:flex items-center gap-2 text-xs font-medium ${theme.textMuted} ${theme.cardBg} px-3 py-1.5 rounded-full border ${theme.border}`}>
+              <div className={`hidden md:flex items-center gap-2 text-xs font-medium ${theme.textMuted} ${hasCustomWallpaper ? (isDarkMode ? 'bg-black/30 backdrop-blur-md' : 'bg-white/40 backdrop-blur-md') : theme.cardBg} px-3 py-1.5 rounded-full border ${theme.border}`}>
                 <span className={appState === 'verify' ? 'text-zinc-500 dark:text-zinc-400 font-bold' : ''}>Verify</span>
                 <ChevronRight size={12} />
                 <span className={appState === 'results' ? 'text-zinc-500 dark:text-zinc-400 font-bold' : ''}>Results</span>
@@ -3640,6 +3726,17 @@ export default function App() {
                         className="flex-1 h-1.5 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-zinc-500"
                       />
                     </div>
+                  </div>
+
+                  {/* Custom Wallpaper Section */}
+                  <div className="pt-2 border-t border-zinc-500/10">
+                    <WallpaperSettingsSection
+                      config={wallpaperConfig}
+                      onChangeConfig={handleWallpaperChange}
+                      onRemoveWallpaper={handleRemoveWallpaper}
+                      isDarkMode={isDarkMode}
+                      theme={theme}
+                    />
                   </div>
                 </div>
 

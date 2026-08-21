@@ -8,7 +8,10 @@ import {
   RotateCcw,
   Sparkles,
   Layers,
-  Trash2
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  GripVertical
 } from 'lucide-react';
 import { ChainToken, CustomChainStyle, DriverInfo } from '../types/chain';
 import { renderChainSubject } from '../utils/chainBuilder';
@@ -171,6 +174,29 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
     setTokens(prev => prev.filter(t => t.id !== idToRemove));
   }, []);
 
+  const handleMoveTokenLeft = useCallback((index: number) => {
+    if (index <= 0) return;
+    setTokens(prev => {
+      if (index >= prev.length) return prev;
+      const updated = [...prev];
+      const temp = updated[index - 1];
+      updated[index - 1] = updated[index];
+      updated[index] = temp;
+      return updated;
+    });
+  }, []);
+
+  const handleMoveTokenRight = useCallback((index: number) => {
+    setTokens(prev => {
+      if (index < 0 || index >= prev.length - 1) return prev;
+      const updated = [...prev];
+      const temp = updated[index + 1];
+      updated[index + 1] = updated[index];
+      updated[index] = temp;
+      return updated;
+    });
+  }, []);
+
   const handleMoveToken = useCallback((fromIndex: number, targetInsertionIdx: number) => {
     if (fromIndex < 0) return;
     setTokens(prev => {
@@ -323,7 +349,7 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
                 ref={containerRef}
                 onDragOver={(e) => {
                   e.preventDefault();
-                  e.dataTransfer.dropEffect = 'copy';
+                  e.dataTransfer.dropEffect = draggedTokenIndex !== null ? 'move' : 'copy';
                   if (!isDragOverDropZone) setIsDragOverDropZone(true);
                   const nearest = calculateInsertionIndex(e.clientX);
                   setInsertionIndex(nearest);
@@ -344,7 +370,7 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
                   const nearest = insertionIndex !== null ? insertionIndex : calculateInsertionIndex(e.clientX);
                   handleProcessDrop(nearest, e.dataTransfer);
                 }}
-                className={`min-h-[88px] p-3.5 pb-4 rounded-2xl border transition-all flex flex-nowrap items-center overflow-x-auto whitespace-nowrap chain-track-scrollbar ${
+                className={`min-h-[92px] p-3.5 pb-4 rounded-2xl border transition-all flex flex-nowrap items-center overflow-x-auto whitespace-nowrap chain-track-scrollbar gap-0.5 ${
                   isDragOverDropZone
                     ? 'border-blue-400 bg-blue-950/40 shadow-[0_0_20px_rgba(59,130,246,0.25)]'
                     : 'border-dashed border-blue-900/40 bg-blue-950/15'
@@ -361,7 +387,7 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
                       onDragOver={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        e.dataTransfer.dropEffect = 'copy';
+                        e.dataTransfer.dropEffect = draggedTokenIndex !== null ? 'move' : 'copy';
                         setInsertionIndex(0);
                       }}
                       onDragEnter={(e) => {
@@ -374,10 +400,10 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
                         e.stopPropagation();
                         handleProcessDrop(0, e.dataTransfer);
                       }}
-                      className="flex-shrink-0 relative flex items-center justify-center w-2 h-9 cursor-pointer select-none"
+                      className="flex-shrink-0 relative flex items-center justify-center w-3 h-10 cursor-pointer select-none"
                     >
                       {insertionIndex === 0 && (
-                        <div className="w-1.5 h-7 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,1)] animate-pulse" />
+                        <div className="w-1.5 h-8 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,1)] animate-pulse" />
                       )}
                     </div>
 
@@ -388,26 +414,37 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
 
                       return (
                         <React.Fragment key={token.id}>
-                          {/* Token Bubble */}
+                          {/* Token Bubble with Move Left / Move Right controls & Drag */}
                           <div
                             data-token-idx={index}
                             draggable={true}
                             onDragStart={(e) => {
                               setDraggedTokenIndex(index);
                               e.dataTransfer.setData('text/plain', `token_idx_${index}`);
+                              e.dataTransfer.setData('application/json', JSON.stringify({ isInternalToken: true, index }));
                               e.dataTransfer.effectAllowed = 'move';
                             }}
                             onDragOver={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              e.dataTransfer.dropEffect = 'copy';
+                              e.dataTransfer.dropEffect = draggedTokenIndex !== null ? 'move' : 'copy';
                               
                               const rect = e.currentTarget.getBoundingClientRect();
                               const midpoint = rect.left + rect.width / 2;
-                              if (e.clientX < midpoint) {
-                                setInsertionIndex(index);
+                              if (draggedTokenIndex !== null) {
+                                if (draggedTokenIndex < index) {
+                                  // Dragging forward/right
+                                  setInsertionIndex(e.clientX > midpoint ? index + 1 : index);
+                                } else if (draggedTokenIndex > index) {
+                                  // Dragging backward/left
+                                  setInsertionIndex(e.clientX < midpoint ? index : index + 1);
+                                }
                               } else {
-                                setInsertionIndex(index + 1);
+                                if (e.clientX < midpoint) {
+                                  setInsertionIndex(index);
+                                } else {
+                                  setInsertionIndex(index + 1);
+                                }
                               }
                             }}
                             onDragEnd={() => {
@@ -421,8 +458,8 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
                               const targetIdx = insertionIndex !== null ? insertionIndex : index;
                               handleProcessDrop(targetIdx, e.dataTransfer);
                             }}
-                            className={`flex-shrink-0 group relative cursor-grab active:cursor-grabbing select-none rounded-full px-3.5 py-1.5 inline-flex items-center gap-2 text-xs font-semibold shadow-sm transition-colors border ${
-                              isBeingDragged ? 'opacity-30 border-dashed border-blue-400' : 'opacity-100'
+                            className={`flex-shrink-0 group relative cursor-grab active:cursor-grabbing select-none rounded-full pl-2 pr-2.5 py-1 inline-flex items-center gap-1.5 text-xs font-semibold shadow-sm transition-all border ${
+                              isBeingDragged ? 'opacity-30 scale-95 border-dashed border-blue-400' : 'opacity-100'
                             } ${
                               isYellowVar
                                 ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:border-amber-400'
@@ -433,7 +470,37 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
                                     : 'bg-blue-500/15 border-blue-500/35 text-blue-200 hover:border-blue-400'
                             }`}
                           >
-                            <span className="font-mono tracking-tight pointer-events-none">{token.label}</span>
+                            {/* Move Left Button */}
+                            {index > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveTokenLeft(index);
+                                }}
+                                className="p-0.5 rounded hover:bg-white/20 text-white/50 hover:text-white transition-all cursor-pointer"
+                                title="Move left"
+                              >
+                                <ChevronLeft size={13} className="stroke-[2.5]" />
+                              </button>
+                            )}
+
+                            <span className="font-mono tracking-tight pointer-events-none px-0.5">{token.label}</span>
+
+                            {/* Move Right Button */}
+                            {index < tokens.length - 1 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveTokenRight(index);
+                                }}
+                                className="p-0.5 rounded hover:bg-white/20 text-white/50 hover:text-white transition-all cursor-pointer"
+                                title="Move right"
+                              >
+                                <ChevronRight size={13} className="stroke-[2.5]" />
+                              </button>
+                            )}
                             
                             {/* Remove button */}
                             <button
@@ -442,7 +509,7 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
                                 e.stopPropagation();
                                 handleRemoveToken(token.id);
                               }}
-                              className={`p-0.5 rounded-full transition-colors cursor-pointer ${
+                              className={`p-0.5 ml-0.5 rounded-full transition-colors cursor-pointer ${
                                 isYellowVar 
                                   ? 'text-amber-400/70 hover:text-red-300 hover:bg-red-500/20' 
                                   : 'text-zinc-400 hover:text-red-300 hover:bg-red-500/20'
@@ -458,7 +525,7 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
                             onDragOver={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              e.dataTransfer.dropEffect = 'copy';
+                              e.dataTransfer.dropEffect = draggedTokenIndex !== null ? 'move' : 'copy';
                               setInsertionIndex(index + 1);
                             }}
                             onDragEnter={(e) => {
@@ -471,10 +538,10 @@ export const ChainEditorModal: React.FC<ChainEditorModalProps> = ({
                               e.stopPropagation();
                               handleProcessDrop(index + 1, e.dataTransfer);
                             }}
-                            className="flex-shrink-0 relative flex items-center justify-center w-2 h-9 cursor-pointer select-none"
+                            className="flex-shrink-0 relative flex items-center justify-center w-3 h-10 cursor-pointer select-none"
                           >
                             {isTargetRight && (
-                              <div className="w-1.5 h-7 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,1)] animate-pulse" />
+                              <div className="w-1.5 h-8 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,1)] animate-pulse" />
                             )}
                           </div>
                         </React.Fragment>
