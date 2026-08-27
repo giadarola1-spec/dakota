@@ -1109,13 +1109,16 @@ export const formatDispatchInfo = (name?: string, ext?: string): string => {
     }
   }
 
+  let info = "";
   if (cleanName && cleanExt) {
-    return `${cleanName} ${cleanExt}`;
+    info = `${cleanName} ${cleanExt}`;
   } else if (cleanName) {
-    return cleanName;
+    info = cleanName;
   } else {
-    return cleanExt;
+    info = cleanExt;
   }
+
+  return `Dispatch: ${info}`;
 };
 
 const DriversView = ({ 
