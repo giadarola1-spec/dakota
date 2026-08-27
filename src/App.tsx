@@ -3714,7 +3714,7 @@ export default function App() {
                             type="text"
                             value={dispatchName}
                             onChange={(e) => setDispatchName(e.target.value)}
-                            placeholder="e.g. Vuko"
+                            placeholder="e.g. Name"
                             className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} focus:outline-none focus:border-zinc-400 transition-all`}
                           />
                         </div>
@@ -3726,7 +3726,7 @@ export default function App() {
                             type="text"
                             value={dispatchExt}
                             onChange={(e) => setDispatchExt(e.target.value)}
-                            placeholder="e.g. 623"
+                            placeholder="e.g. 123"
                             className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} focus:outline-none focus:border-zinc-400 transition-all`}
                           />
                         </div>
