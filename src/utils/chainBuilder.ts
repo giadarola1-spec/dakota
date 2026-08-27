@@ -199,6 +199,15 @@ export const getCity = (addr?: string): string => {
   let text = addr.trim();
   text = text.replace(/^\d{2,4}\s+(?=\d{2,5}\s+[A-Za-z])/i, '').replace(/^\bDC\s*\d+\s+/i, '');
   text = text.replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, '').replace(/,\s*Decatur\s*,?\s*(?=Indianapolis\b)/gi, ', ');
+  text = text
+    .replace(/\b\d+\s*(?:PIECES?|PCS?|PALLETS?|PLTS?|UNITS?|CASES?|BOXES?|CARTONS?|CTNS?|LBS?)\b/gi, "")
+    .replace(/\b(?:PIECES?|PCS?|PALLETS?|PLTS?|COMMODITY|TOTAL\s*WEIGHT)\b/gi, "")
+    .replace(/\bPO\s*#?\s*\d+\b/gi, "")
+    .replace(/\b\d+(?:,\d{3})*\s*(?:LB|LBS|KG|KGS)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/,\s*,/g, ", ")
+    .replace(/^,\s*|,\s*$/g, "")
+    .trim();
   text = text.replace(/,?\s*\b[A-Za-z]{2}\b[,\s]+\d{4,5}(?:-\d{4})?\s*$/i, '');
   text = text.replace(/,?\s*\b[A-Za-z]{2}\b\s*$/i, '');
   text = text.replace(/\s+\d{5}(?:-\d{4})?\s*$/i, '');

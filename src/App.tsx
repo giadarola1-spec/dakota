@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink, Clock, Users, Phone, FileSpreadsheet, DollarSign } from 'lucide-react';
+import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink, Clock, Users, Phone, FileSpreadsheet, DollarSign, Headphones } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set worker source to CDN for reliable production behavior
@@ -307,6 +307,15 @@ const formatAddress = (fullAddress: string, simplified: boolean) => {
   let trimmedAddr = fullAddress.trim();
   trimmedAddr = trimmedAddr.replace(/^\d{2,4}\s+(?=\d{2,5}\s+[A-Za-z])/i, "").replace(/^\bDC\s*\d+\s+/i, "");
   trimmedAddr = trimmedAddr.replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, "").replace(/,\s*Decatur\s*,?\s*(?=Indianapolis\b)/gi, ", ");
+  trimmedAddr = trimmedAddr
+    .replace(/\b\d+\s*(?:PIECES?|PCS?|PALLETS?|PLTS?|UNITS?|CASES?|BOXES?|CARTONS?|CTNS?|LBS?)\b/gi, "")
+    .replace(/\b(?:PIECES?|PCS?|PALLETS?|PLTS?|COMMODITY|TOTAL\s*WEIGHT)\b/gi, "")
+    .replace(/\bPO\s*#?\s*\d+\b/gi, "")
+    .replace(/\b\d+(?:,\d{3})*\s*(?:LB|LBS|KG|KGS)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/,\s*,/g, ", ")
+    .replace(/^,\s*|,\s*$/g, "")
+    .trim();
 
   // 1. Find State and Zip at the end (Zip is optional but preferred)
   const stateZipMatch = trimmedAddr.match(/,\s*([A-Z]{2})(?:\s+(\d{4,5}(?:-\d{4})?))?\s*$/i);
@@ -895,7 +904,7 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
   }, []);
 
   return (
-    <div className={`w-full ${isAutoZoomEnabled ? 'h-full' : 'h-auto'} overflow-hidden rounded-lg shadow-lg border relative ${isDarkMode ? 'border-white/10 bg-zinc-950' : 'border-zinc-200 bg-zinc-100'} flex flex-col`}>
+    <div className={`w-full ${isAutoZoomEnabled ? 'h-full' : 'h-auto'} overflow-hidden rounded-lg shadow-lg border relative ${isDarkMode ? 'border-white/10 bg-zinc-950' : 'border-zinc-300/80 bg-slate-200/75'} flex flex-col`}>
       {/* Page Navigation */}
       {totalPages > 1 && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-white text-xs font-medium">
@@ -1086,6 +1095,29 @@ const cleanTruckNumber = (truckStr: string): string => {
   return digits || truckStr.trim().toUpperCase();
 };
 
+export const formatDispatchInfo = (name?: string, ext?: string): string => {
+  const cleanName = (name || "").trim();
+  let cleanExt = (ext || "").trim();
+
+  if (!cleanName && !cleanExt) return "";
+
+  if (cleanExt) {
+    if (!/^ext\.?\s*/i.test(cleanExt)) {
+      cleanExt = `Ext.${cleanExt}`;
+    } else {
+      cleanExt = cleanExt.replace(/^ext\.?\s*/i, "Ext.");
+    }
+  }
+
+  if (cleanName && cleanExt) {
+    return `${cleanName} ${cleanExt}`;
+  } else if (cleanName) {
+    return cleanName;
+  } else {
+    return cleanExt;
+  }
+};
+
 const DriversView = ({ 
   theme, 
   isDarkMode, 
@@ -1093,6 +1125,8 @@ const DriversView = ({
   setDrivers,
   savedTrucks,
   setSavedTrucks,
+  dispatchName = "",
+  dispatchExt = "",
   onBack 
 }: {
   theme: any,
@@ -1101,6 +1135,8 @@ const DriversView = ({
   setDrivers: (v: Driver[]) => void,
   savedTrucks: string[],
   setSavedTrucks: (v: string[]) => void,
+  dispatchName?: string,
+  dispatchExt?: string,
   onBack: () => void
 }) => {
   const [activeTab, setActiveTab] = useState<'paste' | 'manual'>('paste');
@@ -1163,7 +1199,13 @@ const DriversView = ({
   };
 
   const handleCopyDriver = (driver: Driver) => {
-    const textToCopy = `Truck #: ${driver.truck}\nDriver: ${driver.driverName}\nPhone: ${formatPhoneForCopy(driver.phoneNumber)}`;
+    const dispatchLine = formatDispatchInfo(dispatchName, dispatchExt);
+    const driverLines = [
+      `Truck #: ${driver.truck}`,
+      `Driver: ${driver.driverName}`,
+      `Phone: ${formatPhoneForCopy(driver.phoneNumber)}`
+    ];
+    const textToCopy = dispatchLine ? `${dispatchLine}\n${driverLines.join('\n')}` : driverLines.join('\n');
     navigator.clipboard.writeText(textToCopy);
     setCopiedId(driver.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -2240,6 +2282,8 @@ export default function App() {
   const [isSimplifiedAddress, setIsSimplifiedAddress] = useLocalStorage("dakota_isSimplifiedAddress", true);
   const [robinsonDisplayMode, setRobinsonDisplayMode] = useLocalStorage<'with-space' | 'no-space'>("dakota_robinson_display_mode", 'with-space');
   const [dragSensitivity, setDragSensitivity] = useLocalStorage("dakota_dragSensitivity", 1.5);
+  const [dispatchName, setDispatchName] = useLocalStorage<string>("dakota_dispatch_name", "");
+  const [dispatchExt, setDispatchExt] = useLocalStorage<string>("dakota_dispatch_ext", "");
 
   // Custom Wallpaper State
   const [wallpaperConfig, setWallpaperConfig] = useLocalStorage<WallpaperConfig>("dakota_wallpaper_config", DEFAULT_WALLPAPER_CONFIG);
@@ -2277,16 +2321,16 @@ export default function App() {
   const hasCustomWallpaper = Boolean(wallpaperConfig.enabled && wallpaperConfig.imageData && hasSeenWelcome && termsStatus === 'accepted');
 
   const theme = React.useMemo(() => ({
-    bg: isDarkMode ? 'bg-[#0a0d17]' : 'bg-white',
+    bg: isDarkMode ? 'bg-[#0a0d17]' : 'bg-[#f4f6fa]',
     text: isDarkMode ? 'text-white' : 'text-zinc-900',
-    textMuted: isDarkMode ? 'text-zinc-400' : 'text-zinc-500',
-    border: isDarkMode ? (hasCustomWallpaper ? 'border-white/10' : 'border-zinc-800') : (hasCustomWallpaper ? 'border-zinc-300/40' : 'border-zinc-200'),
+    textMuted: isDarkMode ? 'text-zinc-400' : 'text-zinc-600',
+    border: isDarkMode ? (hasCustomWallpaper ? 'border-white/10' : 'border-zinc-800') : (hasCustomWallpaper ? 'border-zinc-300/60' : 'border-zinc-200/90'),
     cardBg: isDarkMode ? 'bg-[#111626]' : 'bg-white',
     cardHover: isDarkMode ? 'hover:bg-[#1a2035]' : 'hover:bg-zinc-50',
-    inputBg: isDarkMode ? (hasCustomWallpaper ? 'bg-[#1a2035]/50' : 'bg-[#1a2035]') : (hasCustomWallpaper ? 'bg-zinc-100/60' : 'bg-zinc-100'),
+    inputBg: isDarkMode ? (hasCustomWallpaper ? 'bg-[#1a2035]/50' : 'bg-[#1a2035]') : (hasCustomWallpaper ? 'bg-zinc-100/70' : 'bg-[#ebedf3]'),
     headerBg: hasCustomWallpaper
-      ? (isDarkMode ? 'bg-[#0a0d17]/25' : 'bg-white/35')
-      : (isDarkMode ? 'bg-[#0a0d17]/80' : 'bg-white/80'),
+      ? (isDarkMode ? 'bg-[#0a0d17]/25' : 'bg-[#f4f6fa]/40')
+      : (isDarkMode ? 'bg-[#0a0d17]/80' : 'bg-[#f4f6fa]/90'),
     accent: isDarkMode ? 'text-white' : 'text-zinc-900',
     accentBg: isDarkMode ? 'bg-zinc-700' : 'bg-zinc-900',
     accentHover: isDarkMode ? 'hover:bg-zinc-600' : 'hover:bg-zinc-800',
@@ -2993,7 +3037,13 @@ export default function App() {
                       </span>
                       <button
                         onClick={() => {
-                          const textToCopy = `Truck #: ${activeDriver.truck}\nDriver: ${activeDriver.driverName}\nPhone: ${formatPhoneForCopy(activeDriver.phoneNumber)}`;
+                          const dispatchLine = formatDispatchInfo(dispatchName, dispatchExt);
+                          const driverLines = [
+                            `Truck #: ${activeDriver.truck}`,
+                            `Driver: ${activeDriver.driverName}`,
+                            `Phone: ${formatPhoneForCopy(activeDriver.phoneNumber)}`
+                          ];
+                          const textToCopy = dispatchLine ? `${dispatchLine}\n${driverLines.join('\n')}` : driverLines.join('\n');
                           navigator.clipboard.writeText(textToCopy);
                           setCopiedActiveDriver(true);
                           setTimeout(() => setCopiedActiveDriver(false), 2000);
@@ -3142,7 +3192,7 @@ export default function App() {
 
       {/* Dotted map background - hidden when custom wallpaper is active */}
       {!hasCustomWallpaper && (
-        <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#1e2235" : "#d4d4d8"} />
+        <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#1e2235" : "#cbd5e1"} />
       )}
       
       {/* Update Announcement Banner */}
@@ -3319,6 +3369,8 @@ export default function App() {
                 setDrivers={setDrivers}
                 savedTrucks={savedTrucks}
                 setSavedTrucks={setSavedTrucks}
+                dispatchName={dispatchName}
+                dispatchExt={dispatchExt}
                 onBack={() => setAppState('upload')}
               />
             )}
@@ -3414,7 +3466,7 @@ export default function App() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className={`fixed right-0 top-0 bottom-0 w-72 ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-white'} border-l ${theme.border} z-50 shadow-2xl flex flex-col rounded-none border-y-0 border-r-0 overflow-hidden`}
+              className={`fixed right-0 top-0 bottom-0 w-72 ${isDarkMode ? 'bg-[#0a0a0a]' : 'bg-[#fafbfc]'} border-l ${theme.border} z-50 shadow-2xl flex flex-col rounded-none border-y-0 border-r-0 overflow-hidden`}
             >
               <div className="p-5 flex justify-between items-center border-b border-white/5">
                 <div className="flex items-center gap-2">
@@ -3630,6 +3682,57 @@ export default function App() {
                     </div>
                     <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-400 transition-colors" />
                   </button>
+
+                  {/* Dispatch Info Section */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <div className="flex items-center gap-1.5">
+                        <Headphones size={13} className="text-zinc-400" />
+                        <span className="text-xs font-medium text-zinc-400">Dispatch Info</span>
+                      </div>
+                      {(dispatchName || dispatchExt) && (
+                        <button
+                          onClick={() => {
+                            setDispatchName("");
+                            setDispatchExt("");
+                          }}
+                          className="text-[10px] text-zinc-500 hover:text-rose-400 transition-colors"
+                          title="Clear dispatch info"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-black/20' : 'bg-zinc-100'} border ${theme.border}`}>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider mb-1">
+                            Dispatcher Name
+                          </label>
+                          <input 
+                            type="text"
+                            value={dispatchName}
+                            onChange={(e) => setDispatchName(e.target.value)}
+                            placeholder="e.g. Vuko"
+                            className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} focus:outline-none focus:border-zinc-400 transition-all`}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-zinc-400 uppercase tracking-wider mb-1">
+                            Extension (Ext)
+                          </label>
+                          <input 
+                            type="text"
+                            value={dispatchExt}
+                            onChange={(e) => setDispatchExt(e.target.value)}
+                            placeholder="e.g. 623"
+                            className={`w-full px-2.5 py-1.5 text-xs rounded-lg border ${theme.border} ${theme.inputBg} ${theme.text} focus:outline-none focus:border-zinc-400 transition-all`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Theme Toggle */}
                   <div className="space-y-2">

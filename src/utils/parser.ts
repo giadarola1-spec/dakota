@@ -598,6 +598,13 @@ function parseNST(text: string): ParsedRateCon {
     cleaned = cleaned.replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, "").trim();
     cleaned = cleaned.replace(/,\s*Decatur\s*,?\s*(?=Indianapolis\b)/gi, ", ").trim();
 
+    // Strip pieces, pallets, units, cartons, cases, boxes, lbs, commodities and PO numbers from anywhere in address
+    cleaned = cleaned.replace(/\b\d+\s*(?:PIECES?|PCS?|PALLETS?|PLTS?|UNITS?|CASES?|BOXES?|CARTONS?|CTNS?|LBS?)\b/gi, "").trim();
+    cleaned = cleaned.replace(/\b(?:PIECES?|PCS?|PALLETS?|PLTS?|COMMODITY|TOTAL\s*WEIGHT)\b/gi, "").trim();
+    cleaned = cleaned.replace(/\bPO\s*#?\s*\d+\b/gi, "").trim();
+    cleaned = cleaned.replace(/\b\d+(?:,\d{3})*\s*(?:LB|LBS|KG|KGS)\b/gi, "").trim();
+    cleaned = cleaned.replace(/\s+/g, " ").replace(/,\s*,/g, ", ").replace(/^,\s*|,\s*$/g, "").trim();
+
     // Remove trailing noise
     const suffixPattern = /(?:\s*\b(?:REFERENCE\s*NUMBERS|REF\s*#|BOL\s*#|PICKUP\s*#|PU\s*#|DO\s*#|STOP\s*#|NOTES|SPECIAL\s*INSTRUCTIONS|CONTACT|PHONE|EMAIL|FAX|DATE|TIME|APPOINTMENT|APPT|WINDOW|ETA|SCHEDULED|ARRIVAL|CHECK-IN|FCFS|ASAP|DELIVERY|PICKUP|SHIPPER|CONSIGNEE|ORIGIN|DESTINATION|LOCATION|ADDRESS|FROM|TO|RECEIVER|LOADING|UNLOADING|PU|P\/U|DEL|FACILITY|SHIPPING|RECEIVING|DROP|UP|PICK|INFO|NAME|MC|DOT|DISPATCHER|DRIVER|TRUCK|TRAILER|LOAD|RATE|TYPE|UNIT|QUANTITY|TOTAL|MODE|SIZE|LINEAR|FEET|TEMPERATURE|PALLET|CASE|HAZMAT|WEIGHT|ESTIMATED|RECEIPT|EXCHANGE|NOTE|CARRIER|COMMODITY|HANDLING|UNITS|STACKABLE|PIECES|DIMS|TEMP|CONFIRM|OF)\b\s*[:\/\-]?\s*)+$/i;
     cleaned = cleaned.replace(suffixPattern, "").trim();
@@ -1596,9 +1603,8 @@ function parseArrive(text: string): ParsedRateCon {
   }
 
   // 3. Rate (LineHaul $3,100.00 / Total $3,100.00)
-  const totalRateMatch = text.match(/Total\s*[:]?\s*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
-                         text.match(/LineHaul\s*[:]?\s*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
-                         text.match(/Total\s*[:]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i);
+  const totalRateMatch = text.match(/\b(?:Total|LineHaul|Grand\s*Total|Total\s*Pay|Rate)\s*[:]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i) ||
+                         text.match(/\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i);
   if (totalRateMatch) {
     result.rate = totalRateMatch[1].replace(/,/g, '');
   }
@@ -1611,6 +1617,10 @@ function parseArrive(text: string): ParsedRateCon {
   if (arriveEmailMatch) {
     result.brokerEmail = arriveEmailMatch[1];
   }
+
+  // Common street suffixes for extracting clean street lines
+  const streetSuffixes = 'ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|RD|ROAD|DR|DRIVE|PKWY|PARKWAY|WAY|LANE|LN|CT|COURT|PL|PLACE|PIKE|HWY|HIGHWAY|TRAIL|TRL|CIR|CIRCLE|LOOP|EXPWY|EXPRESSWAY|RUN|TER|TERRACE';
+  const streetRegex = new RegExp(`^(\\d{1,6}\\s+[A-Za-z0-9\\s.,#-]+?\\b(?:\\s*STE|UNIT|SUITE|BLDG|APT|#|STB|RM|ROOM\\.?\\s*[A-Z0-9-]+|\\b(?:${streetSuffixes}))\\b)`, 'i');
 
   // 5. Stops (Pickup #1, Delivery #1, etc.)
   const stopSections = text.split(/(?=(?:Pickup|Delivery)\s*#\d+)/i);
@@ -1629,66 +1639,99 @@ function parseArrive(text: string): ParsedRateCon {
                         section.match(/\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/);
       const date = dateMatch ? parseArriveDate(dateMatch[0]) : "";
 
-      // Time: e.g. "18:00 EDT" or "07:30 EDT" or "08:00 - 12:00"
-      const rangeTimeMatch = section.match(/(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?\s*[-–]\s*\d{1,2}:\d{2}(?:\s*(?:AM|PM))?(?:\s*[A-Z]{3})?)/i);
-      const singleTimeMatch = section.match(/(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?(?:\s*(?:EDT|EST|CDT|CST|MDT|MST|PDT|PST))?)/i);
+      // Time: Support explicit ranges, Earliest/Latest Date/Time windows, and single times
       let time = "";
-      if (rangeTimeMatch) {
-        time = rangeTimeMatch[1].trim();
-      } else if (singleTimeMatch) {
-        time = singleTimeMatch[1].trim();
+      const explicitRange = section.match(/(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?\s*[-–]\s*\d{1,2}:\d{2}(?:\s*(?:AM|PM))?(?:\s*[A-Z]{3})?)/i);
+      const timeRegex = /\b(\d{1,2}:\d{2})(?:\s*(AM|PM))?(?:\s*(EDT|EST|CDT|CST|MDT|MST|PDT|PST|AST|HST|AKST|AKDT|UTC|GMT))?\b/gi;
+      const timeMatches = Array.from(section.matchAll(timeRegex));
+      const hasEarliest = /Earliest/i.test(section);
+      const hasLatest = /Latest/i.test(section);
+
+      if (explicitRange) {
+        time = explicitRange[1].trim();
+      } else if ((hasEarliest || hasLatest) && timeMatches.length >= 2) {
+        const t1 = timeMatches[0][1] + (timeMatches[0][2] ? ' ' + timeMatches[0][2].toUpperCase() : '');
+        const t2 = timeMatches[1][1] + (timeMatches[1][2] ? ' ' + timeMatches[1][2].toUpperCase() : '');
+        const tz = timeMatches[1][3] || timeMatches[0][3] || '';
+        if (t1 === t2) {
+          time = `${t1}${tz ? ' ' + tz.toUpperCase() : ''}`.trim();
+        } else {
+          time = `${t1} - ${t2}${tz ? ' ' + tz.toUpperCase() : ''}`.trim();
+        }
+      } else if (timeMatches.length > 0) {
+        const m = timeMatches[0];
+        const t = m[1] + (m[2] ? ' ' + m[2].toUpperCase() : '');
+        const tz = m[3] ? ' ' + m[3].toUpperCase() : '';
+        time = `${t}${tz ? ' ' + tz : ''}`.replace(/\s+/g, ' ').trim();
       }
 
       // Address:
       // In Arrive format:
-      // Pickup Address Appointment Ref/PO# Commodity Weight
-      // GUARDIAN GLASS -
-      // RICHBURG
-      // 610 L C RAILWAY DIST.
-      // PARK
-      // STATE HIGHWAY 9
-      // Richburg, SC 29729
-      
-      // Let's locate the city, state zip line: e.g. "Richburg, SC 29729"
+      // Locate the city, state zip line: e.g. "Richburg, SC 29729" or "Bloomington, IN 47404"
       const cityStateZipMatch = section.match(/([A-Za-z\s.-]+),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/);
       let address = "";
       if (cityStateZipMatch) {
-        const fullCityStateZip = cityStateZipMatch[0].trim();
-        
-        // Let's get preceding lines before this city/state/zip but after "Pickup Address" / "Delivery Address" / "Pickup #1"
-        const preLines = section.substring(0, cityStateZipMatch.index).split('\n');
-        const validAddrParts: string[] = [];
-        
-        for (let i = preLines.length - 1; i >= 0; i--) {
-          const l = preLines[i].trim();
-          if (!l) continue;
-          if (/Pickup\s*Address|Delivery\s*Address|Appointment|Ref\/PO#|Commodity|Weight|Pickup\s*#|Delivery\s*#/i.test(l)) {
-            break;
-          }
-          // Avoid noise lines
-          if (/Driver\s*Instructions|Pickup\s*Notes|Delivery\s*Notes|Comments|Loading\s*Type|Live\s*Load|Appt\.?\s*Type|By\s*Appointment|Confirmed|Customer\s*Ref|PO\s*#/i.test(l)) {
-            continue;
-          }
-          // Filter out standalone timezone strings or times that leaked into address
-          const cleanedLine = l
-            .replace(/\b(?:EDT|EST|CDT|CST|MDT|MST|PDT|PST|AST|HST|AKST|AKDT|UTC|GMT)\b/gi, '')
-            .replace(/\b\d{1,2}:\d{2}(?:\s*(?:AM|PM))?\b/gi, '')
-            .replace(/\b(?:Loading\s*Type|Live\s*Load|Appt\.?\s*Type|By\s*Appointment|Confirmed)\b/gi, '')
-            .trim();
+        const rawCity = cityStateZipMatch[1].trim();
+        const st = cityStateZipMatch[2].trim().toUpperCase();
+        const zip = cityStateZipMatch[3].trim();
 
-          if (cleanedLine) {
-            validAddrParts.unshift(cleanedLine);
-          }
-          if (validAddrParts.length >= 4) break;
-        }
-
-        // Also clean the cityStateZip in case it had prefix noise
-        const cleanCityStateZip = fullCityStateZip
-          .replace(/\b(?:Loading\s*Type|Live\s*Load|EDT|EST|CDT|CST|MDT|MST|PDT|PST)\b/gi, '')
+        // Clean city from any table artifacts
+        const cleanCity = rawCity
+          .replace(/\b(?:Loading\s*Type|Live\s*Load|EDT|EST|CDT|CST|MDT|MST|PDT|PST|Pieces?|Pallets?|Appt\.?\s*Type|By\s*Appointment|Confirmed)\b/gi, '')
+          .replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, '')
+          .replace(/^\d+\s+/, '')
           .trim();
 
-        if (validAddrParts.length > 0) {
-          address = `${validAddrParts.join(' ')}, ${cleanCityStateZip}`.replace(/\s+/g, ' ').replace(/,\s*,/g, ',');
+        const cleanCityStateZip = `${cleanCity}, ${st} ${zip}`;
+
+        const preLines = section.substring(0, cityStateZipMatch.index).split('\n');
+        let streetLine = '';
+        let facilityLine = '';
+
+        for (let i = preLines.length - 1; i >= 0; i--) {
+          const rawL = preLines[i].trim();
+          if (!rawL) continue;
+          if (/Pickup\s*Address|Delivery\s*Address|Appointment|Ref\/PO#|Commodity|Weight|Pickup\s*#|Delivery\s*#/i.test(rawL)) {
+            break;
+          }
+          if (/Driver\s*Instructions|Pickup\s*Notes|Delivery\s*Notes|Comments/i.test(rawL)) {
+            continue;
+          }
+
+          // Check if line contains a recognized street address
+          const sMatch = rawL.match(streetRegex);
+          if (sMatch && !streetLine) {
+            streetLine = sMatch[1].trim();
+            continue;
+          }
+
+          // Extract facility/company name if not identified yet
+          if (!facilityLine) {
+            let fac = rawL
+              .replace(/\b(?:Earliest|Latest|Appointment|Appt|PO\s*#|Ref|Date|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}:\d{2}|\d{5,}).*$/i, '')
+              .replace(/\b\d+(?:,\d{3})*\s*(?:lb|lbs|kg|kgs)\b/gi, '')
+              .replace(/\b\d+\s*(?:Pieces?|Piece|Pcs?|Pallets?|Pallet|Plts?|Plt|Units?|Cartons?|Ctns?|Boxes?|Cases?|Bags?|Pkgs?|Drums?|Totes?|Rolls?)\b/gi, '')
+              .replace(/\b(?:Pieces?|Piece|Pcs?|Pallets?|Pallet|Plts?|Plt|Units?|Cartons?|Ctns?|Boxes?|Cases?|Bags?|Pkgs?|Commodity)\b/gi, '')
+              .replace(/\b\d{10}\b/gi, '')
+              .replace(/\b(?:Loading\s*Type|Live\s*Load|Appt\.?\s*Type|By\s*Appointment|FCFS|Confirmed)\b/gi, '')
+              .replace(/\s+/g, ' ')
+              .replace(/^[\s,:-]+|[\s,:-]+$/g, '')
+              .trim();
+
+            if (fac && fac.length > 2 && isNaN(Number(fac))) {
+              facilityLine = fac;
+            }
+          }
+        }
+
+        if (streetLine) {
+          if (facilityLine) {
+            address = `${facilityLine}, ${streetLine}, ${cleanCityStateZip}`;
+          } else {
+            address = `${streetLine}, ${cleanCityStateZip}`;
+          }
+        } else if (facilityLine) {
+          address = `${facilityLine}, ${cleanCityStateZip}`;
         } else {
           address = cleanCityStateZip;
         }
@@ -1818,6 +1861,13 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     
     // Per user feedback, if the address contains "City, ST Zip" twice or is redundant, try to shorten it
     // Or if it clearly has a street followed by city state zip, just keep that.
+    
+    // Strip pieces, pallets, units, cartons, cases, boxes, lbs, commodities and PO numbers from anywhere in address
+    cleaned = cleaned.replace(/\b\d+\s*(?:PIECES?|PCS?|PALLETS?|PLTS?|UNITS?|CASES?|BOXES?|CARTONS?|CTNS?|LBS?)\b/gi, "").trim();
+    cleaned = cleaned.replace(/\b(?:PIECES?|PCS?|PALLETS?|PLTS?|COMMODITY|TOTAL\s*WEIGHT)\b/gi, "").trim();
+    cleaned = cleaned.replace(/\bPO\s*#?\s*\d+\b/gi, "").trim();
+    cleaned = cleaned.replace(/\b\d+(?:,\d{3})*\s*(?:LB|LBS|KG|KGS)\b/gi, "").trim();
+    cleaned = cleaned.replace(/\s+/g, " ").replace(/,\s*,/g, ", ").replace(/^,\s*|,\s*$/g, "").trim();
     
     const blacklist = [
       "1701 Edison Drive", "PO Box 9049", "Louisville, KY 40209", "Milford, OH 45150",
