@@ -49,6 +49,7 @@ export interface ParsedRateCon {
   pickupTime: string;
   pickupDate: string;
   deliveryTime: string;
+  deliveryDate?: string;
   originAddress: string;
   destinationAddress: string;
   brokerEmail?: string;
@@ -219,8 +220,8 @@ function parseChRobinson(text: string): ParsedRateCon {
   }
 
   // Rate
-  const rateMatch = text.match(/Total\s*[:]?\s*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
-                    text.match(/Line\s*Haul\s*[-–]\s*Flat\s*Rate\s*\d+\s*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
+  const rateMatch = text.match(/Total\s*[:]?\s*[\r\n_ \t]*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/Line\s*Haul\s*[-–]\s*Flat\s*Rate\s*(?:\d+)?\s*[\r\n_ \t]*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i) ||
                     text.match(/Total\s*:\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i);
   if (rateMatch) result.rate = rateMatch[1].replace(/,/g, '');
 
@@ -242,8 +243,8 @@ function parseChRobinson(text: string): ParsedRateCon {
   const cleanRobinsonCity = (raw: string): string => {
     if (!raw) return "";
     let c = raw.trim();
-    // Strip anything up to and including *Scheduled to Pick*, *Scheduled Delivery*, Scheduled, Delivery, Pick Up, etc.
-    c = c.replace(/^[\s\S]*?\*Scheduled[^\*]*\*\s*/i, "");
+    // Strip anything up to and including *Scheduled to Pick*, *Scheduled Delivery*, *Open Delivery*, Scheduled, Delivery, Pick Up, etc.
+    c = c.replace(/^[\s\S]*?\*(?:Scheduled|Open)[^\*]*\*\s*/i, "");
     c = c.replace(/^[\s\S]*?\b(?:scheduled|delivery|pick\s*up|pickup|arrival|appointment|appt|address|phone|ref|receiver|shipper)\b[:*]?\s*/i, "");
     
     // Strip street suffixes if present at start (preserving St/Saint before city names like Louis)
@@ -257,8 +258,8 @@ function parseChRobinson(text: string): ParsedRateCon {
   };
 
   const extractAddressFromBlock = (block: string): { address: string; street: string; cityState: string; zip: string } => {
-    // 1. City, State Zip: match city followed by comma and 2-letter state
-    const cityStateRegex = new RegExp(`(?:^|[\\r\\n\\s*])([A-Za-z][A-Za-z\\s.\\x27-]{1,30}),\\s*(${usStatesPattern})(?:\\s+(\\d{5}(?:-\\d{4})?))?`, "i");
+    // 1. City, State Zip: match city followed by comma and 2-letter state with word boundaries
+    const cityStateRegex = new RegExp(`(?:^|[\\r\\n\\s*])([A-Za-z][A-Za-z\\s.\\x27-]{1,30}),\\s*\\b(${usStatesPattern})\\b(?:\\s+(\\d{5}(?:-\\d{4})?))?`, "i");
     let match = block.match(cityStateRegex);
 
     let city = "";
@@ -375,44 +376,52 @@ function parseChRobinson(text: string): ParsedRateCon {
   };
 
   // Extract stops:
-  // 1. Primary Strategy: C.H. Robinson rate confirmations reliably designate stops via *Scheduled to Pick* and *Scheduled Delivery*
-  const schedPickIdx = text.search(/\*Scheduled\s+to\s+Pick\*/i);
-  const schedDelIdx = text.search(/\*Scheduled\s+Delivery\*/i);
+  // 1. Primary Strategy: C.H. Robinson rate confirmations reliably designate stops via asterisk status markers:
+  // e.g. *Scheduled to Pick*, *Scheduled Delivery*, *Open Delivery*, *Scheduled Pickup*, etc.
+  const markerRegex = /\*(?:[^\*]*\b(?:Pick|Delivery)\b[^\*]*)\*/gi;
+  let m;
+  const markerList: { text: string; index: number; isPick: boolean }[] = [];
+  while ((m = markerRegex.exec(text)) !== null) {
+    const isPick = /Pick/i.test(m[0]);
+    markerList.push({ text: m[0], index: m.index, isPick });
+  }
 
-  if (schedPickIdx !== -1 && schedDelIdx !== -1) {
-    const pickStart = Math.max(0, schedPickIdx - 250);
-    const pickEnd = Math.min(text.length, schedPickIdx + 250, schedDelIdx > schedPickIdx ? schedDelIdx : text.length);
-    const pickBlock = text.substring(pickStart, pickEnd);
+  if (markerList.length >= 2) {
+    for (let i = 0; i < markerList.length; i++) {
+      const curr = markerList[i];
+      const prev = i > 0 ? markerList[i - 1] : null;
+      const next = i < markerList.length - 1 ? markerList[i + 1] : null;
 
-    const delStart = Math.max(0, schedDelIdx - 250, schedPickIdx < schedDelIdx ? schedPickIdx + 50 : 0);
-    const delEnd = Math.min(text.length, schedDelIdx + 250);
-    const delBlock = text.substring(delStart, delEnd);
+      const start = prev ? Math.floor((prev.index + curr.index) / 2) : Math.max(0, curr.index - 350);
+      const end = next ? Math.floor((curr.index + next.index) / 2) : Math.min(text.length, curr.index + 350);
 
-    const pAddr = extractAddressFromBlock(pickBlock);
-    const pDT = extractDateTimeFromBlock(pickBlock);
-    const dAddr = extractAddressFromBlock(delBlock);
-    const dDT = extractDateTimeFromBlock(delBlock);
+      const block = text.substring(start, end);
+      const addr = extractAddressFromBlock(block);
+      const dt = extractDateTimeFromBlock(block);
 
-    if (pAddr.address && dAddr.address && pAddr.address !== dAddr.address) {
-      result.stops.push({
-        type: 'pickup',
-        label: 'SHIPPER#1',
-        address: pAddr.address,
-        date: pDT.date,
-        time: pDT.time
-      });
-      result.stops.push({
-        type: 'delivery',
-        label: 'RECEIVER #1',
-        address: dAddr.address,
-        date: dDT.date,
-        time: dDT.time
-      });
+      const type = curr.isPick ? 'pickup' : 'delivery';
+      const pickCount = result.stops.filter(s => s.type === 'pickup').length;
+      const delCount = result.stops.filter(s => s.type === 'delivery').length;
+
+      // Match explicit label if present in block, e.g. SHIPPER#1, RECEIVER #1, RECEIVER #2
+      const labelMatch = block.match(curr.isPick ? /SHIPPER\s*#\s*\d+/i : /RECEIVER\s*#\s*\d+/i);
+      const label = labelMatch ? labelMatch[0].replace(/\s+/g, ' ') : (curr.isPick ? `SHIPPER#${pickCount + 1}` : `RECEIVER #${delCount + 1}`);
+
+      if (addr.address || dt.date || dt.time) {
+        result.stops.push({
+          type,
+          label,
+          address: addr.address,
+          date: dt.date,
+          time: dt.time
+        });
+      }
     }
   }
 
-  // 2. Secondary Strategy: Standard section splitting or OCR fallback if markers not found
-  if (result.stops.length === 0) {
+  // 2. Secondary Strategy: Standard section splitting or OCR fallback if markers not found or gave < 2 stops
+  if (result.stops.length < 2) {
+    result.stops.length = 0;
     const standardSections = text.split(/(?=SHIPPER\s*#|RECEIVER\s*#)/i);
     let useStandard = false;
 
@@ -438,8 +447,8 @@ function parseChRobinson(text: string): ParsedRateCon {
         
         if (isPickup || isDelivery) {
           const type = isPickup ? 'pickup' : 'delivery';
-          const labelMatch = section.match(/(?:SHIPPER|RECEIVER)\s*#\d+/i);
-          const label = labelMatch ? labelMatch[0] : (isPickup ? 'SHIPPER#1' : 'RECEIVER #1');
+          const labelMatch = section.match(/(?:SHIPPER|RECEIVER)\s*#\s*\d+/i);
+          const label = labelMatch ? labelMatch[0].replace(/\s+/g, ' ') : (isPickup ? 'SHIPPER#1' : 'RECEIVER #1');
           const { address } = extractAddressFromBlock(section);
           const { date, time } = extractDateTimeFromBlock(section);
 
@@ -455,9 +464,11 @@ function parseChRobinson(text: string): ParsedRateCon {
         }
       });
     } else {
-      const splitIdx = schedDelIdx !== -1 ? schedDelIdx : text.search(/RECEIVER\s*#/i);
+      const schedDelMatch = text.match(/\*(?:Scheduled|Open)\s+Delivery\*/i);
+      const delLabelMatch = text.match(/RECEIVER\s*#/i);
+      const splitIdx = schedDelMatch ? schedDelMatch.index : (delLabelMatch ? delLabelMatch.index : -1);
 
-      if (splitIdx !== -1) {
+      if (splitIdx !== -1 && splitIdx !== undefined) {
         const beforeDel = text.substring(0, splitIdx);
         const lastDivider = beforeDel.search(/(?:Ref\s*#|Dominic)[^\n]*$/m) !== -1
           ? (beforeDel.lastIndexOf("Ref #") !== -1 ? beforeDel.lastIndexOf("Ref #") : beforeDel.lastIndexOf("Dominic"))
@@ -505,6 +516,7 @@ function parseChRobinson(text: string): ParsedRateCon {
   if (finalDeliveries.length > 0) {
     const lastDel = finalDeliveries[finalDeliveries.length - 1];
     result.deliveryTime = lastDel.time;
+    result.deliveryDate = lastDel.date;
     result.destinationAddress = lastDel.address;
   }
 
