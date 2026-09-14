@@ -225,166 +225,287 @@ function parseChRobinson(text: string): ParsedRateCon {
   if (rateMatch) result.rate = rateMatch[1].replace(/,/g, '');
 
   // Stops (Shipper / Receiver blocks)
-  // Split by SHIPPER# or RECEIVER# (allowing spaces)
-  const stopsRaw = text.split(/(?=SHIPPER\s*#|RECEIVER\s*#)/i);
-  
-  stopsRaw.forEach(section => {
-    const isPickup = /SHIPPER\s*#/i.test(section);
-    const isDelivery = /RECEIVER\s*#/i.test(section);
-    
-    if (isPickup || isDelivery) {
-      const type = isPickup ? 'pickup' : 'delivery';
-      const labelMatch = section.match(/(?:SHIPPER|RECEIVER)\s*#\d+/i);
-      const label = labelMatch ? labelMatch[0] : (isPickup ? 'Pickup' : 'Delivery');
+  const usStatesPattern = "AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC|PR";
 
-      // Date extraction: Scheduled Pick Up* 5/13/2026 or Pick Up Date: 5/12/2026
-      const dateMatch = section.match(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/) || 
-                        section.match(/(?:Pick\s*Up\s*Date|Delivery\s*Date)\s*[:]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i);
-      let date = "";
-      if (dateMatch) {
-        date = normalizeDateHelper(dateMatch[1]);
-      } else {
-        // Fallback for 2-part dates like "07/13" or "7/13" (MM/DD) without a year
-        const twoPartMatch = section.match(/\b(\d{1,2})[\/.-](\d{1,2})\b/);
-        if (twoPartMatch) {
-          const m = twoPartMatch[1].padStart(2, '0');
-          const d = twoPartMatch[2].padStart(2, '0');
-          const monthInt = parseInt(m, 10);
-          const dayInt = parseInt(d, 10);
-          if (monthInt >= 1 && monthInt <= 12 && dayInt >= 1 && dayInt <= 31) {
-            date = `${m}.${d}.${documentYear}`;
-          }
+  const cleanRobinsonText = (t: string): string => {
+    if (!t) return "";
+    let cleaned = t.replace(/\b(?:scheduled|pick\s*up|delivery|arrival|appointment|appt|phone|address|zip|date|time|pickup|ref|receiver|shipper|units|count|pallets|commodity|est\s*wgt)\b\s*(?:date|time|open|close|#|#\d+|[:*])?/gi, "");
+    cleaned = cleaned.replace(/\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}.*$/gi, ""); 
+    cleaned = cleaned.replace(/\d{1,2}:\d{2}.*$/gi, ""); 
+    cleaned = cleaned.replace(/\(?\d{3}\)?\s*[\-\.]?\s*\d{3}\s*[\-\.]?\s*\d{4}.*$/g, ""); 
+    cleaned = cleaned.replace(/\s+/g, " ");
+    cleaned = cleaned.trim().replace(/^[^a-z0-9#]+/i, "").replace(/[^a-z0-9#]+$/i, "");
+    cleaned = cleaned.replace(/^[\.,\*]\s*/, "").replace(/\s*[\.,\*]$/, "");
+    return cleaned.trim();
+  };
+
+  const cleanRobinsonCity = (raw: string): string => {
+    if (!raw) return "";
+    let c = raw.trim();
+    // Strip anything up to and including *Scheduled to Pick*, *Scheduled Delivery*, Scheduled, Delivery, Pick Up, etc.
+    c = c.replace(/^[\s\S]*?\*Scheduled[^\*]*\*\s*/i, "");
+    c = c.replace(/^[\s\S]*?\b(?:scheduled|delivery|pick\s*up|pickup|arrival|appointment|appt|address|phone|ref|receiver|shipper)\b[:*]?\s*/i, "");
+    
+    // Strip street suffixes if present at start (preserving St/Saint before city names like Louis)
+    const suffixes = ["Turnpike", "Tpke", "Street", "Stret", "Avenue", "Ave", "Road", "Rd", "Boulevard", "Blvd", "Drive", "Dr", "Lane", "Ln", "Highway", "Hwy", "Pkwy", "Parkway"];
+    const suffixRegex = new RegExp(`^(?:.*?\\b(?:${suffixes.join("|")})\\b[\\s,*-]*)+`, "i");
+    c = c.replace(suffixRegex, "").trim();
+
+    c = c.replace(/^[^a-zA-Z]+/, "").replace(/[^a-zA-Z]+$/, "").trim();
+    c = c.replace(/\b[a-z]/g, ch => ch.toUpperCase());
+    return c;
+  };
+
+  const extractAddressFromBlock = (block: string): { address: string; street: string; cityState: string; zip: string } => {
+    // 1. City, State Zip: match city followed by comma and 2-letter state
+    const cityStateRegex = new RegExp(`(?:^|[\\r\\n\\s*])([A-Za-z][A-Za-z\\s.\\x27-]{1,30}),\\s*(${usStatesPattern})(?:\\s+(\\d{5}(?:-\\d{4})?))?`, "i");
+    let match = block.match(cityStateRegex);
+
+    let city = "";
+    let state = "";
+    let zip = "";
+
+    if (match) {
+      city = cleanRobinsonCity(match[1]);
+      state = match[2].toUpperCase();
+      zip = match[3] || "";
+    }
+
+    // Fallback without comma: e.g. "BROCKTON MA 02301" or "kearny NJ 07099-9998" (requires ZIP code to prevent matching words like 'or' in 'origin')
+    if (!city || !state) {
+      const noCommaRegex = new RegExp(`(?:^|[\\r\\n\\s*])([A-Za-z][A-Za-z\\s.\\x27-]{1,30})\\s+\\b(${usStatesPattern})\\b\\s+(\\d{5}(?:-\\d{4})?)`, "i");
+      const m2 = block.match(noCommaRegex);
+      if (m2) {
+        city = cleanRobinsonCity(m2[1]);
+        state = m2[2].toUpperCase();
+        zip = m2[3] || "";
+      }
+    }
+
+    // Zip search fallback
+    if (!zip) {
+      const zipMatch = block.match(/Zip\s*[:]?\s*(\d{5}(?:-\\d{4})?)/i) || 
+                       block.match(new RegExp(`,\\s*(?:${usStatesPattern})\\s*(\\d{5}(?:-\\d{4})?)`, "i")) ||
+                       block.match(/\b(\d{5}(?:-\\d{4})?)\b/);
+      if (zipMatch) zip = zipMatch[1].trim();
+    }
+
+    // 2. Street Address (captured as fallback if city/state not found)
+    let street = "";
+    const addrMatch = block.match(/Address\s*[:]?\s*([^\n\*]+)/i);
+    if (addrMatch) {
+      let s = cleanRobinsonText(addrMatch[1]);
+      if (s.length > 3 && !/^(?:USPS|P&DC|Dominic|Scheduled|Pick|Delivery|Ref|Appointment)/i.test(s)) {
+        street = s;
+      }
+    }
+
+    if (!street && match && match.index !== undefined) {
+      const textBefore = block.substring(0, match.index);
+      const lines = textBefore.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (let j = lines.length - 1; j >= 0; j--) {
+        const line = cleanRobinsonText(lines[j]);
+        if (/^\d{1,5}\s+[-A-Za-z0-9\s.\x27\/#]{3,}/i.test(line) && !/^(?:USPS|P&DC|Dominic|Scheduled|Pick|Delivery|Ref)/i.test(line)) {
+          street = line;
+          break;
         }
       }
+    }
 
-      // Time extraction: Pick Up Open 5/13/2026 5:10 AM or Pick Up Time: 22:00 Appt.
-      // Handlers ranges like 07:00-14:30 or 13:00 Appt or 0700-1400
-      // CRITICAL: Avoid zip codes like 46123-1772
-      const timeRegex = /\b(?:[01]?\d|2[0-3])[:][0-5]\d\b/;
-      const rangeMatch = section.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?\s*[-–]\s*\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
-      
-      // Only capture 4-digit ranges if they look like military time and aren't zip codes
-      // We check if it follows a time label or doesn't have 5 digits before the dash
-      const militaryRangeStr = section.match(/(?:Time|Open|Close|At)\b[:]?\s*(\d{4}\s*[-–]\s*\d{4})/i)?.[1];
-      
-      const apptMatch = section.match(/(\b\d{1,2}:\d{2}(?:\s*(?:AM|PM))?\s*Appt)/i) ||
-                        section.match(/(\b\d{4}\b\s*Appt)/i);
-      
-      const labeledTimeMatch = section.match(/(?:Pick\s*Up\s*Open|Pick\s*Up\s*Time|Pick\s*Up\s*Close|Delivery\s*Open|Delivery\s*Time|Delivery\s*Close)\s*(?:\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})?\s*(\d{1,2}[:]\d{2}(?:\s*(?:AM|PM))?)/i);
-      
-      const fallbackTimeMatch = section.match(/(\b\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i);
-      
-      let time = "";
-      if (rangeMatch) time = rangeMatch[1];
-      else if (militaryRangeStr) time = militaryRangeStr;
-      else if (apptMatch) time = apptMatch[1];
-      else if (labeledTimeMatch) time = labeledTimeMatch[1];
-      else if (fallbackTimeMatch) time = fallbackTimeMatch[1];
-      
-      if (time) {
-         time = time.trim();
-         // If it's a simple HH:MM AM/PM or HH:MM Appt, normalize it. If range, keep it.
-         if (time.includes(':') && !time.includes('-') && !time.includes('–')) {
-           const t = time.replace(/Appt/i, '').trim();
-           let [h, m] = t.split(':');
-           let hours = parseInt(h, 10);
-           const mins = m.match(/\d{2}/)?.[0] || "00";
-           const isPM = /PM/i.test(time);
-           const isAM = /AM/i.test(time);
-           if (isPM && hours < 12) hours += 12;
-           if (isAM && hours === 12) hours = 0;
-           time = `${hours.toString().padStart(2, '0')}:${mins}`;
-         } else if (/^\d{4}$/.test(time)) {
-           // HHMM format
-           time = time.substring(0, 2) + ":" + time.substring(2, 4);
-         }
-      }
+    let cityState = "";
+    if (city && state) {
+      cityState = `${city}, ${state}`;
+    } else if (state) {
+      cityState = state;
+    }
 
-      // Address extraction
-      // Look for Address: ... until next key field or Zip:
-      const addrMatch = section.match(/Address\s*[:]?\s*([^\n\*]+)/i);
-      let cityStateMatch = section.match(/([A-Z][A-Za-z\s]+,\s*[A-Z]{2})/) || section.match(/([A-Z\s]{2,},\s*[A-Z]{2})/); // Knoxville, TN or FRANKFORT, IN
-      const zipMatch = section.match(/Zip\s*[:]?\s*(\d{4,5})/i) || section.match(/,\s*[A-Z]{2}\s*(\d{4,5})/);
-      
-      const cleanRobinsonText = (t: string): string => {
-        if (!t) return "";
-        // Use word boundaries \b to avoid catching parts of words (e.g., "County" -> "ty" because of "count")
-        let cleaned = t.replace(/\b(?:scheduled|pick up|delivery|arrival|appointment|appt|phone|address|zip|date|time|pickup|ref|receiver|shipper|units|count|pallets|commodity|est wgt)\b\s*(?:date|time|open|close|#|#\d+|[:*])?/gi, "");
-        cleaned = cleaned.replace(/\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}.*$/gi, ""); 
-        cleaned = cleaned.replace(/\d{1,2}:\d{2}.*$/gi, ""); 
-        cleaned = cleaned.replace(/\(?\d{3}\)?\s*[\-\.]?\s*\d{3}\s*[\-\.]?\s*\d{4}.*$/g, ""); 
-        cleaned = cleaned.replace(/\s+/g, " ");
-        
-        // Remove leading/trailing non-alphanumeric noise
-        cleaned = cleaned.trim().replace(/^[^a-z0-9#]+/i, "").replace(/[^a-z0-9#]+$/i, "");
-        cleaned = cleaned.replace(/^[\.,\*]\s*/, "").replace(/\s*[\.,\*]$/, "");
-        
-        return cleaned.trim();
-      };
-      
-      let street = addrMatch ? cleanRobinsonText(addrMatch[1]) : "";
-      
-      // If we didn't find street via "Address:", it might be on a line after "RECEIVER #1"
-      if (!street) {
-        const lines = section.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          if (/(?:SHIPPER|RECEIVER)\s*#\d+/i.test(lines[i])) {
-            let found = false;
-            for (let j = 1; j <= 2; j++) {
-              let nextLine = lines[i+j] ? lines[i+j].trim() : "";
-              if (nextLine && nextLine.length > 5 && !/Scheduled|Pick\s*Up|Delivery|Address|Phone|Date:|Time:/i.test(nextLine)) {
-                street = cleanRobinsonText(nextLine);
-                found = true;
-                break;
-              }
-            }
-            if (found) break;
-          }
+    const cityStateZip = [cityState, zip].filter(Boolean).join(" ");
+    // Per user request for CH Robinson: "solo quiero la ciudad, la abreviacion y el zip" (e.g. BROCKTON, MA 02301)
+    const address = cityStateZip || street;
+    return { address, street, cityState, zip };
+  };
+
+  const extractDateTimeFromBlock = (block: string): { date: string; time: string } => {
+    const dateMatch = block.match(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/) || 
+                      block.match(/(?:Pick\s*Up\s*Date|Delivery\s*Date)\s*[:]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i);
+    let date = "";
+    if (dateMatch) {
+      date = normalizeDateHelper(dateMatch[1]);
+    } else {
+      const twoPartMatch = block.match(/\b(\d{1,2})[\/.-](\d{1,2})\b/);
+      if (twoPartMatch) {
+        const m = twoPartMatch[1].padStart(2, "0");
+        const d = twoPartMatch[2].padStart(2, "0");
+        const monthInt = parseInt(m, 10);
+        const dayInt = parseInt(d, 10);
+        if (monthInt >= 1 && monthInt <= 12 && dayInt >= 1 && dayInt <= 31) {
+          date = `${m}.${d}.${documentYear}`;
         }
       }
+    }
 
-      let cityState = cityStateMatch ? cleanRobinsonText(cityStateMatch[1]) : "";
-      let zip = zipMatch ? zipMatch[1] : "";
-      
-      if (!cityState) {
-        const fallbackCityState = section.match(/\b([A-Za-z\s]{2,30}),\s*(AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY)\b/i);
-        if (fallbackCityState) cityState = `${fallbackCityState[1]}, ${fallbackCityState[2].toUpperCase()}`;
-      }
+    const rangeMatch = block.match(/(\d{1,2}:\d{2}\s*(?:AM|PM)?\s*[-–]\s*\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+    const militaryRangeStr = block.match(/(?:Time|Open|Close|At)\b[:]?\s*(\d{4}\s*[-–]\s*\d{4})/i)?.[1];
+    const apptMatch = block.match(/(\b\d{1,2}:\d{2}(?:\s*(?:AM|PM))?\s*Appt)/i) || block.match(/(\b\d{4}\b\s*Appt)/i);
+    const labeledTimeMatch = block.match(/(?:Pick\s*Up\s*Open|Pick\s*Up\s*Time|Pick\s*Up\s*Close|Delivery\s*Open|Delivery\s*Time|Delivery\s*Close)\s*(?:\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})?\s*(\d{1,2}[:]\d{2}(?:\s*(?:AM|PM))?)/i);
+    const fallbackTimeMatch = block.match(/(\b\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i);
 
-      // Per user request: "solo quiero la ciudad, la abreviacion y el zip" for CH Robinson
-      let address = [cityState, zip].filter(Boolean).join(" ");
-      
-      // If NOT CH Robinson, we can keep the street if found
-      if (street && !text.toLowerCase().includes('robinson')) {
-        address = [street, cityState, zip].filter(Boolean).join(", ");
-      }
+    let time = "";
+    if (rangeMatch) time = rangeMatch[1];
+    else if (militaryRangeStr) time = militaryRangeStr;
+    else if (apptMatch) time = apptMatch[1];
+    else if (labeledTimeMatch) time = labeledTimeMatch[1];
+    else if (fallbackTimeMatch) time = fallbackTimeMatch[1];
 
-      if (address && (date || time)) {
-        result.stops.push({
-          type,
-          address,
-          date,
-          time,
-          label
-        });
+    if (time) {
+      time = time.trim();
+      if (time.includes(":") && !time.includes("-") && !time.includes("–")) {
+        const t = time.replace(/Appt/i, "").trim();
+        const [h, m] = t.split(":");
+        let hours = parseInt(h, 10);
+        const mins = m?.match(/\d{2}/)?.[0] || "00";
+        if (/PM/i.test(time) && hours < 12) hours += 12;
+        if (/AM/i.test(time) && hours === 12) hours = 0;
+        time = `${hours.toString().padStart(2, "0")}:${mins}`;
+      } else if (/^\d{4}$/.test(time)) {
+        time = time.substring(0, 2) + ":" + time.substring(2, 4);
       }
     }
-  });
+    return { date, time };
+  };
 
-  if (result.stops.length > 0) {
-    const pickups = result.stops.filter(s => s.type === 'pickup');
-    const deliveries = result.stops.filter(s => s.type === 'delivery');
-    
-    if (pickups.length > 0) {
-      result.pickupTime = pickups[0].time;
-      result.pickupDate = pickups[0].date;
-      result.originAddress = pickups[0].address;
+  // Extract stops:
+  // 1. Primary Strategy: C.H. Robinson rate confirmations reliably designate stops via *Scheduled to Pick* and *Scheduled Delivery*
+  const schedPickIdx = text.search(/\*Scheduled\s+to\s+Pick\*/i);
+  const schedDelIdx = text.search(/\*Scheduled\s+Delivery\*/i);
+
+  if (schedPickIdx !== -1 && schedDelIdx !== -1) {
+    const pickStart = Math.max(0, schedPickIdx - 250);
+    const pickEnd = Math.min(text.length, schedPickIdx + 250, schedDelIdx > schedPickIdx ? schedDelIdx : text.length);
+    const pickBlock = text.substring(pickStart, pickEnd);
+
+    const delStart = Math.max(0, schedDelIdx - 250, schedPickIdx < schedDelIdx ? schedPickIdx + 50 : 0);
+    const delEnd = Math.min(text.length, schedDelIdx + 250);
+    const delBlock = text.substring(delStart, delEnd);
+
+    const pAddr = extractAddressFromBlock(pickBlock);
+    const pDT = extractDateTimeFromBlock(pickBlock);
+    const dAddr = extractAddressFromBlock(delBlock);
+    const dDT = extractDateTimeFromBlock(delBlock);
+
+    if (pAddr.address && dAddr.address && pAddr.address !== dAddr.address) {
+      result.stops.push({
+        type: 'pickup',
+        label: 'SHIPPER#1',
+        address: pAddr.address,
+        date: pDT.date,
+        time: pDT.time
+      });
+      result.stops.push({
+        type: 'delivery',
+        label: 'RECEIVER #1',
+        address: dAddr.address,
+        date: dDT.date,
+        time: dDT.time
+      });
     }
-    if (deliveries.length > 0) {
-      const lastDel = deliveries[deliveries.length - 1];
-      result.deliveryTime = lastDel.time;
-      result.destinationAddress = lastDel.address;
+  }
+
+  // 2. Secondary Strategy: Standard section splitting or OCR fallback if markers not found
+  if (result.stops.length === 0) {
+    const standardSections = text.split(/(?=SHIPPER\s*#|RECEIVER\s*#)/i);
+    let useStandard = false;
+
+    if (standardSections.length > 1) {
+      let hasPick = false;
+      let hasDel = false;
+      standardSections.forEach(s => {
+        const isP = /SHIPPER\s*#/i.test(s);
+        const isD = /RECEIVER\s*#/i.test(s);
+        const addr = extractAddressFromBlock(s).address;
+        if (isP && addr) hasPick = true;
+        if (isD && addr) hasDel = true;
+      });
+      if (hasPick && hasDel) {
+        useStandard = true;
+      }
     }
+
+    if (useStandard) {
+      standardSections.forEach(section => {
+        const isPickup = /SHIPPER\s*#/i.test(section);
+        const isDelivery = /RECEIVER\s*#/i.test(section);
+        
+        if (isPickup || isDelivery) {
+          const type = isPickup ? 'pickup' : 'delivery';
+          const labelMatch = section.match(/(?:SHIPPER|RECEIVER)\s*#\d+/i);
+          const label = labelMatch ? labelMatch[0] : (isPickup ? 'SHIPPER#1' : 'RECEIVER #1');
+          const { address } = extractAddressFromBlock(section);
+          const { date, time } = extractDateTimeFromBlock(section);
+
+          if (address || date || time) {
+            result.stops.push({
+              type,
+              address,
+              date,
+              time,
+              label
+            });
+          }
+        }
+      });
+    } else {
+      const splitIdx = schedDelIdx !== -1 ? schedDelIdx : text.search(/RECEIVER\s*#/i);
+
+      if (splitIdx !== -1) {
+        const beforeDel = text.substring(0, splitIdx);
+        const lastDivider = beforeDel.search(/(?:Ref\s*#|Dominic)[^\n]*$/m) !== -1
+          ? (beforeDel.lastIndexOf("Ref #") !== -1 ? beforeDel.lastIndexOf("Ref #") : beforeDel.lastIndexOf("Dominic"))
+          : splitIdx - 150;
+
+        const pickSection = text.substring(0, lastDivider > 0 ? lastDivider : splitIdx);
+        const delSection = text.substring(lastDivider > 0 ? lastDivider : splitIdx);
+
+        const pAddr = extractAddressFromBlock(pickSection);
+        const pDT = extractDateTimeFromBlock(pickSection);
+        if (pAddr.address || pDT.date || pDT.time) {
+          result.stops.push({
+            type: 'pickup',
+            label: 'SHIPPER#1',
+            address: pAddr.address,
+            date: pDT.date,
+            time: pDT.time
+          });
+        }
+
+        const dAddr = extractAddressFromBlock(delSection);
+        const dDT = extractDateTimeFromBlock(delSection);
+        if (dAddr.address || dDT.date || dDT.time) {
+          result.stops.push({
+            type: 'delivery',
+            label: 'RECEIVER #1',
+            address: dAddr.address,
+            date: dDT.date,
+            time: dDT.time
+          });
+        }
+      }
+    }
+  }
+
+  // Final check: filter pickups & deliveries and populate top-level fields
+  const finalPickups = result.stops.filter(s => s.type === 'pickup');
+  const finalDeliveries = result.stops.filter(s => s.type === 'delivery');
+
+  if (finalPickups.length > 0) {
+    result.pickupTime = finalPickups[0].time;
+    result.pickupDate = finalPickups[0].date;
+    result.originAddress = finalPickups[0].address;
+  }
+  if (finalDeliveries.length > 0) {
+    const lastDel = finalDeliveries[finalDeliveries.length - 1];
+    result.deliveryTime = lastDel.time;
+    result.destinationAddress = lastDel.address;
   }
 
   return result;
