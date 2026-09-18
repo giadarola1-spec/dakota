@@ -161,19 +161,19 @@ function parseChRobinson(text: string): ParsedRateCon {
   const weightMatches: number[] = [];
   
   // 1. Look for weights in the commodity table: [Number] [Units]
-  // In Robinson, weight usually precedes the units (Carton(s), Pieces, Units, etc.)
-  const tableWeightRegex = /(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Carton\(s\)|Cartons?|Ctn\(s\)?|Ctns?|Pieces?|Piece\(s\)?|Pcs?|Units?|Unit\(s\)?|Pallets?\(s\)?|Pallets?|Plt\(s\)?|Plts?|Box\(s\)|Box\(es\)|Boxes|Box|Bxs?|Tote\(s\)?|Totes?|Drum\(s\)?|Drums?|Crate\(s\)?|Crates?|Roll\(s\)?|Rolls?|Bag\(s\)?|Bags?|Pkg\(s\)?|Pkgs?|Package\(s\)?|Packages?|LBS|LB|KGS|KG)/gi;
+  // In Robinson, weight usually precedes the units (Carton(s), Pieces, Units, Eaches, etc.)
+  const tableWeightRegex = /(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)\s+(?:Eaches\(s\)?|Eaches?|Each|Carton\(s\)|Cartons?|Ctn\(s\)?|Ctns?|Pieces?|Piece\(s\)?|Pcs?|Units?|Unit\(s\)?|Pallets?\(s\)?|Pallets?|Plt\(s\)?|Plts?|Box\(s\)|Box\(es\)|Boxes|Box|Bxs?|Tote\(s\)?|Totes?|Drum\(s\)?|Drums?|Crate\(s\)?|Crates?|Roll\(s\)?|Rolls?|Bag\(s\)?|Bags?|Pkg\(s\)?|Pkgs?|Package\(s\)?|Packages?|LBS|LB|KGS|KG)/gi;
   let weightMatch;
   while ((weightMatch = tableWeightRegex.exec(text)) !== null) {
     const val = parseFloat(weightMatch[1].replace(/[,\s]/g, ''));
-    if (!isNaN(val) && val > 10) weightMatches.push(val);
+    if (!isNaN(val) && val > 10 && val <= 65000) weightMatches.push(val);
   }
 
   // 2. Look for explicit total line (restricted to same-line to prevent crossing into fuel surcharge/rates)
   const sameLineTotalMatch = text.match(/(?:\n|^)[^\n$]*?\b(\d{2,}(?:[,\s]\d{3})*(?:\.\d+)?)[ \t]+Total\b/i);
   if (sameLineTotalMatch) {
     const val = parseFloat(sameLineTotalMatch[1].replace(/[,\s]/g, ''));
-    if (!isNaN(val) && val > 10) weightMatches.push(val);
+    if (!isNaN(val) && val > 10 && val <= 65000) weightMatches.push(val);
   }
 
   // 3. Locate the table under "Count Pallets Est Wgt" or similar header
@@ -190,7 +190,7 @@ function parseChRobinson(text: string): ParsedRateCon {
       const numbers = line.match(/\b\d+(?:[,\s]\d{3})*(?:\.\d+)?\b/g);
       if (numbers && numbers.length >= 2) {
         const floatVals = numbers.map(n => parseFloat(n.replace(/[,\s]/g, '')));
-        const possibleWeights = floatVals.filter(v => v >= 100);
+        const possibleWeights = floatVals.filter(v => v >= 100 && v <= 65000);
         if (possibleWeights.length > 0) {
           const maxW = Math.max(...possibleWeights);
           weightMatches.push(maxW);
@@ -204,18 +204,26 @@ function parseChRobinson(text: string): ParsedRateCon {
   const labelWeightRegex = /(?:\n|^)[^\n$]*?(?:Est\s*Wgt|Total\s*Weight|Weight|Wt)\s*[:]?\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/gi;
   while ((weightMatch = labelWeightRegex.exec(text)) !== null) {
     const val = parseFloat(weightMatch[1].replace(/[,\s]/g, ''));
-    if (!isNaN(val) && val > 10) weightMatches.push(val);
+    if (!isNaN(val) && val > 10 && val <= 65000) weightMatches.push(val);
   }
 
   if (weightMatches.length > 0) {
-    // Pick the largest weight found
-    const maxW = Math.max(...weightMatches);
-    result.weight = maxW.toLocaleString() + " LBS";
+    const totalWeight = weightMatches.reduce((acc, curr) => acc + curr, 0);
+    // If multiple commodity line items were extracted and total is within standard truckload range, use sum
+    if (weightMatches.length > 1 && totalWeight >= 500 && totalWeight <= 65000) {
+      result.weight = Math.round(totalWeight).toLocaleString() + " LBS";
+    } else {
+      const maxW = Math.max(...weightMatches);
+      result.weight = maxW.toLocaleString() + " LBS";
+    }
   } else {
     // Final fallback (ensuring no $ on that line)
     const genericMatch = text.match(/(?:\n|^)[^\n$]*?(?:Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{2,}(?:[,\s]\d{3})*)/i);
     if (genericMatch) {
-       result.weight = genericMatch[1].replace(/[,\s]/g, '') + " LBS";
+      const val = parseFloat(genericMatch[1].replace(/[,\s]/g, ''));
+      if (!isNaN(val) && val <= 65000) {
+        result.weight = val.toLocaleString() + " LBS";
+      }
     }
   }
 
@@ -376,14 +384,14 @@ function parseChRobinson(text: string): ParsedRateCon {
   };
 
   // Extract stops:
-  // 1. Primary Strategy: C.H. Robinson rate confirmations reliably designate stops via asterisk status markers:
-  // e.g. *Scheduled to Pick*, *Scheduled Delivery*, *Open Delivery*, *Scheduled Pickup*, etc.
-  const markerRegex = /\*(?:[^\*]*\b(?:Pick|Delivery)\b[^\*]*)\*/gi;
+  // 1. Primary Strategy: C.H. Robinson rate confirmations reliably designate stops via status markers:
+  // e.g. *Scheduled to Pick*, *Scheduled Delivery*, *Open Delivery*, Scheduled to Pick, Scheduled Delivery, etc.
+  const markerRegex = /[*•"'\s]*\b(Scheduled\s+(?:to\s+Pick|Pickup)|Open\s+(?:to\s+Pick|Pick|Pickup)|Scheduled\s+Delivery|Open\s+Delivery)\b[*•"'\s]*/gi;
   let m;
   const markerList: { text: string; index: number; isPick: boolean }[] = [];
   while ((m = markerRegex.exec(text)) !== null) {
-    const isPick = /Pick/i.test(m[0]);
-    markerList.push({ text: m[0], index: m.index, isPick });
+    const isPick = /Pick/i.test(m[1] || m[0]);
+    markerList.push({ text: m[1] || m[0], index: m.index, isPick });
   }
 
   if (markerList.length >= 2) {
@@ -392,8 +400,8 @@ function parseChRobinson(text: string): ParsedRateCon {
       const prev = i > 0 ? markerList[i - 1] : null;
       const next = i < markerList.length - 1 ? markerList[i + 1] : null;
 
-      const start = prev ? Math.floor((prev.index + curr.index) / 2) : Math.max(0, curr.index - 350);
-      const end = next ? Math.floor((curr.index + next.index) / 2) : Math.min(text.length, curr.index + 350);
+      const start = prev ? Math.floor((prev.index + curr.index) / 2) : Math.max(0, curr.index - 400);
+      const end = next ? Math.floor((curr.index + next.index) / 2) : Math.min(text.length, curr.index + 400);
 
       const block = text.substring(start, end);
       const addr = extractAddressFromBlock(block);
@@ -464,7 +472,7 @@ function parseChRobinson(text: string): ParsedRateCon {
         }
       });
     } else {
-      const schedDelMatch = text.match(/\*(?:Scheduled|Open)\s+Delivery\*/i);
+      const schedDelMatch = text.match(/[*•"'\s]*(?:Scheduled|Open)\s+Delivery[*•"'\s]*/i);
       const delLabelMatch = text.match(/RECEIVER\s*#/i);
       const splitIdx = schedDelMatch ? schedDelMatch.index : (delLabelMatch ? delLabelMatch.index : -1);
 
@@ -504,6 +512,13 @@ function parseChRobinson(text: string): ParsedRateCon {
     }
   }
 
+  // Safety rule: In logistics, every shipment requires a delivery.
+  // If we found at least 2 stops and none was marked delivery, the last stop must be a delivery!
+  if (result.stops.length >= 2 && !result.stops.some(s => s.type === 'delivery')) {
+    result.stops[result.stops.length - 1].type = 'delivery';
+    result.stops[result.stops.length - 1].label = 'RECEIVER #1';
+  }
+
   // Final check: filter pickups & deliveries and populate top-level fields
   const finalPickups = result.stops.filter(s => s.type === 'pickup');
   const finalDeliveries = result.stops.filter(s => s.type === 'delivery');
@@ -512,12 +527,22 @@ function parseChRobinson(text: string): ParsedRateCon {
     result.pickupTime = finalPickups[0].time;
     result.pickupDate = finalPickups[0].date;
     result.originAddress = finalPickups[0].address;
+  } else if (result.stops.length > 0) {
+    result.pickupTime = result.stops[0].time;
+    result.pickupDate = result.stops[0].date;
+    result.originAddress = result.stops[0].address;
   }
+
   if (finalDeliveries.length > 0) {
     const lastDel = finalDeliveries[finalDeliveries.length - 1];
     result.deliveryTime = lastDel.time;
     result.deliveryDate = lastDel.date;
     result.destinationAddress = lastDel.address;
+  } else if (result.stops.length > 1) {
+    const lastStop = result.stops[result.stops.length - 1];
+    result.deliveryTime = lastStop.time;
+    result.deliveryDate = lastStop.date;
+    result.destinationAddress = lastStop.address;
   }
 
   return result;

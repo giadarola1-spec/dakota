@@ -2525,6 +2525,18 @@ export default function App() {
     const data = dataOverride || extractedDataRef.current;
     if (!data) return;
     
+    // Ensure originAddress and destinationAddress are never empty or ?? if stops exist
+    if (data.stops && data.stops.length > 0) {
+      if (!data.originAddress || getState(data.originAddress) === '??') {
+        const firstPu = data.stops.find(s => s.type === 'pickup') || data.stops[0];
+        data.originAddress = firstPu.address;
+      }
+      if (!data.destinationAddress || getState(data.destinationAddress) === '??') {
+        const lastDel = [...data.stops].reverse().find(s => s.type === 'delivery') || data.stops[data.stops.length - 1];
+        data.destinationAddress = lastDel.address;
+      }
+    }
+
     const tNum = truckNumberOverride || truckNumber;
 
     const overnight = isOvernight(data);
@@ -2555,15 +2567,17 @@ export default function App() {
       // Overnight mode: Two separate notes
       const pickups = data.stops.filter(s => s.type === 'pickup');
       const deliveries = data.stops.filter(s => s.type === 'delivery');
+      const isMultiPu = pickups.length > 1;
+      const isMultiDel = deliveries.length > 1;
 
       const puNotes = weightLine + pickups.map(s => {
-        const label = s.label.match(/\d+/)?.[0] || "";
+        const label = isMultiPu ? (s.label.match(/\d+/)?.[0] || "") : "";
         const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
         return `PU${label ? ' ' + label : ''} ${timeFormatted}`;
       }).join('\n') + '\n' + chain;
 
       const delNotes = weightLine + deliveries.map(s => {
-        const label = s.label.match(/\d+/)?.[0] || "";
+        const label = isMultiDel ? (s.label.match(/\d+/)?.[0] || "") : "";
         const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
         return `DEL${label ? ' ' + label : ''} ${timeFormatted}`;
       }).join('\n') + '\n' + chain;
@@ -2573,9 +2587,15 @@ export default function App() {
       // Standard mode
       notes = weightLine;
       if (data.stops && data.stops.length > 0) {
+        const pickups = data.stops.filter(s => s.type === 'pickup');
+        const deliveries = data.stops.filter(s => s.type === 'delivery');
+        const isMultiPu = pickups.length > 1;
+        const isMultiDel = deliveries.length > 1;
+
         data.stops.forEach((s, idx) => {
           const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
-          const label = s.label.match(/\d+/)?.[0] || "";
+          const isMulti = s.type === 'pickup' ? isMultiPu : isMultiDel;
+          const label = isMulti ? (s.label.match(/\d+/)?.[0] || "") : "";
           const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
           notes += `${prefix}${label ? ' ' + label : ''} ${timeFormatted}\n`;
         });
@@ -2642,8 +2662,20 @@ export default function App() {
 
   const generateRenameString = (data: ParsedRateCon, tNum: string) => {
     // Logic: TRUCK#-ORIGIN_STATE-DEST_STATE-DATE-C
-    const originState = getState(data.originAddress);
-    const destState = getState(data.destinationAddress);
+    const puStop = data.stops?.find(s => s.type === 'pickup');
+    const originState = (data.originAddress && getState(data.originAddress) !== '??')
+      ? getState(data.originAddress)
+      : (puStop?.address && getState(puStop.address) !== '??')
+        ? getState(puStop.address)
+        : (data.stops && data.stops.length > 0 ? getState(data.stops[0].address) : '??');
+
+    const delStops = data.stops?.filter(s => s.type === 'delivery') || [];
+    const lastDel = delStops.length > 0 ? delStops[delStops.length - 1] : null;
+    const destState = (data.destinationAddress && getState(data.destinationAddress) !== '??')
+      ? getState(data.destinationAddress)
+      : (lastDel?.address && getState(lastDel.address) !== '??')
+        ? getState(lastDel.address)
+        : (data.stops && data.stops.length > 1 ? getState(data.stops[data.stops.length - 1].address) : '??');
     
     // Date: MM.DD.YYYY
     const date = data.pickupDate ? normalizeDateHelper(data.pickupDate) : "MM.DD.YYYY";
@@ -2674,15 +2706,17 @@ export default function App() {
         if (overnight && extractedData.stops && extractedData.stops.length > 0) {
           const pickups = extractedData.stops.filter(s => s.type === 'pickup');
           const deliveries = extractedData.stops.filter(s => s.type === 'delivery');
+          const isMultiPu = pickups.length > 1;
+          const isMultiDel = deliveries.length > 1;
 
           const puSection = pickups.map(s => {
-            const label = s.label.match(/\d+/)?.[0] || "";
+            const label = isMultiPu ? (s.label.match(/\d+/)?.[0] || "") : "";
             const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
             return `PU${label ? ' ' + label : ''} ${timeFormatted}`;
           }).join('\n') + '\n';
 
           const delSection = deliveries.map(s => {
-            const label = s.label.match(/\d+/)?.[0] || "";
+            const label = isMultiDel ? (s.label.match(/\d+/)?.[0] || "") : "";
             const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
             return `DEL${label ? ' ' + label : ''} ${timeFormatted}`;
           }).join('\n') + '\n';
@@ -2694,10 +2728,16 @@ export default function App() {
           }
         } else {
           // Standard logic
+          const pickups = extractedData.stops?.filter(s => s.type === 'pickup') || [];
+          const deliveries = extractedData.stops?.filter(s => s.type === 'delivery') || [];
+          const isMultiPu = pickups.length > 1;
+          const isMultiDel = deliveries.length > 1;
+
           const stops = extractedData.stops && extractedData.stops.length > 0 
             ? extractedData.stops.map((s, idx) => {
                 const prefix = s.type === 'pickup' ? 'PU' : 'DEL';
-                const label = s.label.match(/\d+/)?.[0] || "";
+                const isMulti = s.type === 'pickup' ? isMultiPu : isMultiDel;
+                const label = isMulti ? (s.label.match(/\d+/)?.[0] || "") : "";
                 const timeFormatted = formatStopTimeWithTimezone(s.time, s.address);
                 return `${prefix}${label ? ' ' + label : ''} ${timeFormatted}`;
               }).join('\n') + '\n'
@@ -3326,7 +3366,7 @@ export default function App() {
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 isDragging={isDragging}
-                className={`flex-1 flex flex-col items-center justify-center text-center p-8 rounded-3xl border-2 border-dashed ${isDragging ? 'border-zinc-500 bg-zinc-500/10 opacity-100' : `${theme.border} opacity-50 hover:opacity-100`} glass-card`}
+                className={`group flex-1 flex flex-col items-center justify-center text-center p-8 rounded-3xl border-2 border-dashed ${isDragging ? 'border-zinc-500 bg-zinc-500/10 opacity-100' : `${theme.border} opacity-50 hover:opacity-100`} glass-card`}
               >
                 <input 
                   type="file" 

@@ -14,20 +14,27 @@ export const UploadGlareCard: React.FC<UploadGlareCardProps> = ({
   const containerRef = useRef<HTMLLabelElement>(null);
   const [isHovered, setIsHovered] = useState(false);
 
-  // Initialize CSS custom properties immediately on mount so they exist for the transition on the first hover
+  // Initialize CSS custom properties immediately on mount and detect if already hovered upon load
   useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.style.setProperty('--tilt-x', '0deg');
-      containerRef.current.style.setProperty('--tilt-y', '0deg');
-      containerRef.current.style.setProperty('--glare-x', '50%');
-      containerRef.current.style.setProperty('--glare-y', '50%');
-      containerRef.current.style.setProperty('--glare-angle', '135deg');
+    const el = containerRef.current;
+    if (!el) return;
+
+    el.style.setProperty('--tilt-x', '0deg');
+    el.style.setProperty('--tilt-y', '0deg');
+    el.style.setProperty('--glare-x', '50%');
+    el.style.setProperty('--glare-y', '50%');
+    el.style.setProperty('--glare-angle', '135deg');
+
+    // If mouse was already over the card when page reloaded
+    if (el.matches(':hover')) {
+      setIsHovered(true);
     }
   }, []);
 
-  const calculateAndApplyCoordinates = (e: React.MouseEvent<HTMLLabelElement>) => {
+  const calculateAndApplyCoordinates = (e: React.MouseEvent<HTMLLabelElement> | React.PointerEvent<HTMLLabelElement>) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
     
     // Calculate normalized relative position from 0 to 1
     const x = (e.clientX - rect.left) / rect.width;
@@ -37,8 +44,8 @@ export const UploadGlareCard: React.FC<UploadGlareCardProps> = ({
     const glareX = e.clientX - rect.left;
     const glareY = e.clientY - rect.top;
 
-    // Map 0 to 1 range to tilt degree (e.g. -5 degrees to +5 degrees)
-    const maxTilt = 5; 
+    // Map 0 to 1 range to tilt degree (e.g. -6 degrees to +6 degrees)
+    const maxTilt = 6; 
     const tiltX = (y - 0.5) * -maxTilt; 
     const tiltY = (x - 0.5) * maxTilt;
     const glareAngle = 135 + (tiltX + tiltY) * 2.5;
@@ -46,16 +53,20 @@ export const UploadGlareCard: React.FC<UploadGlareCardProps> = ({
     // Set styles synchronously on the Ref element for ultra-smooth responsiveness
     containerRef.current.style.setProperty('--glare-x', `${glareX}px`);
     containerRef.current.style.setProperty('--glare-y', `${glareY}px`);
-    containerRef.current.style.setProperty('--tilt-x', `${tiltX}deg`);
-    containerRef.current.style.setProperty('--tilt-y', `${tiltY}deg`);
-    containerRef.current.style.setProperty('--glare-angle', `${glareAngle}deg`);
+    containerRef.current.style.setProperty('--tilt-x', `${tiltX.toFixed(2)}deg`);
+    containerRef.current.style.setProperty('--tilt-y', `${tiltY.toFixed(2)}deg`);
+    containerRef.current.style.setProperty('--glare-angle', `${glareAngle.toFixed(1)}deg`);
+    containerRef.current.style.transform = `perspective(1000px) rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg) scale3d(1.008, 1.008, 1.008)`;
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLLabelElement>) => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLLabelElement> | React.PointerEvent<HTMLLabelElement>) => {
+    if (!isHovered) {
+      setIsHovered(true);
+    }
     calculateAndApplyCoordinates(e);
   };
 
-  const handleMouseEnter = (e: React.MouseEvent<HTMLLabelElement>) => {
+  const handleMouseEnter = (e: React.MouseEvent<HTMLLabelElement> | React.PointerEvent<HTMLLabelElement>) => {
     setIsHovered(true);
     calculateAndApplyCoordinates(e);
   };
@@ -69,6 +80,7 @@ export const UploadGlareCard: React.FC<UploadGlareCardProps> = ({
       containerRef.current.style.setProperty('--glare-x', '50%');
       containerRef.current.style.setProperty('--glare-y', '50%');
       containerRef.current.style.setProperty('--glare-angle', '135deg');
+      containerRef.current.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
     }
   };
 
@@ -85,6 +97,9 @@ export const UploadGlareCard: React.FC<UploadGlareCardProps> = ({
       onMouseMove={handleMouseMove}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onPointerMove={handleMouseMove}
+      onPointerEnter={handleMouseEnter}
+      onPointerLeave={handleMouseLeave}
       className={`relative overflow-hidden cursor-pointer select-none ${className}`}
       style={{
         transform: transformStyle,
@@ -92,7 +107,7 @@ export const UploadGlareCard: React.FC<UploadGlareCardProps> = ({
         transition: isDragging 
           ? 'transform 0.15s ease-out, border-color 0.2s, background-color 0.2s, opacity 0.3s'
           : isHovered 
-            ? 'transform 0.08s ease-out, border-color 0.2s, background-color 0.2s, opacity 0.3s' 
+            ? 'transform 0.06s ease-out, border-color 0.2s, background-color 0.2s, opacity 0.3s' 
             : 'transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.2s, background-color 0.2s, opacity 0.3s',
       }}
       {...props}

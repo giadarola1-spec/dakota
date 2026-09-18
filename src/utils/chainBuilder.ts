@@ -259,6 +259,41 @@ export const getCityState = (addr?: string): string => {
   return `${city}, ${state}`;
 };
 
+// Helpers to extract effective origin and destination addresses from data or data.stops
+export const getEffectiveOrigin = (data: Partial<ParsedRateCon>): string => {
+  if (data.originAddress && getState(data.originAddress) !== '??') {
+    return data.originAddress;
+  }
+  const puStop = data.stops?.find(s => s.type === 'pickup');
+  if (puStop?.address && getState(puStop.address) !== '??') {
+    return puStop.address;
+  }
+  if (data.stops && data.stops.length > 0 && getState(data.stops[0].address) !== '??') {
+    return data.stops[0].address;
+  }
+  return data.originAddress || "";
+};
+
+export const getEffectiveDest = (data: Partial<ParsedRateCon>): string => {
+  if (data.destinationAddress && getState(data.destinationAddress) !== '??') {
+    return data.destinationAddress;
+  }
+  const delStops = data.stops?.filter(s => s.type === 'delivery') || [];
+  if (delStops.length > 0) {
+    const lastDel = delStops[delStops.length - 1];
+    if (lastDel?.address && getState(lastDel.address) !== '??') {
+      return lastDel.address;
+    }
+  }
+  if (data.stops && data.stops.length > 1) {
+    const lastStop = data.stops[data.stops.length - 1];
+    if (lastStop?.address && getState(lastStop.address) !== '??') {
+      return lastStop.address;
+    }
+  }
+  return data.destinationAddress || "";
+};
+
 // Normalize date to various formats
 const formatDateHelper = (dateStr: string, separator: '.' | '/' | '-'): string => {
   if (!dateStr) return `MM${separator}DD${separator}YYYY`;
@@ -297,14 +332,17 @@ export function renderChainSubject(
     loadNum = loadNum.replace(/^T/i, '');
   }
 
-  const originState = getState(data.originAddress);
-  const destState = getState(data.destinationAddress);
+  const effectiveOrigin = getEffectiveOrigin(data);
+  const effectiveDest = getEffectiveDest(data);
+
+  const originState = getState(effectiveOrigin);
+  const destState = getState(effectiveDest);
   const lane = `${originState}-${destState}`;
 
-  const originCity = getCity(data.originAddress);
-  const destCity = getCity(data.destinationAddress);
-  const originCityState = getCityState(data.originAddress);
-  const destCityState = getCityState(data.destinationAddress);
+  const originCity = getCity(effectiveOrigin);
+  const destCity = getCity(effectiveDest);
+  const originCityState = getCityState(effectiveOrigin);
+  const destCityState = getCityState(effectiveDest);
 
   const rawDate = data.pickupDate || "";
   const dateDots = formatDateHelper(rawDate, '.');
