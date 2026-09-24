@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Upload, FileText, Copy, Check, RefreshCw, ChevronRight, ChevronLeft, Eye, Edit2, Menu, X, Sun, Moon, Shield, Info, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize, Hand, MousePointer, Sliders, Target, Zap, Search, TrendingUp, Mail, Truck, Building2, Plus, Trash2, Settings, Hash, ClipboardList, ExternalLink, Clock, Users, Phone, FileSpreadsheet, DollarSign, Headphones, ShieldAlert, Lock, ScrollText } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Set worker source to CDN for reliable production behavior
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs';
+// Set worker source to match the exact installed PDF.js version dynamically
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 import { parseRateConfirmation, ParsedRateCon, normalizeDateHelper } from './utils/parser';
 import { DottedMapBackground } from './components/DottedMapBackground';
