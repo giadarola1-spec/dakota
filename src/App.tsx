@@ -54,7 +54,7 @@ const WelcomeView: React.FC<WelcomeViewProps> = ({
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.location.reload()}>
             <DakotaLogo className="w-7 h-7" />
-            <span className="text-xl font-geologica font-bold tracking-tight text-white lowercase">dakota</span>
+            <span className="text-xl font-bold tracking-tight text-white lowercase">dakota</span>
           </div>
         </div>
       </header>
@@ -116,7 +116,7 @@ const WelcomeView: React.FC<WelcomeViewProps> = ({
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-6">
               <DakotaLogo className="w-6 h-6" />
-              <span className="text-xl font-geologica font-bold tracking-tight text-white lowercase">dakota</span>
+              <span className="text-xl font-bold tracking-tight text-white lowercase">dakota</span>
             </div>
             <p className="text-zinc-500 text-sm leading-relaxed max-w-xs mb-8">
               Designed for billing large scale traffix rate confirmations. Built for speed.
@@ -3725,7 +3725,7 @@ export default function App() {
         <div className="w-full px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setHasSeenWelcome(false)}>
             <DakotaLogo className="w-7 h-7" />
-            <h1 className={`text-2xl font-geologica font-bold tracking-tight ${theme.text} lowercase`}>dakota</h1>
+            <h1 className={`text-2xl font-bold tracking-tight ${theme.text} lowercase`}>dakota</h1>
           </div>
 
           {/* Header Search Bar */}
