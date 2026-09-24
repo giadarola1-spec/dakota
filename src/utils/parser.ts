@@ -1925,9 +1925,218 @@ function parseArrive(text: string): ParsedRateCon {
   return result;
 }
 
+export function parseEcho(rawText: string): ParsedRateCon {
+  const text = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const result: ParsedRateCon = {
+    loadNumber: "",
+    weight: "",
+    rate: "",
+    stops: [],
+    pickupTime: "",
+    pickupDate: "",
+    deliveryTime: "",
+    deliveryDate: "",
+    originAddress: "",
+    destinationAddress: "",
+    brokerName: "ECHO",
+    rawTextPreview: text.substring(0, 200) + "..."
+  };
+
+  // 1. Order / Load Number
+  const loadMatch = text.match(/\bORDER\s+(\d{7,10})\b/i)
+    || text.match(/Broker[’']?s\s*load\s*number\s*(\d{7,10})/i)
+    || text.match(/Service\s*for\s*Load\s*#\s*(\d{7,10})/i)
+    || text.match(/Load\s*Number\s*[:#]?\s*(\d{7,10})/i)
+    || text.match(/load\s*#\s*(\d{7,10})/i);
+  if (loadMatch) {
+    result.loadNumber = loadMatch[1].trim();
+  }
+
+  // 2. Pay / Rate Summary (Extract total from PAY SUMMARY or agreed Line Haul)
+  const paySummaryMatch = text.match(/PAY\s*SUMMARY[\s\S]*?(?=(?:Pickup|Drop|Terms|Signature|INSTRUCTIONS|Service\s*for\s*Load|$))/i);
+  const paySection = paySummaryMatch ? paySummaryMatch[0] : "";
+
+  const totalInPaySummary = paySection.match(/Total\s*[:]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d{3,6}(?:\.\d{2})?)/i);
+  const lineHaulInPaySummary = paySection.match(/Line\s*Haul\s*[:]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d{3,6}(?:\.\d{2})?)/i);
+
+  const totalGeneral = text.match(/PAY\s*SUMMARY[\s\S]*?Total\s*[:]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d{3,6}(?:\.\d{2})?)/i)
+    || text.match(/(?:Total\s*Pay|Total\s*Charges|Grand\s*Total|Total\s*Carrier\s*Pay)\s*[:]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d{3,6}(?:\.\d{2})?)/i)
+    || text.match(/Total\s+\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i);
+
+  const lineHaulGeneral = text.match(/Line\s*Haul(?:\s+\d+(?:\.\d+)?)?\s+\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d{3,6}(?:\.\d{2})?)/i);
+
+  let rawRate = "";
+  if (totalInPaySummary) {
+    rawRate = totalInPaySummary[1];
+  } else if (lineHaulInPaySummary) {
+    rawRate = lineHaulInPaySummary[1];
+  } else if (totalGeneral) {
+    rawRate = totalGeneral[1];
+  } else if (lineHaulGeneral) {
+    rawRate = lineHaulGeneral[1];
+  }
+
+  if (rawRate) {
+    const num = parseFloat(rawRate.replace(/,/g, ''));
+    if (!isNaN(num) && num > 0) {
+      result.rate = num % 1 === 0 ? num.toLocaleString('en-US') : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+  }
+
+  // 3. Weight
+  const weightMatch = text.match(/Weight\s*[:]?\s*(\d{1,3}(?:,\d{3})+|\d{3,6})/i);
+  if (weightMatch) {
+    const rawNum = weightMatch[1].replace(/,/g, '');
+    const parsed = parseInt(rawNum, 10);
+    if (!isNaN(parsed)) {
+      result.weight = `${parsed.toLocaleString('en-US')} LBS`;
+    }
+  }
+
+  // 4. Broker Email
+  const emailMatch = text.match(/Rep\s*Email\s*[:]?\s*([a-zA-Z0-9._%+-]+@echo\.com)/i)
+    || text.match(/([a-zA-Z0-9._%+-]+@echo\.com)/i);
+  if (emailMatch) {
+    result.brokerEmail = emailMatch[1].trim();
+  }
+
+  // 5. Stops (Pickup and Drop)
+  const stopHeaderRegex = /(?:^|\n|[.\s])(Pickup|Drop)(?:\s*#?\s*\d+)?(?!\s*(?:INSTRUCTIONS|Trailer))\b/gi;
+  const headerMatches = Array.from(text.matchAll(stopHeaderRegex));
+  const rawSections: { type: 'pickup' | 'delivery'; headerText: string; sectionText: string }[] = [];
+
+  if (headerMatches.length > 0) {
+    for (let i = 0; i < headerMatches.length; i++) {
+      const match = headerMatches[i];
+      const type = match[1].toLowerCase().includes("drop") ? "delivery" : "pickup";
+      const startIdx = (match.index || 0) + match[0].length;
+      const nextIdx = i < headerMatches.length - 1 ? (headerMatches[i + 1].index || text.length) : text.length;
+      let section = text.substring(startIdx, nextIdx);
+
+      const termsIdx = section.search(/\b(?:(?:Pickup|Drop)\s*INSTRUCTIONS|INVOICE\s*PAYMENT|SIGNATURE|withheld\s*if\s*this\s*Load)\b/i);
+      if (termsIdx !== -1) {
+        section = section.substring(0, termsIdx);
+      }
+      rawSections.push({ type, headerText: match[1], sectionText: section });
+    }
+  }
+
+  // Fallback if no clean header matches found
+  if (rawSections.length === 0) {
+    const dropIdx = text.search(/\b(?:Drop|Delivery|Consignee)\b(?!\s*(?:Trailer|INSTRUCTIONS))/i);
+    if (dropIdx !== -1) {
+      rawSections.push({ type: 'pickup', headerText: 'Pickup', sectionText: text.substring(0, dropIdx) });
+      rawSections.push({ type: 'delivery', headerText: 'Drop', sectionText: text.substring(dropIdx) });
+    }
+  }
+
+  let countMap = { pickup: 0, delivery: 0 };
+  for (const s of rawSections) {
+    const sec = s.sectionText;
+    const isPickup = s.type === 'pickup';
+    if (isPickup) countMap.pickup++;
+    else countMap.delivery++;
+    const num = isPickup ? countMap.pickup : countMap.delivery;
+    const label = isPickup ? `Pickup ${num}` : `Drop ${num}`;
+
+    // Earliest and Latest window matching (including Eearliest)
+    const earliestMatch = sec.match(/(?:E+arliest|Early)\s*[:.]?\s*(?:(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\s+)?(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i);
+    const latestMatch = sec.match(/Latest\s*[:.]?\s*(?:(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\s+)?(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i);
+
+    let date = "";
+    if (earliestMatch?.[1]) {
+      date = normalizeDateHelper(earliestMatch[1]);
+    } else if (latestMatch?.[1]) {
+      date = normalizeDateHelper(latestMatch[1]);
+    } else {
+      const anyDate = sec.match(/\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/);
+      if (anyDate) date = normalizeDateHelper(anyDate[1]);
+    }
+
+    let time = "";
+    const eTime = earliestMatch?.[2]?.trim() || "";
+    const lTime = latestMatch?.[2]?.trim() || "";
+    if (eTime && lTime) {
+      time = (eTime === lTime) ? eTime : `${eTime} - ${lTime}`;
+    } else {
+      time = eTime || lTime;
+    }
+
+    // Strict City, State Zip matching (requires 5-digit zip)
+    const cityStateZipRegex = /(?:^|\n|[,\t])\s*([A-Za-z][A-Za-z \t.-]{1,35}?)(?:,|\s+)\s*\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\b\s+(\d{5}(?:-\d{4})?)\b/i;
+    const addrMatch = sec.match(cityStateZipRegex)
+      || sec.match(/([A-Za-z][A-Za-z \t.-]{1,35}?)(?:,|\s+)\s*\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\b\s+(\d{5}(?:-\d{4})?)\b/i);
+
+    let address = "";
+    if (addrMatch) {
+      let rawCity = addrMatch[1].trim();
+      const st = addrMatch[2].toUpperCase();
+      const zip = addrMatch[3].trim();
+      if (rawCity.includes(",")) {
+        const parts = rawCity.split(",");
+        rawCity = parts[parts.length - 1].trim();
+      }
+      let cleanCity = rawCity
+        .replace(/\b(?:Earliest|Latest|Weight|Pieces|Pallets|Item|Drop|Pickup|PKU|DELV)\b.*$/i, "")
+        .replace(/^.*?\bc\/o\s+[A-Za-z0-9\s.-]+?\s+/i, "")
+        .replace(/^\d+\s+/, "")
+        .trim().toUpperCase();
+
+      address = `${cleanCity}, ${st} ${zip}`;
+    }
+
+    if (address || date || time) {
+      result.stops.push({
+        type: s.type,
+        label,
+        address,
+        date,
+        time
+      });
+    }
+  }
+
+  // Backup pickup date from verbal agreement line
+  if (!result.pickupDate) {
+    const moveDate = text.match(/moving\s*on\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i);
+    if (moveDate) {
+      result.pickupDate = normalizeDateHelper(moveDate[1]);
+    }
+  }
+
+  const pickups = result.stops.filter(st => st.type === 'pickup');
+  const deliveries = result.stops.filter(st => st.type === 'delivery');
+
+  if (pickups.length > 0) {
+    result.pickupTime = pickups[0].time;
+    if (!result.pickupDate && pickups[0].date) {
+      result.pickupDate = pickups[0].date;
+    }
+    result.originAddress = pickups[0].address;
+  }
+
+  if (deliveries.length > 0) {
+    const lastDel = deliveries[deliveries.length - 1];
+    result.deliveryTime = lastDel.time;
+    result.deliveryDate = lastDel.date;
+    result.destinationAddress = lastDel.address;
+  }
+
+  return result;
+}
+
 export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
   
+  // ECHO detection
+  const isEcho = lowerText.includes('echo global logistics') || 
+                 lowerText.includes('echodrive') || 
+                 lowerText.includes('@echo.com') || 
+                 (lowerText.includes('echo') && (lowerText.includes('echo rep') || lowerText.includes('pku#') || lowerText.includes('delv#') || lowerText.includes('load confirmation')));
+  if (isEcho) {
+    return parseEcho(text);
+  }
+
   // ARRIVE detection
   const isArrive = lowerText.includes('arrive logistics') || 
                    lowerText.includes('arrivelogistics.com') ||
@@ -2005,9 +2214,13 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
     // Handle cases like "480 Address: 711..." where a number from a previous field is caught
     cleaned = cleaned.replace(/^\d+\s+(?:ADDRESS|LOCATION|SHIPPER|CONSIGNEE|PICKUP|DELIVERY|REFERENCE\s*NUMBERS)[:\-]?\s*/i, "").trim();
 
-    // Strip leading DC/facility codes or stray leading numbers (e.g. "2042 5510 Exploration Dr" -> "5510 Exploration Dr")
-    cleaned = cleaned.replace(/^\d{2,4}\s+(?=\d{2,5}\s+[A-Za-z])/i, "").trim();
+    // Strip leading DC/facility codes or stray leading numbers (e.g. "2042 5510 Exploration Dr" -> "5510 Exploration Dr" or "260923 135 S...")
+    cleaned = cleaned.replace(/^\d{2,8}\s+(?=\d{1,5}\s+[A-Za-z])/i, "").trim();
     cleaned = cleaned.replace(/^\bDC\s*\d+\s+/i, "").trim();
+
+    // Strip c/o facility noise and date/time noise from address
+    cleaned = cleaned.replace(/,\s*c\/o\s+[^,]+/i, "").trim();
+    cleaned = cleaned.replace(/\b(?:Earliest|Latest)\s*[:.]?\s*[\d\s:/-]+/gi, "").trim();
 
     // Strip township or area noise before the main city (e.g., "5510 Exploration Dr, Decatur Indianapolis" -> "5510 Exploration Dr, Indianapolis")
     cleaned = cleaned.replace(/\bDecatur\s*,?\s+(?=Indianapolis\b)/gi, "").trim();

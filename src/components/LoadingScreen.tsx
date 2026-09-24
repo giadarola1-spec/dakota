@@ -30,22 +30,12 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ isDarkMode = true 
         transition={{ duration: 0.8, ease: "easeOut" }}
         className="relative z-10 flex flex-col items-center"
       >
-        {/* Header-identical Dakota Logo */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className={`text-4xl font-geologica font-bold tracking-tight ${
-              isDarkMode ? 'text-white' : 'text-zinc-900'
-            } lowercase`}>
-              dakota
-            </h1>
-            <div className="flex gap-2">
-              <div className="w-3.5 h-3.5 rounded-full bg-zinc-700 shadow-sm" />
-              <div className={`w-3.5 h-3.5 rounded-full shadow-sm border ${
-                isDarkMode ? 'bg-zinc-200 border-white/20' : 'bg-white border-zinc-200/50'
-              }`} />
-              <div className="w-3.5 h-3.5 rounded-full bg-zinc-400 shadow-sm" />
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <h1 className={`text-3xl font-geologica font-bold tracking-tight ${
+            isDarkMode ? 'text-white' : 'text-zinc-900'
+          }`}>
+            Rate Confirmation Tool
+          </h1>
         </div>
         
         <p className={`text-[10px] font-medium uppercase tracking-[0.4em] mt-6 ${

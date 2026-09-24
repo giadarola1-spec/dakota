@@ -546,6 +546,8 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
         escapedChars.push('\\s+');
       } else if (/[a-zA-Z0-9]/.test(ch)) {
         escapedChars.push(ch + '[^a-zA-Z0-9]*');
+      } else if (/[,.]/.test(ch)) {
+        escapedChars.push('(?:\\' + ch + ')?[^a-zA-Z0-9]*');
       } else {
         escapedChars.push('\\' + ch + '[^a-zA-Z0-9]*');
       }
@@ -3106,7 +3108,7 @@ export default function App() {
               <div className="flex items-center gap-2 ml-4">
                 <button 
                   onClick={() => {
-                    const brokersList = ["TRAFFIX", "CH ROBINSON", "LANDSTAR", "TQL", "NST", "OPENROAD", "ARRIVE"];
+                    const brokersList = ["TRAFFIX", "CH ROBINSON", "LANDSTAR", "TQL", "NST", "OPENROAD", "ARRIVE", "ECHO"];
                     const currentUpper = broker.toUpperCase();
                     let currentNormalized = "TRAFFIX";
                     if (currentUpper.includes("ROBINSON")) {
@@ -3121,6 +3123,8 @@ export default function App() {
                       currentNormalized = "OPENROAD";
                     } else if (currentUpper.includes("ARRIVE")) {
                       currentNormalized = "ARRIVE";
+                    } else if (currentUpper.includes("ECHO")) {
+                      currentNormalized = "ECHO";
                     } else if (currentUpper.includes("TRAFFIX")) {
                       currentNormalized = "TRAFFIX";
                     }
@@ -3388,7 +3392,7 @@ export default function App() {
                     <div className="pt-4 flex flex-col items-center gap-2">
                       <span className="text-[10px] font-bold tracking-wider uppercase opacity-40">Permitted Rate Confirmations</span>
                       <div className="flex flex-wrap justify-center gap-1.5 max-w-md px-4">
-                        {['Traffix', 'CH ROBINSON', 'North Star Transport', 'TQL', 'Landstar', 'OpenRoad', 'Arrive'].map((brokerName) => (
+                        {['Traffix', 'CH ROBINSON', 'North Star Transport', 'TQL', 'Landstar', 'OpenRoad', 'Arrive', 'Echo'].map((brokerName) => (
                           <span 
                             key={brokerName}
                             className={`px-2.5 py-0.5 text-[11px] font-medium rounded-full border ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-400' : 'bg-zinc-100/60 border-zinc-200 text-zinc-600'} transition-all`}

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Geologica:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geologica:wght@100..900&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -6,8 +6,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-display: "Inter", sans-serif;
-  --font-sans: "Inter", sans-serif;
+  --font-display: "Geologica", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: "Geologica", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-geologica: "Geologica", sans-serif;
   
   /* Liquid Glass Colors */
