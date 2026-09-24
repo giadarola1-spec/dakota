@@ -33,7 +33,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ isDarkMode = true 
         {/* Header-identical Dakota Logo */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
-            <h1 className={`text-4xl font-black tracking-tight ${
+            <h1 className={`text-4xl font-geologica font-bold tracking-tight ${
               isDarkMode ? 'text-white' : 'text-zinc-900'
             } lowercase`}>
               dakota
