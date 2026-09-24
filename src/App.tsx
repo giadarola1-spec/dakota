@@ -546,6 +546,8 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
         escapedChars.push('\\s+');
       } else if (/[a-zA-Z0-9]/.test(ch)) {
         escapedChars.push(ch + '[^a-zA-Z0-9]*');
+      } else if (ch === ',') {
+        escapedChars.push('(?:,\\s*)?');
       } else {
         escapedChars.push('\\' + ch + '[^a-zA-Z0-9]*');
       }
@@ -3106,7 +3108,7 @@ export default function App() {
               <div className="flex items-center gap-2 ml-4">
                 <button 
                   onClick={() => {
-                    const brokersList = ["TRAFFIX", "CH ROBINSON", "LANDSTAR", "TQL", "NST", "OPENROAD", "ARRIVE"];
+                    const brokersList = ["TRAFFIX", "CH ROBINSON", "LANDSTAR", "TQL", "NST", "OPENROAD", "ARRIVE", "ECHO"];
                     const currentUpper = broker.toUpperCase();
                     let currentNormalized = "TRAFFIX";
                     if (currentUpper.includes("ROBINSON")) {
@@ -3121,6 +3123,8 @@ export default function App() {
                       currentNormalized = "OPENROAD";
                     } else if (currentUpper.includes("ARRIVE")) {
                       currentNormalized = "ARRIVE";
+                    } else if (currentUpper.includes("ECHO")) {
+                      currentNormalized = "ECHO";
                     } else if (currentUpper.includes("TRAFFIX")) {
                       currentNormalized = "TRAFFIX";
                     }

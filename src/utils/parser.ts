@@ -1925,9 +1925,262 @@ function parseArrive(text: string): ParsedRateCon {
   return result;
 }
 
+export function parseEcho(text: string): ParsedRateCon {
+  const normText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  const result: ParsedRateCon = {
+    loadNumber: "",
+    weight: "",
+    rate: "",
+    stops: [],
+    pickupTime: "",
+    pickupDate: "",
+    deliveryTime: "",
+    deliveryDate: "",
+    originAddress: "",
+    destinationAddress: "",
+    brokerName: "ECHO",
+    rawTextPreview: normText.substring(0, 200) + "..."
+  };
+
+  // 1. Load Number / Order Number
+  // E.g. "ORDER 69104688", "ask for Load Number 69104688", "Broker’s load number 69104688", "Service for Load # 69104688"
+  const loadMatch = normText.match(/\bORDER\s+(\d{7,10})\b/i) ||
+                    normText.match(/Broker[’']?s\s*load\s*number\s*(\d{7,10})/i) ||
+                    normText.match(/Service\s*for\s*Load\s*#\s*(\d{7,10})/i) ||
+                    normText.match(/Load\s*Number\s*[:#]?\s*(\d{7,10})/i) ||
+                    normText.match(/load\s*#\s*(\d{7,10})/i);
+  if (loadMatch) {
+    result.loadNumber = loadMatch[1].trim();
+  }
+
+  // 2. Total Rate
+  // Echo pay summaries typically have "PAY SUMMARY", with "Total $1,700.00" or "Line Haul 1 $1,700.00 $1,700.00"
+  // Avoid matching the quantity/unit column (e.g. "1")
+  let rate = "";
+  const paySummarySection = normText.match(/PAY\s*SUMMARY[\s\S]*?(?=(?:Pickup|Drop|Terms|Signature|INSTRUCTIONS|$))/i)?.[0] || normText;
+
+  // 1st Priority: Explicit Total in PAY SUMMARY or whole document
+  const totalInPay = paySummarySection.match(/(?:Total\s*(?:Pay|Charges|Amount)?|Grand\s*Total|Agreed\s*Amount)\s*[:]?\s*\$?\s*(\d{1,3}(?:,\d{3})+(?:\.\d{2})?|\d{3,6}(?:\.\d{2})?)/i) ||
+                     normText.match(/(?:Total\s*Pay|Total\s*Charges|Grand\s*Total|Total\s*Carrier\s*Pay)\s*[:]?\s*\$?\s*(\d{1,3}(?:,\d{3})+(?:\.\d{2})?|\d{3,6}(?:\.\d{2})?)/i);
+  
+  // 2nd Priority: Line Haul amount (skipping quantity if present, e.g. "Line Haul 1 $1,700.00")
+  const lineHaulInPay = paySummarySection.match(/Line\s*Haul[^\$\n\r]*\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i) ||
+                        paySummarySection.match(/Line\s*Haul(?:\s+\d+(?:\.\d+)?)?\s+\$?\s*(\d{1,3}(?:,\d{3})+(?:\.\d{2})?|\d{3,6}(?:\.\d{2})?)/i);
+
+  // 3rd Priority: Any dollar amount >= 100 in the pay summary section
+  const anyDollarInPay = Array.from(paySummarySection.matchAll(/\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g))
+    .map(m => m[1])
+    .filter(val => {
+      const num = parseFloat(val.replace(/,/g, ''));
+      return !isNaN(num) && num >= 100;
+    });
+
+  if (totalInPay) {
+    rate = totalInPay[1];
+  } else if (lineHaulInPay) {
+    rate = lineHaulInPay[1];
+  } else if (anyDollarInPay.length > 0) {
+    rate = anyDollarInPay[anyDollarInPay.length - 1];
+  } else {
+    const fallbackRate = normText.match(/\$\s*(\d{1,3}(?:,\d{3})+(?:\.\d{2})?|\d{3,6}(?:\.\d{2})?)/);
+    if (fallbackRate) {
+      rate = fallbackRate[1];
+    }
+  }
+
+  if (rate) {
+    result.rate = rate.replace(/,/g, '');
+  }
+
+  // 3. Weight
+  const weightMatch = normText.match(/Weight\s*[:]?\s*(\d{1,3}(?:,\d{3})+|\d{3,6})/i);
+  if (weightMatch) {
+    const rawVal = weightMatch[1].replace(/,/g, '');
+    const num = parseInt(rawVal, 10);
+    if (!isNaN(num)) {
+      result.weight = `${num.toLocaleString()} LBS`;
+    }
+  }
+
+  // 4. Broker Contact Info
+  const repEmailMatch = normText.match(/Rep\s*Email\s*[:]?\s*([a-zA-Z0-9._%+-]+@echo\.com)/i) ||
+                        normText.match(/([a-zA-Z0-9._%+-]+@echo\.com)/i);
+  if (repEmailMatch) {
+    result.brokerEmail = repEmailMatch[1].trim();
+  }
+
+  // 5. Stops Segmentation
+  // Stop headers in Echo: "Pickup" and "Drop" (not followed by "INSTRUCTIONS" or "Trailer")
+  const stopHeaderRegex = /(?:^|\n|[.\s])(Pickup|Drop)(?:\s*#?\s*\d+)?(?!\s*(?:INSTRUCTIONS|Trailer))\b/gi;
+  const headerMatches = Array.from(normText.matchAll(stopHeaderRegex));
+
+  interface RawEchoStop {
+    type: 'pickup' | 'delivery';
+    headerText: string;
+    sectionText: string;
+  }
+
+  const rawSections: RawEchoStop[] = [];
+
+  if (headerMatches.length > 0) {
+    for (let i = 0; i < headerMatches.length; i++) {
+      const match = headerMatches[i];
+      const typeStr = match[1].toLowerCase();
+      const type = typeStr.includes('drop') ? 'delivery' : 'pickup';
+      const startIdx = (match.index || 0) + match[0].length;
+      const endIdx = (i < headerMatches.length - 1) ? (headerMatches[i + 1].index || normText.length) : normText.length;
+      
+      let sec = normText.substring(startIdx, endIdx);
+      // Truncate at instructions or terms/footer
+      const cutoff = sec.search(/\b(?:(?:Pickup|Drop)\s*INSTRUCTIONS|INVOICE\s*PAYMENT|SIGNATURE|withheld\s*if\s*this\s*Load)\b/i);
+      if (cutoff !== -1) {
+        sec = sec.substring(0, cutoff);
+      }
+
+      rawSections.push({
+        type,
+        headerText: match[1],
+        sectionText: sec
+      });
+    }
+  }
+
+  // Fallback: If no distinct headers found, split around Drop
+  if (rawSections.length === 0) {
+    const dropIdx = normText.search(/\b(?:Drop|Delivery|Consignee)\b(?!\s*(?:Trailer|INSTRUCTIONS))/i);
+    if (dropIdx !== -1) {
+      rawSections.push({
+        type: 'pickup',
+        headerText: 'Pickup',
+        sectionText: normText.substring(0, dropIdx)
+      });
+      rawSections.push({
+        type: 'delivery',
+        headerText: 'Drop',
+        sectionText: normText.substring(dropIdx)
+      });
+    }
+  }
+
+  let stopCount = { pickup: 0, delivery: 0 };
+
+  for (const rawSec of rawSections) {
+    const sec = rawSec.sectionText;
+    const isPickup = rawSec.type === 'pickup';
+    if (isPickup) stopCount.pickup++; else stopCount.delivery++;
+    const stopNum = isPickup ? stopCount.pickup : stopCount.delivery;
+    const label = isPickup ? `Pickup ${stopNum}` : `Drop ${stopNum}`;
+
+    // --- A. Earliest & Latest (Time & Date) ---
+    // User notes: "el pickup se encuentra debajo de la lista Pickup y empieza como Earliest y Latest, y el delivery debajo la lista Drop y empieza como Eearliest y Latest"
+    const earliestMatch = sec.match(/(?:E+arliest|Early)\s*[:.]?\s*(?:(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\s+)?(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i);
+    const latestMatch = sec.match(/Latest\s*[:.]?\s*(?:(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\s+)?(\d{1,2}:\d{2}(?:\s*(?:AM|PM))?)/i);
+
+    let date = "";
+    if (earliestMatch?.[1]) {
+      date = normalizeDateHelper(earliestMatch[1]);
+    } else if (latestMatch?.[1]) {
+      date = normalizeDateHelper(latestMatch[1]);
+    } else {
+      const fallbackDate = sec.match(/\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/);
+      if (fallbackDate) {
+        date = normalizeDateHelper(fallbackDate[1]);
+      }
+    }
+
+    let time = "";
+    const t1 = earliestMatch?.[2]?.trim() || "";
+    const t2 = latestMatch?.[2]?.trim() || "";
+    if (t1 && t2) {
+      time = (t1 === t2) ? t1 : `${t1} - ${t2}`;
+    } else {
+      time = t1 || t2;
+    }
+
+    // --- B. Address (MANDATORY REQUIREMENT: MUST HAVE ZIP CODE) ---
+    // User instruction: "Puedes notar que las direcciones siempre tienen el zip code, por ejemplo Junction city KS 66441, si no tiene zip code no es direccion"
+    // User clarification: "el highlight de lebanon IN 46052 muestra un monton de cosas mal, aunque el resultado es correcto, muestra todo esto 260923  135 S MOUNT ZION RD, c/o NIKE REBOUND, LEBANON, IN 46052 y solo deberia mostrar LEBANON, IN 46052."
+    const cszMatch = sec.match(/(?:^|\n|[,\t])\s*([A-Za-z][A-Za-z \t.-]{1,35}?)(?:,|\s+)\s*\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\b\s+(\d{5}(?:-\d{4})?)\b/i) ||
+                     sec.match(/([A-Za-z][A-Za-z \t.-]{1,35}?)(?:,|\s+)\s*\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY)\b\s+(\d{5}(?:-\d{4})?)\b/i);
+
+    let address = "";
+    if (cszMatch) {
+      let rawCity = cszMatch[1].trim();
+      const state = cszMatch[2].toUpperCase();
+      const zip = cszMatch[3].trim();
+
+      // If rawCity contains a comma, take the portion after the last comma
+      if (rawCity.includes(',')) {
+        const parts = rawCity.split(',');
+        rawCity = parts[parts.length - 1].trim();
+      }
+
+      // Clean city name of preceding labels/numbers/c/o
+      let cleanCity = rawCity
+        .replace(/\b(?:Earliest|Latest|Weight|Pieces|Pallets|Item|Drop|Pickup|PKU|DELV)\b.*$/i, '')
+        .replace(/^.*?\bc\/o\s+[A-Za-z0-9\s.-]+?\s+/i, '')
+        .replace(/^\d+\s+/, '')
+        .trim();
+
+      cleanCity = cleanCity.toUpperCase();
+      address = `${cleanCity}, ${state} ${zip}`;
+    } else {
+      // If no 5-digit zip code, reject as an address
+      address = "";
+    }
+
+    if (address || date || time) {
+      result.stops.push({
+        type: rawSec.type,
+        label,
+        address,
+        date,
+        time
+      });
+    }
+  }
+
+  // Moving date fallback from page 1 if pickup date missing
+  if (!result.pickupDate) {
+    const movingDateMatch = normText.match(/moving\s*on\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i);
+    if (movingDateMatch) {
+      result.pickupDate = normalizeDateHelper(movingDateMatch[1]);
+    }
+  }
+
+  const pickups = result.stops.filter(s => s.type === 'pickup');
+  const deliveries = result.stops.filter(s => s.type === 'delivery');
+
+  if (pickups.length > 0) {
+    result.pickupTime = pickups[0].time;
+    if (!result.pickupDate && pickups[0].date) {
+      result.pickupDate = pickups[0].date;
+    }
+    result.originAddress = pickups[0].address;
+  }
+  if (deliveries.length > 0) {
+    const lastDel = deliveries[deliveries.length - 1];
+    result.deliveryTime = lastDel.time;
+    result.deliveryDate = lastDel.date;
+    result.destinationAddress = lastDel.address;
+  }
+
+  return result;
+}
+
 export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
   
+  // ECHO detection
+  const isEcho = lowerText.includes('echo global logistics') || 
+                 lowerText.includes('echodrive') ||
+                 lowerText.includes('@echo.com') ||
+                 (lowerText.includes('echo') && (lowerText.includes('echo rep') || lowerText.includes('pku#') || lowerText.includes('delv#')));
+  if (isEcho) {
+    return parseEcho(text);
+  }
+
   // ARRIVE detection
   const isArrive = lowerText.includes('arrive logistics') || 
                    lowerText.includes('arrivelogistics.com') ||

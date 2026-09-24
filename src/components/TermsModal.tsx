@@ -139,7 +139,7 @@ export const TermsModal: React.FC<TermsModalProps> = ({
                 </p>
 
                 {/* Privacy Warning highlight Box */}
-                <div className="p-5 border-l-4 border-emerald-500 bg-emerald-500/5 rounded-r-2xl space-y-2">
+                <div className="p-4 border border-emerald-500/25 bg-emerald-500/5 rounded-xl space-y-2">
                   <span className="text-[10px] font-bold text-emerald-500 tracking-wider uppercase flex items-center gap-1.5">
                     <Check size={12} /> CRITICAL PRIVACY ASSURANCE
                   </span>
