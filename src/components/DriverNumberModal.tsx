@@ -79,7 +79,7 @@ export const DriverNumberModal: React.FC<DriverNumberModalProps> = ({
             </div>
             
             <div className="space-y-2">
-              <h2 className={`text-3xl font-display font-medium ${theme.text}`}>Driver Number</h2>
+              <h2 className={`text-3xl font-medium ${theme.text}`}>Driver Number</h2>
               <p className={`${theme.textMuted} text-sm max-w-[280px]`}>
                 Please enter the truck or driver number for this load.
               </p>

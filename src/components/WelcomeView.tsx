@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { DottedMapBackground } from './DottedMapBackground';
 
@@ -25,12 +25,20 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
   isDarkMode,
   theme
 }) => {
+  const [isDismissing, setIsDismissing] = useState(false);
+
+  const handleStart = () => {
+    if (isDismissing) return;
+    setIsDismissing(true);
+    onGetStarted();
+  };
+
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.05, filter: 'blur(20px)' }}
-      className="fixed inset-0 z-[200] bg-[#030723] text-white overflow-y-auto overflow-x-hidden font-sans"
+    <div 
+      className={`fixed inset-0 z-[200] bg-[#030723] text-white overflow-y-auto overflow-x-hidden font-sans transition-opacity duration-200 ${
+        isDismissing ? 'pointer-events-none opacity-0' : 'opacity-100'
+      }`}
+      style={isDismissing ? { opacity: 0, pointerEvents: 'none' } : undefined}
     >
       {/* Header */}
       <header className="sticky top-0 z-50 w-full bg-[#030723]/80 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between max-w-7xl mx-auto rounded-b-2xl shadow-2xl">
@@ -82,8 +90,10 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
                   </div>
                   {/* Green primary start action */}
                   <button
-                    onClick={onGetStarted}
-                    className="bg-[#2ea44f] hover:bg-[#2c974b] text-white px-8 py-4 h-[54px] font-bold text-[14.5px] transition-colors duration-200 cursor-pointer text-center flex items-center justify-center whitespace-nowrap rounded-b-lg sm:rounded-b-none sm:rounded-r-lg shadow-sm font-sans"
+                    type="button"
+                    onClick={handleStart}
+                    disabled={isDismissing}
+                    className="bg-[#2ea44f] hover:bg-[#2c974b] text-white px-8 py-4 h-[54px] font-bold text-[14.5px] transition-colors duration-200 cursor-pointer text-center flex items-center justify-center whitespace-nowrap rounded-b-lg sm:rounded-b-none sm:rounded-r-lg shadow-sm font-sans disabled:opacity-50"
                   >
                     Start Dakota
                   </button>
@@ -119,6 +129,6 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
           </div>
         </div>
       </footer>
-    </motion.div>
+    </div>
   );
 };

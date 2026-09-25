@@ -113,12 +113,12 @@ Kind regards.`;
     <div className="max-w-4xl mx-auto space-y-8 py-8 px-4">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className={`text-3xl font-display font-medium ${theme.text}`}>Templates</h2>
+          <h2 className={`text-3xl font-medium ${theme.text}`}>Templates</h2>
           <p className={`${theme.textMuted} text-sm`}>Quick status updates for your team</p>
         </div>
         <button 
           onClick={onBack}
-          className={`px-4 py-2 rounded-xl border ${theme.border} ${theme.textMuted} hover:${theme.text} hover:${theme.cardBg} transition-colors flex items-center gap-2 glass-button`}
+          className={`px-4 py-2 rounded-xl border ${theme.border} ${theme.textMuted} hover:${theme.text} hover:${theme.cardBg} transition-colors flex items-center gap-2`}
         >
           <ChevronLeft size={18} />
           Back
@@ -127,7 +127,7 @@ Kind regards.`;
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Pickup Template Card */}
-        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} p-6 shadow-sm flex flex-col space-y-4`}>
+        <div className={`${theme.cardBg} rounded-2xl border ${theme.border} p-6 shadow-sm flex flex-col space-y-4`}>
           <div className="flex items-center justify-between">
             <h3 className={`text-lg font-medium ${theme.text} flex items-center gap-2`}>
               <div className="w-2 h-2 rounded-full bg-emerald-500" /> Pickup Template
@@ -196,7 +196,7 @@ Kind regards.`;
         </div>
 
         {/* Delivery Template Card */}
-        <div className={`${theme.cardBg} glass-card rounded-2xl border ${theme.border} p-6 shadow-sm flex flex-col space-y-4`}>
+        <div className={`${theme.cardBg} rounded-2xl border ${theme.border} p-6 shadow-sm flex flex-col space-y-4`}>
           <div className="flex items-center justify-between">
             <h3 className={`text-lg font-medium ${theme.text} flex items-center gap-2`}>
               <div className="w-2 h-2 rounded-full bg-zinc-500" /> Delivery Template

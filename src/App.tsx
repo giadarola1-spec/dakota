@@ -7,7 +7,6 @@ import * as pdfjsLib from 'pdfjs-dist';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs';
 
 import { parseRateConfirmation, ParsedRateCon, normalizeDateHelper } from './utils/parser';
-import { DottedMapBackground } from './components/DottedMapBackground';
 import { LoadingScreen } from './components/LoadingScreen';
 import { DriverNumberModal } from './components/DriverNumberModal';
 import { ChainEditorModal } from './components/ChainEditorModal';
@@ -2324,19 +2323,19 @@ export default function App() {
   const hasCustomWallpaper = Boolean(wallpaperConfig.enabled && wallpaperConfig.imageData && hasSeenWelcome && termsStatus === 'accepted');
 
   const theme = React.useMemo(() => ({
-    bg: isDarkMode ? 'bg-[#0a0d17]' : 'bg-[#f4f6fa]',
+    bg: isDarkMode ? 'bg-[#08090b]' : 'bg-[#f4f6fa]',
     text: isDarkMode ? 'text-white' : 'text-zinc-900',
     textMuted: isDarkMode ? 'text-zinc-400' : 'text-zinc-600',
-    border: isDarkMode ? (hasCustomWallpaper ? 'border-white/10' : 'border-zinc-800') : (hasCustomWallpaper ? 'border-zinc-300/60' : 'border-zinc-200/90'),
-    cardBg: isDarkMode ? 'bg-[#111626]' : 'bg-white',
-    cardHover: isDarkMode ? 'hover:bg-[#1a2035]' : 'hover:bg-zinc-50',
-    inputBg: isDarkMode ? (hasCustomWallpaper ? 'bg-[#1a2035]/50' : 'bg-[#1a2035]') : (hasCustomWallpaper ? 'bg-zinc-100/70' : 'bg-[#ebedf3]'),
+    border: isDarkMode ? (hasCustomWallpaper ? 'border-white/10' : 'border-white/[0.08]') : (hasCustomWallpaper ? 'border-zinc-300/60' : 'border-zinc-200/90'),
+    cardBg: isDarkMode ? 'bg-[#0c0d11]' : 'bg-white',
+    cardHover: isDarkMode ? 'hover:bg-[#121418]' : 'hover:bg-zinc-50',
+    inputBg: isDarkMode ? (hasCustomWallpaper ? 'bg-[#121418]/60' : 'bg-[#111216]') : (hasCustomWallpaper ? 'bg-zinc-100/70' : 'bg-[#ebedf3]'),
     headerBg: hasCustomWallpaper
-      ? (isDarkMode ? 'bg-[#0a0d17]/25' : 'bg-[#f4f6fa]/40')
-      : (isDarkMode ? 'bg-[#0a0d17]/80' : 'bg-[#f4f6fa]/90'),
+      ? (isDarkMode ? 'bg-[#08090b]/40' : 'bg-[#f4f6fa]/40')
+      : (isDarkMode ? 'bg-[#08090b]/90' : 'bg-[#f4f6fa]/90'),
     accent: isDarkMode ? 'text-white' : 'text-zinc-900',
-    accentBg: isDarkMode ? 'bg-zinc-700' : 'bg-zinc-900',
-    accentHover: isDarkMode ? 'hover:bg-zinc-600' : 'hover:bg-zinc-800',
+    accentBg: isDarkMode ? 'bg-white text-zinc-950' : 'bg-zinc-900 text-white',
+    accentHover: isDarkMode ? 'hover:bg-zinc-200' : 'hover:bg-zinc-800',
   }), [isDarkMode, hasCustomWallpaper]);
 
   const processPdfData = async (pdf: any) => {
@@ -3204,25 +3203,34 @@ export default function App() {
 
       <AnimatePresence>
         {!hasSeenWelcome && (
-          <WelcomeView 
-            onGetStarted={() => setHasSeenWelcome(true)} 
-            team={team} 
-            setTeam={setTeam} 
-            isDarkMode={isDarkMode} 
-            theme={theme} 
-          />
+          <motion.div
+            key="welcome-view-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, pointerEvents: 'none' }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="fixed inset-0 z-[200]"
+          >
+            <WelcomeView 
+              onGetStarted={() => setHasSeenWelcome(true)} 
+              team={team} 
+              setTeam={setTeam} 
+              isDarkMode={isDarkMode} 
+              theme={theme} 
+            />
+          </motion.div>
         )}
       </AnimatePresence>
 
       {isDarkMode && (
         <div className="atmospheric-bg">
-          <div className="atmosphere-orb w-[600px] h-[600px] bg-blue-900/10 -top-[200px] -left-[100px]" />
-          <div className="atmosphere-orb w-[500px] h-[500px] bg-slate-800/10 bottom-[10%] -right-[100px]" style={{ animationDelay: '-5s' }} />
-          <div className="atmosphere-orb w-[400px] h-[400px] bg-indigo-950/5 top-[40%] left-[20%]" style={{ animationDelay: '-12s' }} />
+          {/* Subtle top-center illumination like the Sentient X reference */}
+          <div className="absolute -top-[150px] left-1/2 -translate-x-1/2 w-[900px] h-[550px] bg-white/[0.025] rounded-full blur-[140px] pointer-events-none" />
+          <div className="absolute top-[40%] left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-white/[0.015] rounded-full blur-[120px] pointer-events-none" />
         </div>
       )}
       <AnimatePresence>
-        {isLoading && <LoadingScreen isDarkMode={isDarkMode} />}
+        {isLoading && <LoadingScreen key="loading-screen" isDarkMode={isDarkMode} />}
       </AnimatePresence>
 
       {/* Local Custom Wallpaper (Active on Home, Verify, Results, etc. - Not Welcome) */}
@@ -3232,26 +3240,21 @@ export default function App() {
           isDarkMode={isDarkMode} 
         />
       )}
-
-      {/* Dotted map background - hidden when custom wallpaper is active */}
-      {!hasCustomWallpaper && (
-        <DottedMapBackground className="fixed inset-0" color={isDarkMode ? "#1e2235" : "#cbd5e1"} />
-      )}
       
       {/* Update Announcement Banner */}
       {showBanner && (
-        <div className="w-full flex-none bg-[#0a182e] text-blue-100/95 font-sans py-2.5 px-6 border-b border-blue-900/40 select-none z-30 relative shadow-lg flex items-center justify-between gap-3 animate-fade-in backdrop-blur-md">
+        <div className="w-full flex-none bg-[#0c0d11]/95 text-zinc-300 font-sans py-2.5 px-6 border-b border-white/[0.08] select-none z-30 relative shadow-lg flex items-center justify-between gap-3 animate-fade-in backdrop-blur-md">
           <div className="flex-grow flex items-center justify-center gap-2 text-center text-xs font-medium tracking-wide md:flex-row flex-col">
-            <span className="font-bold uppercase tracking-wider text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-md border border-blue-400/20 shrink-0">
+            <span className="font-bold uppercase tracking-wider text-[10px] bg-white/10 text-white px-2 py-0.5 rounded-md border border-white/15 shrink-0 font-mono">
               New Update (0724)
             </span>
-            <span className="text-zinc-200">
+            <span className="text-zinc-300">
               Various errors and bugs fixed in this version
             </span>
           </div>
           <button 
             onClick={handleDismissBanner}
-            className="text-blue-400 hover:text-white p-1.5 rounded-xl hover:bg-blue-500/10 border border-transparent hover:border-blue-500/20 transition-all ml-2 flex-none inline-flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase cursor-pointer select-none"
+            className="text-zinc-400 hover:text-white p-1.5 rounded-xl hover:bg-white/10 border border-transparent hover:border-white/10 transition-all ml-2 flex-none inline-flex items-center gap-1 text-[10px] font-bold tracking-wide uppercase cursor-pointer select-none"
             title="Dismiss update banner"
           >
             <span>Dismiss</span>
@@ -3260,94 +3263,133 @@ export default function App() {
         </div>
       )}
       
-      {/* Header */}
-      <header className={`border-b ${appState === 'verify' ? 'border-zinc-700' : theme.border} sticky top-0 z-20 ${theme.headerBg} ${hasCustomWallpaper ? 'backdrop-blur-2xl shadow-xs' : 'backdrop-blur-md'} transition-all duration-300 flex-none border-x-0 border-t-0 rounded-none relative`}>
-        <div className="w-full px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setHasSeenWelcome(false)}>
-            <DakotaLogo className="w-7 h-7" />
-            <h1 className={`text-2xl font-geologica font-bold tracking-tight ${theme.text} lowercase`}>dakota</h1>
-          </div>
-
-          {/* Header Search Bar */}
-          <div className="flex-1 max-w-md mx-8 hidden sm:block">
-            <div className="relative group">
-              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${theme.textMuted} group-focus-within:text-zinc-500 transition-colors`} size={18} />
-              <input 
-                type="text"
-                placeholder="Search history (Load #, Broker, Route)..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  if (appState !== 'history' && e.target.value.length > 0) {
-                    setAppState('history');
-                  }
-                }}
-                className={`w-full pl-10 pr-4 py-2 rounded-xl border ${theme.border} ${theme.inputBg} ${theme.text} text-sm focus:outline-none focus:border-zinc-500/50 focus:ring-4 focus:ring-zinc-500/5 transition-all ${hasCustomWallpaper ? 'backdrop-blur-md shadow-xs' : ''}`}
-              />
-            </div>
-          </div>
+      {/* Sentient X Style Header: Centered, Full Black, 2px borders, no rounded pills */}
+      <header className="sticky top-0 z-30 w-full px-4 sm:px-6 py-3.5 flex-none transition-all duration-300">
+        <div className="max-w-7xl mx-auto flex items-center justify-center">
           
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setAppState('templates')}
-              className={`p-2 rounded-xl transition-all ${appState === 'templates' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
-              title="Templates"
+          {/* Centered Floating Bar (Brand + Navigation Tabs + Menu) */}
+          <div className="flex items-center gap-2 sm:gap-3.5 px-3.5 py-1.5 rounded-[2px] border border-white/10 bg-black shadow-2xl backdrop-blur-xl">
+            
+            {/* Wordmark & Logo - clicking this takes the user to where HOME used to take them */}
+            <div 
+              className="flex items-center gap-2.5 cursor-pointer pr-1 select-none group"
+              onClick={() => {
+                if (appState !== 'upload') {
+                  setAppState('upload');
+                } else {
+                  setHasSeenWelcome(false);
+                }
+              }}
+              title={appState !== 'upload' ? 'Back to upload' : 'Return to Welcome'}
             >
-              <ClipboardList size={20} />
-            </button>
-            <button 
-              onClick={() => setAppState('history')}
-              className={`p-2 rounded-xl transition-all ${appState === 'history' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
-              title="History"
-            >
-              <Search size={20} />
-            </button>
-            <button 
-              onClick={() => setAppState('manage')}
-              className={`p-2 rounded-xl transition-all ${appState === 'manage' ? 'bg-zinc-800 text-white shadow-lg shadow-zinc-950/25' : `${theme.textMuted} hover:${theme.cardBg} hover:${theme.text}`}`}
-              title="Drivers"
-            >
-              <Users size={20} />
-            </button>
+              <DakotaLogo className="w-5 h-5 flex-none group-hover:scale-105 transition-transform" />
+              <span className={`font-geologica font-bold text-sm tracking-tight ${theme.text} lowercase flex items-center`}>
+                dakota
+              </span>
+            </div>
 
-            <div className="flex items-center gap-4">
-            {appState !== 'upload' && (
-              <div className={`hidden md:flex items-center gap-2 text-xs font-medium ${theme.textMuted} ${hasCustomWallpaper ? (isDarkMode ? 'bg-black/30 backdrop-blur-md' : 'bg-white/40 backdrop-blur-md') : theme.cardBg} px-3 py-1.5 rounded-full border ${theme.border}`}>
-                <span className={appState === 'verify' ? 'text-zinc-500 dark:text-zinc-400 font-bold' : ''}>Verify</span>
-                <ChevronRight size={12} />
-                <span className={appState === 'results' ? 'text-zinc-500 dark:text-zinc-400 font-bold' : ''}>Results</span>
+            <div className={`w-px h-4 ${isDarkMode ? 'bg-white/10' : 'bg-zinc-200'} hidden sm:block`} />
+
+            {/* Navigation Tabs (Single-line controls with 2px borders) */}
+            <nav className="hidden md:flex items-center gap-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setAppState('upload')}
+                className={`px-3 py-1.5 rounded-[2px] transition-all font-medium whitespace-nowrap cursor-pointer ${
+                  appState === 'upload'
+                    ? (isDarkMode ? 'bg-white/15 text-white font-semibold' : 'bg-zinc-900 text-white')
+                    : `${theme.textMuted} hover:${theme.text} hover:bg-white/[0.04]`
+                }`}
+              >
+                Upload
+              </button>
+              <button
+                type="button"
+                onClick={() => setAppState('templates')}
+                className={`px-3 py-1.5 rounded-[2px] transition-all font-medium whitespace-nowrap cursor-pointer ${
+                  appState === 'templates'
+                    ? (isDarkMode ? 'bg-white/15 text-white font-semibold' : 'bg-zinc-900 text-white')
+                    : `${theme.textMuted} hover:${theme.text} hover:bg-white/[0.04]`
+                }`}
+              >
+                Templates
+              </button>
+              <button
+                type="button"
+                onClick={() => setAppState('history')}
+                className={`px-3 py-1.5 rounded-[2px] transition-all font-medium whitespace-nowrap cursor-pointer ${
+                  appState === 'history'
+                    ? (isDarkMode ? 'bg-white/15 text-white font-semibold' : 'bg-zinc-900 text-white')
+                    : `${theme.textMuted} hover:${theme.text} hover:bg-white/[0.04]`
+                }`}
+              >
+                History
+              </button>
+              <button
+                type="button"
+                onClick={() => setAppState('manage')}
+                className={`px-3 py-1.5 rounded-[2px] transition-all font-medium whitespace-nowrap cursor-pointer ${
+                  appState === 'manage'
+                    ? (isDarkMode ? 'bg-white/15 text-white font-semibold' : 'bg-zinc-900 text-white')
+                    : `${theme.textMuted} hover:${theme.text} hover:bg-white/[0.04]`
+                }`}
+              >
+                Drivers
+              </button>
+            </nav>
+
+            {/* Verification / Results indicator if mid-flow */}
+            {appState !== 'upload' && appState !== 'templates' && appState !== 'history' && appState !== 'manage' && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-[2px] bg-white/[0.06] text-[11px] font-mono border border-white/[0.06]">
+                <span className={appState === 'verify' ? 'text-white font-bold' : 'text-zinc-500'}>Verify</span>
+                <ChevronRight size={10} className="text-zinc-600" />
+                <span className={appState === 'results' ? 'text-white font-bold' : 'text-zinc-500'}>Results</span>
               </div>
             )}
-            
-            <button 
-              onClick={() => setIsMenuOpen(true)}
-              className={`p-2 rounded-lg hover:${theme.cardBg} transition-colors`}
+
+            <div className={`w-px h-4 ${isDarkMode ? 'bg-white/10' : 'bg-zinc-200'}`} />
+
+            {/* Search Trigger Button */}
+            <button
+              type="button"
+              onClick={() => {
+                if (appState !== 'history') setAppState('history');
+              }}
+              className={`p-1.5 rounded-[2px] ${theme.textMuted} hover:${theme.text} hover:bg-white/[0.05] transition-colors cursor-pointer`}
+              title="Search History"
             >
-              <Menu size={24} className={theme.textMuted} />
+              <Search size={16} />
+            </button>
+
+            {/* Hamburger Menu Icon (matches ☰ in screenshot) */}
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(true)}
+              className={`p-1.5 rounded-[2px] ${theme.textMuted} hover:${theme.text} hover:bg-white/[0.05] transition-colors cursor-pointer`}
+              title="Open Navigation Menu"
+            >
+              <Menu size={18} />
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* Progress Bar Line */}
-      {appState === 'verify' && (
-        <div key={`progress-${pdfLoadNumber || 'nav'}`} className="absolute bottom-0 left-0 right-0 h-[2px] bg-zinc-400/20 dark:bg-zinc-800/50 overflow-hidden">
-          <motion.div 
-            initial={{ width: 0 }}
-            animate={{ 
-              width: (currentSteps.length > 0) 
-                ? `${(currentStepIndex / currentSteps.length) * 100}%` 
-                : '0%' 
-            }}
-            transition={{ type: "spring", stiffness: 50, damping: 15 }}
-            className={`h-full ${isDarkMode ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'bg-zinc-900'} relative z-10`}
-          >
-            {/* Glossy lead effect */}
-            {isDarkMode && <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-r from-transparent to-white/30" />}
-          </motion.div>
         </div>
-      )}
-    </header>
+
+        {/* Verification Progress Line */}
+        {appState === 'verify' && (
+          <div key={`progress-${pdfLoadNumber || 'nav'}`} className="max-w-7xl mx-auto mt-2 h-[2px] bg-zinc-800/60 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ 
+                width: (currentSteps.length > 0) 
+                  ? `${(currentStepIndex / currentSteps.length) * 100}%` 
+                  : '0%' 
+              }}
+              transition={{ type: "spring", stiffness: 50, damping: 15 }}
+              className="h-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.7)]"
+            />
+          </div>
+        )}
+      </header>
 
       {/* Main Layout */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 relative z-10 flex flex-col">
@@ -3361,46 +3403,68 @@ export default function App() {
             className="max-w-7xl mx-auto w-full flex-1 flex flex-col"
           >
             {appState === 'upload' && (
-              <UploadGlareCard 
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                isDragging={isDragging}
-                className={`group flex-1 flex flex-col items-center justify-center text-center p-8 rounded-3xl border-2 border-dashed ${isDragging ? 'border-zinc-500 bg-zinc-500/10 opacity-100' : `${theme.border} opacity-50 hover:opacity-100`} glass-card`}
-              >
-                <input 
-                  type="file" 
-                  accept=".pdf" 
-                  onChange={handleFileUpload}
-                  className="hidden" 
-                />
-                <div className={`w-24 h-24 rounded-full ${theme.cardBg} border ${theme.border} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm ${isDragging ? 'border-zinc-500 text-zinc-500' : ''} glass-card`}>
-                  <Upload size={40} className={isDragging ? 'text-zinc-500' : theme.textMuted} />
-                </div>
-                <div className="space-y-2">
-                  <h2 className={`text-xl font-medium ${isDragging ? 'text-zinc-500' : theme.text}`}>
-                    {isDragging ? 'Drop PDF here' : 'No Document Selected'}
-                  </h2>
-                  <p className={`text-sm ${theme.textMuted}`}>
-                    {isDragging ? 'Release to upload' : 'Click or drag PDF here to upload'}
-                  </p>
-                  {!isDragging && (
-                    <div className="pt-4 flex flex-col items-center gap-2">
-                      <span className="text-[10px] font-bold tracking-wider uppercase opacity-40">Permitted Rate Confirmations</span>
-                      <div className="flex flex-wrap justify-center gap-1.5 max-w-md px-4">
-                        {['Traffix', 'CH ROBINSON', 'North Star Transport', 'TQL', 'Landstar', 'OpenRoad', 'Arrive'].map((brokerName) => (
-                          <span 
-                            key={brokerName}
-                            className={`px-2.5 py-0.5 text-[11px] font-medium rounded-full border ${isDarkMode ? 'bg-zinc-900/40 border-zinc-800 text-zinc-400' : 'bg-zinc-100/60 border-zinc-200 text-zinc-600'} transition-all`}
-                          >
-                            {brokerName}
-                          </span>
-                        ))}
-                      </div>
+              <div className="flex-1 flex flex-col items-center justify-center text-center relative py-6 md:py-10 max-w-4xl mx-auto w-full">
+                {/* Glare Dropzone styled with deep matte obsidian aesthetic */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="w-full max-w-xl mx-auto"
+                >
+                  <UploadGlareCard 
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    isDragging={isDragging}
+                    className={`group w-full flex flex-col items-center justify-center text-center p-8 sm:p-12 rounded-[28px] border transition-all ${
+                      isDragging 
+                        ? 'border-white/40 bg-[#12141a] shadow-2xl scale-[1.01]' 
+                        : 'border-white/[0.08] hover:border-white/25 bg-[#0c0d11]/85 shadow-2xl backdrop-blur-xl'
+                    }`}
+                  >
+                    <input 
+                      type="file" 
+                      accept=".pdf" 
+                      onChange={handleFileUpload} 
+                      className="hidden" 
+                    />
+                    
+                    {/* Concentric upload circle */}
+                    <div className="w-20 h-20 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center group-hover:scale-105 group-hover:border-white/20 transition-all duration-300 shadow-inner mb-2 relative">
+                      <div className="absolute inset-0 rounded-2xl bg-white/[0.02] blur-md group-hover:bg-white/[0.05] transition-colors" />
+                      <Upload size={32} className={isDragging ? 'text-white' : 'text-zinc-400 group-hover:text-white transition-colors'} />
                     </div>
-                  )}
-                </div>
-              </UploadGlareCard>
+
+                    <div className="space-y-2 mt-2">
+                      <h2 className="text-lg sm:text-xl font-semibold text-white tracking-tight">
+                        {isDragging ? 'Drop Rate Confirmation Here' : 'Drop PDF or Click to Browse'}
+                      </h2>
+                      <p className="text-xs text-zinc-400 max-w-sm mx-auto font-light leading-relaxed">
+                        {isDragging ? 'Release file to start instant extraction' : 'Extract broker, load number, rate, stops, and dispatch chains locally'}
+                      </p>
+
+                      {!isDragging && (
+                        <div className="pt-6 border-t border-white/[0.06] mt-4 flex flex-col items-center gap-2.5">
+                          <span className="text-[10px] font-mono tracking-widest uppercase text-zinc-500 font-semibold">
+                            Supported Brokers
+                          </span>
+                          <div className="flex flex-wrap justify-center gap-1.5 max-w-md px-2">
+                            {['Traffix', 'CH Robinson', 'North Star', 'TQL', 'Landstar', 'OpenRoad', 'Arrive'].map((brokerName) => (
+                              <span 
+                                key={brokerName}
+                                className="px-2.5 py-0.5 text-[11px] font-mono rounded-md border border-white/[0.07] bg-white/[0.02] text-zinc-400"
+                              >
+                                {brokerName}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </UploadGlareCard>
+                </motion.div>
+
+              </div>
             )}
             {appState === 'verify' && renderVerification()}
             {appState === 'results' && renderResults()}
