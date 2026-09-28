@@ -1925,9 +1925,195 @@ function parseArrive(text: string): ParsedRateCon {
   return result;
 }
 
+function parseEcho(text: string): ParsedRateCon {
+  // Normalize line endings
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  const result: ParsedRateCon = {
+    loadNumber: "",
+    weight: "",
+    rate: "",
+    stops: [],
+    pickupTime: "",
+    pickupDate: "",
+    deliveryTime: "",
+    originAddress: "",
+    destinationAddress: "",
+    brokerName: "ECHO",
+    brokerEmail: "",
+    rawTextPreview: text.substring(0, 200) + "..."
+  };
+
+  // 1. Load Number / Order Number
+  const loadMatch = text.match(/(?:ORDER|Load\s*Number|Broker[’']s\s*load\s*number|Service\s*for\s*Load\s*#)\s*[:#]?\s*(\d{7,10})/i) ||
+                    text.match(/\bORDER\s*(\d{7,10})/i) ||
+                    text.match(/\b(\d{8})\b/);
+  if (loadMatch) {
+    result.loadNumber = loadMatch[1].trim();
+  }
+
+  // 2. Weight
+  const weightMatch = text.match(/Weight\s*[:]?\s*(\d+(?:,\d{3})*|\d+)/i);
+  if (weightMatch) {
+    const rawVal = weightMatch[1].replace(/,/g, '');
+    const num = parseInt(rawVal, 10);
+    if (!isNaN(num)) {
+      result.weight = num.toLocaleString('en-US') + " LBS";
+    }
+  }
+
+  // 3. Rate from PAY SUMMARY (Total & Line Haul)
+  const paySummaryIdx = text.search(/PAY\s*SUMMARY/i);
+  if (paySummaryIdx !== -1) {
+    const payBlock = text.substring(paySummaryIdx, paySummaryIdx + 300);
+    const totalMatch = payBlock.match(/Total\s*[:]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i);
+    const lineHaulMatch = payBlock.match(/Line\s*Haul\s*[:]?\s*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i);
+    if (totalMatch) {
+      result.rate = totalMatch[1].replace(/,/g, '');
+    } else if (lineHaulMatch) {
+      result.rate = lineHaulMatch[1].replace(/,/g, '');
+    }
+  }
+
+  if (!result.rate) {
+    const totalTableMatch = text.match(/Total\s*[:]?\s*\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i) ||
+                            text.match(/Line\s*Haul\s*[:]?\s*\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i);
+    if (totalTableMatch) {
+      result.rate = totalTableMatch[1].replace(/,/g, '');
+    }
+  }
+
+  // 4. Broker Email
+  const repEmailMatch = text.match(/Rep\s*Email\s*[:]?\s*([a-zA-Z0-9._%+-]+@echo\.com)/i);
+  if (repEmailMatch) {
+    result.brokerEmail = repEmailMatch[1].trim();
+  } else {
+    const genericEmailMatch = text.match(/([a-zA-Z0-9._%+-]+@echo\.com)/i);
+    if (genericEmailMatch) {
+      result.brokerEmail = genericEmailMatch[1].trim();
+    }
+  }
+
+  // 5. Stops (Pickup and Drop)
+  const usStatesPattern = "AL|AK|AS|AZ|AR|CA|CO|CT|DE|DC|FM|FL|GA|GU|HI|ID|IL|IN|IA|KS|KY|LA|ME|MH|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|MP|OH|OK|OR|PW|PA|PR|RI|SC|SD|TN|TX|UT|VT|VI|VA|WA|WV|WI|WY";
+  const cityStateZipRegex = new RegExp(`\\b([A-Za-z][A-Za-z\\s.-]{1,30})[\\s,]+\\b(${usStatesPattern})\\b\\s+(\\d{5})\\b`, "i");
+
+  // Locate Pickup and Drop stop headers
+  const markerRegex = /(?:^|\n)\s*(Pickup|Drop)\s*(?:\n|$)/gi;
+  const markers: { type: 'pickup' | 'delivery'; index: number }[] = [];
+  let m: RegExpExecArray | null;
+
+  while ((m = markerRegex.exec(text)) !== null) {
+    const isPick = m[1].toLowerCase() === 'pickup';
+    const idx = m.index + m[0].indexOf(m[1]);
+    markers.push({
+      type: isPick ? 'pickup' : 'delivery',
+      index: idx
+    });
+  }
+
+  for (let i = 0; i < markers.length; i++) {
+    const curr = markers[i];
+    const nextIdx = (i < markers.length - 1) ? markers[i + 1].index : text.length;
+    let block = text.substring(curr.index, nextIdx);
+
+    const cutoffMatch = block.match(/\b(?:Pickup\s*INSTRUCTIONS|Drop\s*INSTRUCTIONS|INVOICE\s*PAYMENT|SUBMIT\s*INVOICE|compliance\s*with)\b/i);
+    if (cutoffMatch && cutoffMatch.index !== undefined) {
+      block = block.substring(0, cutoffMatch.index);
+    }
+
+    // Strict 5-digit ZIP validation
+    const addrMatch = block.match(cityStateZipRegex);
+    let address = "";
+    if (addrMatch) {
+      let rawCity = addrMatch[1].trim();
+      rawCity = rawCity.replace(/^(?:Earliest|Latest|Drop|Pickup|Pieces|Pallets|Weight|DELV|PKU|Item)[\s:]*/i, '').trim();
+      const cityLines = rawCity.split(/\n/);
+      rawCity = cityLines[cityLines.length - 1].trim();
+      rawCity = rawCity.replace(/^[^a-zA-Z]+/, '').replace(/[^a-zA-Z]+$/, '');
+      const state = addrMatch[2].toUpperCase();
+      const zip = addrMatch[3];
+      address = `${rawCity.toUpperCase()}, ${state} ${zip}`;
+    }
+
+    // Earliest / Eearliest / Latest
+    const earliestMatch = block.match(/(?:E+arliest|Earliest)\s*[:]?\s*(?:(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\s+)?(\d{1,2}:\d{2})/i);
+    const latestMatch = block.match(/Latest\s*[:]?\s*(?:(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\s+)?(\d{1,2}:\d{2})/i);
+
+    let date = "";
+    if (earliestMatch && earliestMatch[1]) {
+      date = normalizeDateHelper(earliestMatch[1]);
+    } else if (latestMatch && latestMatch[1]) {
+      date = normalizeDateHelper(latestMatch[1]);
+    } else {
+      const genericDate = block.match(/\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/);
+      if (genericDate) date = normalizeDateHelper(genericDate[1]);
+    }
+
+    let time = "";
+    const startTime = earliestMatch ? earliestMatch[2] : "";
+    const endTime = latestMatch ? latestMatch[2] : "";
+
+    if (startTime && endTime) {
+      if (startTime === endTime) {
+        time = startTime;
+      } else {
+        time = `${startTime} - ${endTime}`;
+      }
+    } else if (startTime) {
+      time = startTime;
+    } else if (endTime) {
+      time = endTime;
+    }
+
+    const type = curr.type;
+    const sameTypeCount = result.stops.filter(s => s.type === type).length;
+    const label = type === 'pickup' 
+      ? (sameTypeCount === 0 ? 'Pickup' : `Pickup ${sameTypeCount + 1}`)
+      : (sameTypeCount === 0 ? 'Delivery' : `Delivery ${sameTypeCount + 1}`);
+
+    if (address || date || time) {
+      result.stops.push({
+        type,
+        address,
+        date,
+        time,
+        label
+      });
+    }
+  }
+
+  // Populate top-level fields
+  const pickups = result.stops.filter(s => s.type === 'pickup');
+  const deliveries = result.stops.filter(s => s.type === 'delivery');
+
+  if (pickups.length > 0) {
+    result.pickupDate = pickups[0].date;
+    result.pickupTime = pickups[0].time;
+    result.originAddress = pickups[0].address;
+  }
+  if (deliveries.length > 0) {
+    const lastDel = deliveries[deliveries.length - 1];
+    result.deliveryTime = lastDel.time;
+    result.deliveryDate = lastDel.date;
+    result.destinationAddress = lastDel.address;
+  }
+
+  return result;
+}
+
 export function parseRateConfirmation(text: string): ParsedRateCon {
   const lowerText = text.toLowerCase();
   
+  // ECHO detection
+  const isEcho = lowerText.includes('echo global logistics') || 
+                 lowerText.includes('@echo.com') ||
+                 lowerText.includes('echodrive') ||
+                 (lowerText.includes('echo') && (lowerText.includes('load confirmation') || lowerText.includes('echo rep') || lowerText.includes('order 69')));
+  if (isEcho) {
+    return parseEcho(text);
+  }
+
   // ARRIVE detection
   const isArrive = lowerText.includes('arrive logistics') || 
                    lowerText.includes('arrivelogistics.com') ||

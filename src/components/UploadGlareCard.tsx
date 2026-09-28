@@ -134,7 +134,7 @@ export const UploadGlareCard: React.FC<UploadGlareCardProps> = ({
 
       {/* Primary child content container on separated depth plane to highlight 3D parallax */}
       <div 
-        className="w-full h-full flex flex-col items-center justify-center relative z-20 space-y-6"
+        className="w-full h-full flex flex-col items-center justify-center relative z-20 space-y-6 sm:space-y-8 md:space-y-10"
         style={{
           transform: isHovered && !isDragging ? 'translateZ(6px)' : 'translateZ(0px)',
           transition: 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)',

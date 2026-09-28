@@ -1,6 +1,6 @@
 {
   "name": "Dakota",
-  "description": "Extracts data from Rate Confirmation PDFs and sends it to Google Sheets.",
+  "description": "Extracts data from Rate Confirmation PDFs and sends it to Google Sheets, featuring Dakota+ AI hybrid parsing.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
