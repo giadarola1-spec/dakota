@@ -538,6 +538,23 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
       }
     }
 
+    // 2.5 Time Range Matching (e.g. "08:00 - 15:00" -> matches "08:00 - 09/29/2026 15:00" or "08:00 - 15:00")
+    const timeRangeMatch = raw.match(/^(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})(?:\s*[A-Z]{3})?$/i);
+    if (timeRangeMatch) {
+      const t1 = timeRangeMatch[1];
+      const t2 = timeRangeMatch[2];
+      const spanRegex = new RegExp(`(${t1}[\\s\\S]{0,40}?${t2})`, 'gi');
+      const spanMatches = [...lowerCombined.matchAll(spanRegex)];
+      if (spanMatches.length > 0) {
+        return { index: spanMatches[0].index!, length: spanMatches[0][0].length };
+      }
+      const singleRegex = new RegExp(`\\b${t1}\\b`, 'gi');
+      const singleMatches = [...lowerCombined.matchAll(singleRegex)];
+      if (singleMatches.length > 0) {
+        return { index: singleMatches[0].index!, length: singleMatches[0][0].length };
+      }
+    }
+
     // 3. Literal Text Match (safely escaped)
     const escapedChars: string[] = [];
     for (let i = 0; i < raw.length; i++) {
@@ -579,6 +596,16 @@ const PdfViewer = ({ pdfDocument, highlightText, isDarkMode, isAutoZoomEnabled, 
           return !/[a-z0-9]/i.test(charBefore);
         }) || fuzzyMatches[0];
         return { index: best.index!, length: best[0].length };
+      }
+    }
+
+    // 5. Multi-part Address fallback (e.g. "5100 33RD STREET SE, GR RPDS, MI 49512")
+    if (raw.includes(',')) {
+      const parts = raw.split(',').map(p => p.trim()).filter(p => p.length >= 4);
+      for (const part of parts) {
+        if (/^[A-Za-z]{2}\s+\d{5}/.test(part)) continue;
+        const partMatch = findMatchInCombinedText(part, combinedText);
+        if (partMatch) return partMatch;
       }
     }
 
