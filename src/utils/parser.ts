@@ -563,216 +563,113 @@ function parseLandstar(text: string): ParsedRateCon {
     pickupTime: "",
     pickupDate: "",
     deliveryTime: "",
-    deliveryDate: "",
     originAddress: "",
     destinationAddress: "",
     brokerName: "LANDSTAR",
     rawTextPreview: text.substring(0, 200) + "..."
   };
 
-  // 1. Load Number
-  // Handles:
-  // "Freight Bill #: 1704950", "Freight Bill # 1704950", "Freight Bill: 1704950"
-  // "FB #: 1704950", "EL # EL10420551", "EL #: 10420551"
-  const loadMatch = text.match(/Freight\s*Bill\s*(?:#|No\.?|Number)?\s*[:.]?\s*([A-Z0-9-]+)/i) ||
-                    text.match(/FB\s*#\s*[:.]?\s*([A-Z0-9-]+)/i) ||
-                    text.match(/EL\s*#\s*[:.]?\s*([A-Z0-9-]+)/i) ||
-                    text.match(/\bEL[:\s]+(EL\d+|\d{6,})/i);
-  if (loadMatch) {
-    result.loadNumber = loadMatch[1].trim();
-  }
+  // Load Number
+  // Freight Bill # 3101610 or EL # EL10420551
+  const loadMatch = text.match(/Freight\s*Bill\s*#\s*(\d+)/i) || 
+                    text.match(/EL\s*#\s*(EL\d+)/i) ||
+                    text.match(/EL\s*#\s*(\d+)/i);
+  if (loadMatch) result.loadNumber = loadMatch[1];
 
-  // 2. Broker Contact Email
-  const emailMatch = text.match(/(?:Contact\s*Email|Email)\s*[:]?\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i) ||
-                    text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-  if (emailMatch) {
-    result.brokerEmail = emailMatch[1].trim();
-  }
-
-  // 3. Weight extraction
+  // Weight extraction (Collect all and pick max, consistent with Robinson preference)
   const weightMatches: number[] = [];
-  
-  // 3a. Explicit weight labels: "Weight: 40,000", "Wgt: 40,000", "Gross Wt: 40,000", "Est Wgt: 40,000"
-  const landstarWeightRegex = /(?:Wgt|Weight|Gross\s*Weight|Est\s*Wgt|Total\s*Weight)\s*[:]?\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/gi;
+  const landstarWeightRegex = /(?:Wgt|Weight)\s*[:]?\s*(\d{1,3}(?:[,\s]\d{3})*(?:\.\d+)?)/gi;
   let wMatch;
   while ((wMatch = landstarWeightRegex.exec(text)) !== null) {
     const val = parseFloat(wMatch[1].replace(/[,\s]/g, ''));
-    if (!isNaN(val) && val > 10 && val <= 80000) weightMatches.push(val);
+    if (!isNaN(val) && val > 10) weightMatches.push(val);
   }
-
-  // 3b. Commodity table header:
-  // e.g. "Item ID Hazmat Description Qty Weight Class Dimensions" followed by row "CGAPP No CONSUMER GOODS... 40,000 C"
-  const tableHeaderMatch = text.match(/(?:Item\s*ID[\s\S]*?Weight[\s\S]*?Dimensions|Weight\s+Class\s+Dimensions|Weight\s+Class)/i);
-  if (tableHeaderMatch && tableHeaderMatch.index !== undefined) {
-    const tableText = text.substring(tableHeaderMatch.index, Math.min(tableHeaderMatch.index + 600, text.length));
-    const tableNums = tableText.matchAll(/\b(\d{1,3}(?:,\d{3})+|\d{4,5})\b(?:\s*([A-Za-z]\b|lbs?))?/gi);
-    for (const tn of tableNums) {
-      const val = parseFloat(tn[1].replace(/[,\s]/g, ''));
-      if (!isNaN(val) && val >= 500 && val <= 80000) {
-        weightMatches.push(val);
-      }
-    }
-  }
-
-  // 3c. Fallback for weight with class or lbs: e.g. "40,000 C" or "40,000 LBS"
-  const classWeightMatch = text.matchAll(/\b(\d{1,3},\d{3})\s+(?:[A-Z]\b|LBS|lbs)/gi);
-  for (const cwm of classWeightMatch) {
-    const val = parseFloat(cwm[1].replace(/[,\s]/g, ''));
-    if (!isNaN(val) && val >= 500 && val <= 80000) {
-      weightMatches.push(val);
-    }
-  }
-
   if (weightMatches.length > 0) {
     result.weight = Math.max(...weightMatches).toLocaleString() + " LBS";
   }
 
-  // 4. Rate
-  let foundRate = "";
-  // Strategy 4a: Within "Agreed Rate" section (prioritize "Total $1,000.00" over "Pay Capacity")
-  const agreedRateSectionMatch = text.match(/Agreed\s*Rate[\s\S]*?(?:Important\s*Billing\s*Instructions|PAPERWORK\s*SUBMISSION|Notes\b|$)/i);
-  if (agreedRateSectionMatch) {
-    const agreedText = agreedRateSectionMatch[0];
-    const totalMatch = agreedText.match(/Total\s*[:]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i);
-    const chargeMatch = agreedText.match(/(?:Pay\s*Capacity|Charge)\s*[:]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i);
-    if (totalMatch) {
-      foundRate = totalMatch[1].replace(/,/g, '');
-    } else if (chargeMatch) {
-      foundRate = chargeMatch[1].replace(/,/g, '');
-    }
-  }
+  // Rate
+  const rateMatch = text.match(/Total\s*[:]?\s*\$?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/Charge\s*\$?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i) ||
+                    text.match(/Agreed\s*Rate[\s\S]*?Charge[\s\S]*?\$?\s*(\d+(?:[,\s]\d{3})*(?:\.\d{2})?)/i);
+  if (rateMatch) result.rate = rateMatch[1].replace(/[,\s]/g, '');
 
-  // Strategy 4b: "Total $1,000.00" with explicit dollar sign (so it doesn't match "Total Miles")
-  if (!foundRate) {
-    const totalDollarMatch = text.match(/Total\s*[:]?\s*\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i);
-    if (totalDollarMatch) {
-      foundRate = totalDollarMatch[1].replace(/,/g, '');
-    }
-  }
+  // Stops
+  // Stop #1 Pickup - 
+  const stopsRaw = text.split(/(?=Stop\s*#\d+\s*(?:Pickup|Drop|Delivery|Drop-off))/i);
+  stopsRaw.forEach(section => {
+    const isPickup = /Stop\s*#\d+\s*Pickup/i.test(section);
+    const isDelivery = /Stop\s*#\d+\s*(?:Drop|Delivery|Drop-off)/i.test(section);
+    
+    if (isPickup || isDelivery) {
+      const type = isPickup ? 'pickup' : 'delivery';
+      const labelMatch = section.match(/Stop\s*#\d+\s*(?:Pickup|Drop|Delivery|Drop-off)/i);
+      const label = labelMatch ? labelMatch[0].trim() : (isPickup ? 'Pickup' : 'Delivery');
 
-  // Strategy 4c: "Pay Capacity $1,000.00" or "Charge $1,000.00"
-  if (!foundRate) {
-    const chargeMatch = text.match(/(?:Pay\s*Capacity|Charge)\s*[:]?\s*\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i);
-    if (chargeMatch) {
-      foundRate = chargeMatch[1].replace(/,/g, '');
-    }
-  }
-
-  if (foundRate) {
-    result.rate = foundRate;
-  }
-
-  // 5. Stops
-  // Find all stop headers like "Stop #1 Origin", "Stop #2 Destination", "Stop #1 Pickup", "Stop #2 Delivery", etc.
-  const stopHeaderRegex = /\b(Stop\s*#\s*(\d+)(?:\s*(?:Origin|Destination|Pickup|Delivery|Drop|Drop-off|Shipper|Receiver))?)\b/gi;
-  const stopMatches = Array.from(text.matchAll(stopHeaderRegex));
-
-  if (stopMatches.length > 0) {
-    for (let i = 0; i < stopMatches.length; i++) {
-      const match = stopMatches[i];
-      const headerLine = match[1].trim();
-
-      const start = match.index || 0;
-      let end = text.length;
-      if (i < stopMatches.length - 1) {
-        end = stopMatches[i + 1].index || text.length;
-      } else {
-        // Last stop: truncate before billing instructions or notes if present
-        const termsIndex = text.substring(start).search(/\b(?:Agreed\s*Rate|Important\s*Billing\s*Instructions|PAPERWORK\s*SUBMISSION|Notes\b|TOTAL\s*CARRIER\s*PAYS|Thank\s*you\s*for\s*doing\s*business|Freight\s*Bill\s*#\s*:\s*\d+\s+Page\s+\d+)\b/i);
-        if (termsIndex !== -1) {
-          end = start + termsIndex;
-        }
-      }
-
-      const section = text.substring(start, end);
-
-      // Determine Stop Type
-      const isPickup = /Origin|Pickup|Pick-up|Shipper|PU\b/i.test(headerLine) || (i === 0 && !/Destination|Delivery|Drop|Consignee|Receiver|DEL\b/i.test(headerLine));
-      const type: 'pickup' | 'delivery' = isPickup ? 'pickup' : 'delivery';
-      const label = headerLine;
-
-      // Extract Target Window (Date & Time)
-      // Handles:
-      // "Target Window: 09/29/2026 08:00 - 09/29/2026 15:00"
-      // "Target Window 05/06/2026 06:00 - 05/06/2026 06:00"
-      // "Target Window: 09/29/2026 08:00 - 15:00"
-      // "Target Window: 09/29/2026 08:00"
+      // Date & Time from "Target Window"
+      // Target Window 05/06/2026 06:00 - 05/06/2026 06:00
+      const windowMatch = section.match(/Target\s*Window\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})(?:\s*(\d{1,2}:\d{2}))?\s*[-–]\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})?(?:\s*(\d{1,2}:\d{2}))?/i);
       let date = "";
       let time = "";
-
-      const windowMatch = section.match(/Target\s*Window\s*[:]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})(?:\s*(\d{1,2}:\d{2}))?\s*(?:[-–]\s*(?:(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\s*)?(\d{1,2}:\d{2}))?/i);
       if (windowMatch) {
-        date = normalizeDateHelper(windowMatch[1]);
-        const startTime = windowMatch[2];
-        const endTime = windowMatch[4];
-        if (startTime && endTime && startTime !== endTime) {
-          time = `${startTime} - ${endTime}`;
-        } else if (startTime) {
-          time = startTime;
-        }
+         date = normalizeDateHelper(windowMatch[1]);
+         const startTime = windowMatch[2];
+         const endTime = windowMatch[4];
+         if (startTime && endTime && startTime !== endTime) {
+           time = `${startTime} - ${endTime}`;
+         } else if (startTime) {
+           time = startTime;
+         }
       }
 
-      // Fallback date/time if Target Window didn't capture both
-      if (!date) {
-        const dMatch = section.match(/\b(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})\b/);
-        if (dMatch) date = normalizeDateHelper(dMatch[1]);
-      }
-      if (!time) {
-        const tRangeMatch = section.match(/(\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2})/);
-        if (tRangeMatch) {
-          time = tRangeMatch[1];
-        } else {
-          const singleTMatch = section.match(/\b(\d{1,2}:\d{2})\b/);
-          if (singleTMatch) time = singleTMatch[1];
-        }
-      }
-
-      // Extract Address
-      // In Landstar, address lines usually follow Location:
-      // Address: 5100 33RD STREET SE
-      // Address: GR RPDS MI 49512
-      let address = "";
-      const preComment = section.split(/\b(?:Directions|Comment|Comments|Special\s*Instructions|PU#|DO#)\b/i)[0];
-      const addrRegex = /\bAddress\s*[:]?\s*(.*?)(?=\s*(?:\b(?:Address|Location|Contact|Phone|Directions|Comment|Comments|Notes|PU#|DO#|Stop\s*#)\b|$|\n))/gi;
-      const addrMatches = Array.from(preComment.matchAll(addrRegex));
-
-      const addressLines: string[] = [];
-      for (const am of addrMatches) {
-        let line = am[1].trim();
-        line = line.replace(/\s+(?:Contact|Phone|Directions|Comment|Notes)[:].*$/i, '').trim();
-        if (line.length > 1) {
-          addressLines.push(line);
-        }
-      }
-
-      if (addressLines.length > 0) {
-        const formattedParts: string[] = [];
-        for (const line of addressLines) {
-          // Check for "City State Zip" without comma: e.g. "GR RPDS MI 49512" or "LEBANON IN 46052"
-          const cityStZipMatch = line.match(/^([A-Za-z\s.]+?)\s+\b([A-Z]{2})\b\s+(\d{5}(?:-\d{4})?)$/);
-          if (cityStZipMatch && !line.includes(',')) {
-            formattedParts.push(`${cityStZipMatch[1].trim()}, ${cityStZipMatch[2].trim()} ${cityStZipMatch[3].trim()}`);
-          } else {
-            formattedParts.push(line);
+      // Address extraction
+      let addressParts: string[] = [];
+      
+      // Split the section by known labels to isolate address components
+      const blocks = section.split(/\b(?:Stop\s*#\d+|Target\s*Window|Location|Address|Contact|Phone|Notes|Item|Qty|Wgt|Appoint)\b/i);
+      blocks.forEach(b => {
+        let clean = b.trim();
+        if (clean.length > 2) {
+          // Remove trailing/leading punctuation specifically for Landstar headers
+          clean = clean.replace(/^[:\-\s,]+|[:\-\s,]+$/g, "");
+          if (clean && !addressParts.includes(clean)) {
+            addressParts.push(clean);
           }
         }
-        address = formattedParts.join(', ');
-      }
+      });
 
-      // Fallback address logic
-      if (!address) {
-        const streetMatch = preComment.match(/\b(\d{1,5}\s+[A-Za-z0-9\s.]{3,35}?(?:STREET|ST|AVE|AVENUE|RD|ROAD|BLVD|DR|DRIVE|WAY|LN|LANE|CT|CIR))\b/i);
-        const cityStateZipMatch = preComment.match(/\b([A-Za-z\s.]+?)\s+\b([A-Z]{2})\b\s+(\d{5}(?:-\d{4})?)\b/);
-        if (streetMatch && cityStateZipMatch) {
-          address = `${streetMatch[1].trim()}, ${cityStateZipMatch[1].trim()}, ${cityStateZipMatch[2].trim()} ${cityStateZipMatch[3].trim()}`;
-        } else if (cityStateZipMatch) {
-          address = `${cityStateZipMatch[1].trim()}, ${cityStateZipMatch[2].trim()} ${cityStateZipMatch[3].trim()}`;
-        } else if (streetMatch) {
-          address = streetMatch[1].trim();
+      // Per user request: Favor the part that contains "City, ST Zip"
+      // We use case-insensitive matching for the city name to avoid missing parts due to OCR case errors
+      let cityStateZip = "";
+      for (const part of addressParts) {
+        // High confidence match: "City, ST 12345" or "City, ST" 
+        // We look for at least 3 letters for city name, a comma, and a 2-letter state code
+        if (part.match(/\b[A-Za-z\s\.]{3,},\s*[A-Z]{2}\b/i)) {
+          cityStateZip = part;
+          break;
         }
       }
 
-      if (address || date || time) {
+      let address = cityStateZip || addressParts.filter(p => p.length > 5 && !p.match(/^\d+$/)).join(", ");
+
+      // Fallback address logic if labels are messy
+      if (!address) {
+        const lines = section.split('\n');
+        const startIdx = lines.findIndex(l => /Stop\s*#\d+/i.test(l));
+        if (startIdx !== -1) {
+          for (let i = 1; i < 8; i++) {
+            const line = lines[startIdx + i]?.trim();
+            if (line && line.length > 5 && !/Stop|Window|Date|Time|Appoint|Contact|Phone|Notes|Item|Qty|Wgt/i.test(line)) {
+              if (line.match(/\b[A-Za-z\s]+,\s*[A-Z]{2}\b/i) || line.match(/\b[A-Z]{2}\s+\d{4,5}/)) {
+                address = line;
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      if (address) {
         result.stops.push({
           type,
           address,
@@ -782,9 +679,8 @@ function parseLandstar(text: string): ParsedRateCon {
         });
       }
     }
-  }
+  });
 
-  // Populate top-level fields
   if (result.stops.length > 0) {
     const pickups = result.stops.filter(s => s.type === 'pickup');
     const deliveries = result.stops.filter(s => s.type === 'delivery');
@@ -793,22 +689,11 @@ function parseLandstar(text: string): ParsedRateCon {
       result.pickupTime = pickups[0].time;
       result.pickupDate = pickups[0].date;
       result.originAddress = pickups[0].address;
-    } else {
-      result.pickupTime = result.stops[0].time;
-      result.pickupDate = result.stops[0].date;
-      result.originAddress = result.stops[0].address;
     }
-
     if (deliveries.length > 0) {
       const lastDel = deliveries[deliveries.length - 1];
       result.deliveryTime = lastDel.time;
-      result.deliveryDate = lastDel.date;
       result.destinationAddress = lastDel.address;
-    } else if (result.stops.length > 1) {
-      const lastStop = result.stops[result.stops.length - 1];
-      result.deliveryTime = lastStop.time;
-      result.deliveryDate = lastStop.date;
-      result.destinationAddress = lastStop.address;
     }
   }
 
@@ -2074,7 +1959,7 @@ export function parseRateConfirmation(text: string): ParsedRateCon {
   }
 
   // Landstar detection
-  const isLandstar = lowerText.includes('landstar') || lowerText.includes('freight bill');
+  const isLandstar = lowerText.includes('landstar') || lowerText.includes('freight bill #');
   if (isLandstar) {
     return parseLandstar(text);
   }
